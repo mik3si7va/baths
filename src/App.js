@@ -8,7 +8,7 @@ function App() {
         <img src={logo} className="App-logo" alt="logo" />
         <br />
         <p>
-          Get ready to start Coding! 😜
+          Get ready to start Coding! 😜 <a href="/login">  Login</a>
         </p>
       </header>
     </div>
