@@ -1,70 +1,131 @@
-# Getting Started with Create React App
+🛁✂️ Baths & Trims — Project Backbone
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+Este repositório contém o backbone inicial do projeto Baths & Trims.
+O objetivo não é entregar uma app final, mas sim fornecer uma base sólida sobre a qual o resto do trabalho vai evoluir.
 
-## Available Scripts
+Pensa nisto como o chassis do projeto: rotas, autenticação fake, layout base e organização geral.
 
-In the project directory, you can run:
+🚀 Como correr o projeto
 
-### `npm start`
+Clonar o repositório
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+git clone <repo-url>
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
 
-### `npm test`
+Instalar dependências
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+npm install
 
-### `npm run build`
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+Iniciar o projeto
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+npm start
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
 
-### `npm run eject`
+O projeto corre por defeito em:
+👉 http://localhost:3000
 
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
+🔐 Login (modo desenvolvimento)
 
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+Este projeto usa autenticação fake apenas para efeitos de desenvolvimento.
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
+Credenciais:
 
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
+Username: admin
 
-## Learn More
+Password: password
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+Após login:
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+o utilizador é redirecionado para /home
 
-### Code Splitting
+o estado de autenticação é guardado em localStorage
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
+🧭 Estrutura geral do projeto
+src/
+ ├─ pages/
+ │   ├─ home/
+ │   │   ├─ home.js
+ │   │   └─ home.css
+ │   ├─ login/
+ │   │   ├─ login.js
+ │   │   └─ login.css
+ │
+ ├─ routes.js      // definição das rotas + guards
+ ├─ App.js
+ ├─ index.js
 
-### Analyzing the Bundle Size
+📌 Onde mexer
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
+Home page: src/pages/home
 
-### Making a Progressive Web App
+Login page: src/pages/login
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
+Rotas / Guards: src/routes.js
 
-### Advanced Configuration
+🛡️ Sistema de Rotas
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
+O projeto já inclui:
 
-### Deployment
+Rotas públicas
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
+/login
 
-### `npm run build` fails to minify
+Se não estiver autenticado → mostra login
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+Se já estiver autenticado → redireciona para /home
+
+Rotas privadas
+
+/home
+
+Só acessível se estiver autenticado
+
+Caso contrário → redireciona para /login
+
+Este comportamento está implementado em:
+
+PrivateRoute
+
+PublicLoginRoute
+
+no ficheiro routes.js.
+
+⚠️ Regras simples (importantes)
+
+Para manter o projeto estável:
+
+Cada feature numa branch
+
+PR obrigatório para merge
+
+Não mexer em routes.js sem avisar a equipa
+
+Estas regras evitam conflitos e retrabalho.
+
+🎯 Objetivo desta fase
+
+Nesta fase o foco é:
+
+perceber a estrutura do projeto
+
+entender o fluxo de login → home
+
+explorar o código existente
+
+👉 Não é esperado que tudo seja alterado de imediato.
+👉 Primeiro “sink in”, depois evoluímos.
+
+🧠 Nota final
+
+Este backbone existe para:
+
+evitar começar do zero
+
+garantir que todos trabalham sobre a mesma base
+
+permitir evolução progressiva do projeto
+
+Mais funcionalidades virão de forma incremental.
+
+Boa exploração 👀🚀
