@@ -1,47 +1,37 @@
-🛁✂️ Baths & Trims — Project Backbone
+# 🛁✂️ Baths & Trims — Project Backbone
 
 Este repositório contém o backbone inicial do projeto Baths & Trims.
 O objetivo não é entregar uma app final, mas sim fornecer uma base sólida sobre a qual o resto do trabalho vai evoluir.
 
 Pensa nisto como o chassis do projeto: rotas, autenticação fake, layout base e organização geral.
 
-🚀 Como correr o projeto
+## Elementos da equipa
 
-Clonar o repositório
+- Gonçalo Rodrigues as "Gonçalo_Rodrigues | Goncalo-Dias-Rodrigues"
 
-git clone <repo-url>
+## 🚀 Como correr o projeto
 
-
-Instalar dependências
-
-npm install
-
-
-Iniciar o projeto
-
-npm start
+1. Clonar o repositório
+    - git clone "repo-url"
+2. Instalar dependências
+    - npm install
+3. Iniciar o projeto
+    - npm start
 
 
 O projeto corre por defeito em:
 👉 http://localhost:3000
 
-🔐 Login (modo desenvolvimento)
+## 🔐 Login (modo desenvolvimento)
 
-Este projeto usa autenticação fake apenas para efeitos de desenvolvimento.
+Este projeto usa autenticação temporária apenas para efeitos de desenvolvimento, com os seguintes credenciais:
+- Username: admin
+- Password: password
 
-Credenciais:
+Após login o utilizador é redirecionado para /home e o estado de autenticação é guardado em localStorage
 
-Username: admin
-
-Password: password
-
-Após login:
-
-o utilizador é redirecionado para /home
-
-o estado de autenticação é guardado em localStorage
-
-🧭 Estrutura geral do projeto
+## 🧭 Estrutura geral do projeto
+```
 src/
  ├─ pages/
  │   ├─ home/
@@ -51,11 +41,12 @@ src/
  │   │   ├─ login.js
  │   │   └─ login.css
  │
- ├─ routes.js      // definição das rotas + guards
+ ├─ routes.js  // definição das rotas + guards
  ├─ App.js
  ├─ index.js
+ ```
 
-📌 Onde mexer
+## 📌 Onde mexer
 
 Home page: src/pages/home
 
@@ -63,68 +54,60 @@ Login page: src/pages/login
 
 Rotas / Guards: src/routes.js
 
-🛡️ Sistema de Rotas
+## 🛡️ Sistema de Rotas
 
 O projeto já inclui:
 
-Rotas públicas
-
-/login
-
-Se não estiver autenticado → mostra login
-
-Se já estiver autenticado → redireciona para /home
-
-Rotas privadas
-
-/home
-
-Só acessível se estiver autenticado
-
-Caso contrário → redireciona para /login
+- Rotas públicas:
+    - /login
+    - Se não estiver autenticado → mostra login
+    - Se já estiver autenticado → redireciona para /home
+- Rotas privadas:
+    - /home
+    - Só acessível se estiver autenticado
+    - Caso contrário → redireciona para /login
 
 Este comportamento está implementado em:
-
-PrivateRoute
-
-PublicLoginRoute
+- PrivateRoute
+- PublicLoginRoute
 
 no ficheiro routes.js.
 
-⚠️ Regras simples (importantes)
+## ⚠️ Regras simples (importantes)
 
 Para manter o projeto estável:
 
-Cada feature numa branch
+- Cada feature numa branch
 
-PR obrigatório para merge
+- PR obrigatório para merge
 
-Não mexer em routes.js sem avisar a equipa
+- Não mexer em routes.js sem avisar a equipa
 
 Estas regras evitam conflitos e retrabalho.
 
-🎯 Objetivo desta fase
+## 🎯 Objetivo desta fase
 
 Nesta fase o foco é:
 
-perceber a estrutura do projeto
+- Perceber a estrutura do projeto
 
-entender o fluxo de login → home
+- Entender o fluxo de login → home
 
-explorar o código existente
+- Explorar o código existente
 
-👉 Não é esperado que tudo seja alterado de imediato.
-👉 Primeiro “sink in”, depois evoluímos.
+Não é esperado que tudo seja alterado de imediato.
 
-🧠 Nota final
+Primeiro “sink in”, depois evoluímos.
+
+## 🧠 Nota final
 
 Este backbone existe para:
 
-evitar começar do zero
+- Evitar começar do zero
 
-garantir que todos trabalham sobre a mesma base
+- Garantir que todos trabalham sobre a mesma base
 
-permitir evolução progressiva do projeto
+- Permitir evolução progressiva do projeto
 
 Mais funcionalidades virão de forma incremental.
 
