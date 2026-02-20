@@ -112,3 +112,40 @@ Este backbone existe para:
 Mais funcionalidades virão de forma incremental.
 
 Boa exploração 👀🚀
+
+## Docker + Camunda (guia rapido)
+
+### Pre-requisitos
+- Docker Desktop instalado e a correr
+- Node.js 18+ instalado
+- Dependencias do projeto instaladas (`npm install`)
+
+### Primeira execucao (na pasta \baths)
+1. Subir Postgres + Camunda:
+   - `npm run camunda:up`
+2. Ver logs (opcional):
+   - `npm run camunda:logs`
+3. Fazer deploy dos BPMN em `workflows/`:
+   - `npm run camunda:deploy`
+4. Abrir Camunda:
+   - `http://localhost:8080/camunda`
+5. OU simplesmente correr:
+   - `npm run camunda:boot`
+   
+Nota: com `example.enabled: false`, no primeiro acesso vais criar o user admin manualmente na pagina de setup.
+
+### Scripts disponiveis
+- `npm run camunda:up`: sobe containers em background
+- `npm run camunda:down`: para e remove containers (mantem dados)
+- `npm run camunda:logs`: segue logs do servico Camunda
+- `npm run camunda:restart`: reinicia stack mantendo volume
+- `npm run camunda:deploy`: deploy BPMN para o engine REST
+- `npm run camunda:boot`: sobe stack e faz deploy BPMN de seguida
+- `npm run camunda:wipe-processes`: apaga deployments/processos sem apagar utilizadores
+- `npm run camunda:clean`: remove containers + volumes (apaga tudo, incluindo users)
+- `npm run camunda:reset`: clean total e rebuild da stack
+
+### Persistencia de dados
+- O volume `pgdata` guarda os dados do Postgres entre reinicios do Docker/PC.
+- Se usares `camunda:down`, os users continuam la.
+- Se usares `camunda:clean` ou `camunda:reset`, os dados sao apagados.
