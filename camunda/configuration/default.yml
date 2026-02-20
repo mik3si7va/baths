@@ -1,0 +1,9 @@
+camunda.bpm.run:
+  example.enabled: false
+
+spring:
+  datasource:
+    url: jdbc:postgresql://postgres:5432/camunda
+    driver-class-name: org.postgresql.Driver
+    username: camunda
+    password: camunda

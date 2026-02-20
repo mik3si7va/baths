@@ -1,0 +1,15 @@
+{
+  "name": "baths",
+  "private": true,
+  "scripts": {
+    "camunda:up": "docker compose up -d",
+    "camunda:logs": "docker compose logs -f camunda",
+    "camunda:down": "docker compose down",
+    "camunda:clean": "docker compose down -v",
+    "camunda:reset": "docker compose down -v && docker compose up -d --build",
+    "camunda:restart": "docker compose down && docker compose up -d",
+    "camunda:deploy": "node ./camunda/deploy-bpmn.js",
+    "camunda:boot": "npm run camunda:up && node ./camunda/deploy-bpmn.js",
+    "camunda:wipe-processes": "node ./camunda/wipe-processes.js"
+  }
+}

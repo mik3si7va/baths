@@ -1,0 +1,38 @@
+services:
+  postgres:
+    image: postgres:15
+    container_name: baths-postgres
+    environment:
+      POSTGRES_DB: camunda
+      POSTGRES_USER: camunda
+      POSTGRES_PASSWORD: camunda
+      TZ: Europe/Lisbon
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U camunda -d camunda"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  camunda:
+    build:
+      context: ./camunda
+      dockerfile: Dockerfile
+    container_name: baths-camunda7
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./camunda/configuration/default.yml:/camunda/configuration/default.yml
+    environment:
+      - TZ=Europe/Lisbon
+    restart: unless-stopped
+
+volumes:
+  pgdata:
