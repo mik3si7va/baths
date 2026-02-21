@@ -11,5 +11,8 @@
     "camunda:deploy": "node ./camunda/deploy-bpmn.js",
     "camunda:boot": "npm run camunda:up && node ./camunda/deploy-bpmn.js",
     "camunda:wipe-processes": "node ./camunda/wipe-processes.js"
+  },
+  "dependencies": {
+    "camunda-external-task-client-js": "^3.1.0"
   }
 }

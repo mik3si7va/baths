@@ -125,7 +125,7 @@ Boa exploração 👀🚀
    - `npm run camunda:up`
 2. Ver logs (opcional):
    - `npm run camunda:logs`
-3. Fazer deploy dos BPMN em `workflows/`:
+3. Fazer deploy dos BPMN em `camunda/workflows/`:
    - `npm run camunda:deploy`
 4. Abrir Camunda:
    - `http://localhost:8080/camunda`
@@ -149,3 +149,5 @@ Nota: com `example.enabled: false`, no primeiro acesso vais criar o user admin m
 - O volume `pgdata` guarda os dados do Postgres entre reinicios do Docker/PC.
 - Se usares `camunda:down`, os users continuam la.
 - Se usares `camunda:clean` ou `camunda:reset`, os dados sao apagados.
+
+Swagger UI local: http://localhost:8081

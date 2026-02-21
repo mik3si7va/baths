@@ -1,0 +1,42 @@
+{
+  "components": [
+    {
+      "label": "bookLabel",
+      "type": "textfield",
+      "layout": {
+        "row": "Row_12sq8nb",
+        "columns": null
+      },
+      "id": "Field_0ylvd2w",
+      "key": "book",
+      "description": "want a book to go?",
+      "validate": {
+        "required": true
+      }
+    },
+    {
+      "label": "canHelp",
+      "type": "textfield",
+      "layout": {
+        "row": "Row_1tjlrpy",
+        "columns": null
+      },
+      "id": "Field_04zwugd",
+      "key": "help",
+      "description": "want some help?",
+      "validate": {
+        "required": true,
+        "pattern": "maybe|no|definetly"
+      }
+    }
+  ],
+  "type": "default",
+  "id": "form_one",
+  "exporter": {
+    "name": "Camunda Modeler",
+    "version": "5.44.0"
+  },
+  "executionPlatform": "Camunda Platform",
+  "executionPlatformVersion": "7.24.0",
+  "schemaVersion": 19
+}

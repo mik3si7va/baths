@@ -1,0 +1,29 @@
+{
+  "components": [
+    {
+      "label": "confirmation",
+      "type": "textfield",
+      "layout": {
+        "row": "Row_1j9w6e9",
+        "columns": null
+      },
+      "id": "Field_042hwny",
+      "key": "confirm",
+      "description": "please write to confirm that you approve the task...",
+      "validate": {
+        "required": true,
+        "pattern": "^.*confirm.*$",
+        "patternErrorMessage": "no confirm word in it"
+      }
+    }
+  ],
+  "type": "default",
+  "id": "Form_1uae1wd",
+  "exporter": {
+    "name": "Camunda Modeler",
+    "version": "5.44.0"
+  },
+  "executionPlatform": "Camunda Platform",
+  "executionPlatformVersion": "7.24.0",
+  "schemaVersion": 19
+}

@@ -1,0 +1,126 @@
+openapi: 3.0.3
+info:
+  title: Camunda 7 Engine REST API (Project-local)
+  version: "1.0.0"
+  description: |
+    Local Swagger specification for the Camunda 7 REST endpoint used by this project.
+    Base URL points to localhost:8080/engine-rest.
+servers:
+  - url: http://localhost:8080/engine-rest
+    description: Local Camunda REST
+paths:
+  /engine:
+    get:
+      summary: List process engines
+      operationId: getEngines
+      responses:
+        "200":
+          description: List of available process engines
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/EngineInfo"
+  /version:
+    get:
+      summary: Get engine version
+      operationId: getVersion
+      responses:
+        "200":
+          description: Camunda engine version
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VersionInfo"
+  /process-definition:
+    get:
+      summary: Query process definitions
+      operationId: getProcessDefinitions
+      parameters:
+        - in: query
+          name: latestVersion
+          schema:
+            type: boolean
+        - in: query
+          name: firstResult
+          schema:
+            type: integer
+            minimum: 0
+        - in: query
+          name: maxResults
+          schema:
+            type: integer
+            minimum: 1
+      responses:
+        "200":
+          description: Process definitions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ProcessDefinition"
+  /message:
+    post:
+      summary: Correlate message
+      operationId: correlateMessage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MessageCorrelationRequest"
+      responses:
+        "200":
+          description: Correlation result
+          content:
+            application/json:
+              schema:
+                type: object
+        "204":
+          description: Correlation accepted with no response body
+components:
+  schemas:
+    EngineInfo:
+      type: object
+      properties:
+        name:
+          type: string
+      required:
+        - name
+    VersionInfo:
+      type: object
+      properties:
+        version:
+          type: string
+      required:
+        - version
+    ProcessDefinition:
+      type: object
+      properties:
+        id:
+          type: string
+        key:
+          type: string
+        name:
+          type: string
+        version:
+          type: integer
+      required:
+        - id
+        - key
+        - version
+    MessageCorrelationRequest:
+      type: object
+      properties:
+        messageName:
+          type: string
+        businessKey:
+          type: string
+        processVariables:
+          type: object
+          additionalProperties:
+            type: object
+      required:
+        - messageName
