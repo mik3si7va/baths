@@ -19,7 +19,7 @@ export default function Home() {
                 <section className="hero">
                     <h2>Welcome!</h2>
                     <p>This is a typical home page.</p>
-                    <button>Get Started</button>
+                    <button onClick={() => window.location.href = '/calendar'}>Get Started</button>
                 </section>
 
                 <section className="features">

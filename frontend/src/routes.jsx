@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import Home from './pages/home/home';
 import LoginPage from './pages/login/login';
 import App from './App';
+import CalendarView from './pages/calendar/calendar';
 
 const PrivateRoute = ({ element }) => {
     const user = localStorage.getItem('usernameB&T');
@@ -20,6 +21,7 @@ export default function AppRoutes() {
             <Routes>
                 <Route path="/" element={<App />} />
                 <Route path="/home" element={<PrivateRoute element={<Home />} />} />
+                <Route path="/calendar" element={<PrivateRoute element={<CalendarView />} />} />
                 <Route path="/login" element={<PublicLoginRoute />} />
             </Routes>
         </BrowserRouter>

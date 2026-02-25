@@ -1,13 +1,44 @@
 const express = require('express');
 const cors = require('cors');
+
 const app = express();
+const PORT = 5000;
 
-app.use(cors()); // Permite pedidos do React
-app.use(express.json()); // Permite ler o JSON que envias no body
+app.use(cors({ origin: 'http://localhost:3000' }));
+app.use(express.json());
 
-app.post('/receber-dados', (req) => {
-  console.log("Dados recebidos do React:", req.body);
-  // Aqui poderias usar o módulo 'fs' para gravar num ficheiro .txt ou .json
+// In-memory event store for now (replace with DB later).
+const events = [
+  {
+    id: '1',
+    title: 'Banho Rex',
+    start: '2026-02-23T10:00:00',
+    end: '2026-02-23T11:00:00',
+  },
+];
+
+app.get('/events', (_req, res) => {
+  res.json(events);
 });
 
-app.listen(5000, () => console.log("Backend a ouvir na porta 5000!"));
+app.post('/events', (req, res) => {
+  const { title, start, end } = req.body || {};
+
+  if (!title || !start || !end) {
+    return res.status(400).json({ error: 'title, start, and end are required' });
+  }
+
+  const newEvent = {
+    id: String(Date.now()),
+    title,
+    start,
+    end,
+  };
+
+  events.push(newEvent);
+  return res.status(201).json(newEvent);
+});
+
+app.listen(PORT, () => {
+  console.log(`Backend a ouvir na porta ${PORT}!`);
+});
