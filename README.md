@@ -151,3 +151,39 @@ Nota: com `example.enabled: false`, no primeiro acesso vais criar o user admin m
 - Se usares `camunda:clean` ou `camunda:reset`, os dados sao apagados.
 
 Swagger UI local: http://localhost:8081
+
+## Startup guide (Backend + DB + Frontend)
+
+### Terminal 1 - Backend + Postgres
+Na raiz do projeto (`\baths`):
+
+1. Entrar no backend:
+   - `cd backend`
+2. Subir apenas o Postgres:
+   - `npm run db:up`
+3. Aplicar migrations da base de dados:
+   - `npm run db:migrate`
+4. Iniciar o backend:
+   - `npm start`
+
+Backend API:
+- `http://localhost:5000/events`
+
+### Terminal 2 - Frontend
+Na raiz do projeto (`\baths`):
+
+1. Entrar no frontend:
+   - `cd frontend`
+2. Instalar dependencias (se ainda nao estiverem instaladas):
+   - `npm install`
+3. Iniciar a app:
+   - `npm start`
+
+Frontend:
+- `http://localhost:3000`
+
+### Ordem recomendada
+1. `db:up`
+2. `db:migrate`
+3. `backend npm start`
+4. `frontend npm start`
