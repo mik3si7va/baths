@@ -3,14 +3,13 @@ import FullCalendar from '@fullcalendar/react'
 import dayGridPlugin from '@fullcalendar/daygrid'
 import timeGridPlugin from '@fullcalendar/timegrid'
 import interactionPlugin from '@fullcalendar/interaction'
+import { API_BASE_URL } from '../../apiConfig'
 import './calendar.css'
 
 export default function CalendarView() {
   const [events, setEvents] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000'
-
   useEffect(() => {
     const loadEvents = async () => {
       try {
@@ -33,7 +32,7 @@ export default function CalendarView() {
     }
 
     loadEvents()
-  }, [API_BASE_URL])
+  }, [])
 
   return (
     <div style={{ padding: 12 }}>

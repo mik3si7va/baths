@@ -1,9 +1,9 @@
 import React from 'react';
-import './home.css';
+import './admin.css';
 
-export default function Home() {
+export default function Admin() {
     return (
-        <div className="home-container">
+        <div className="admin-container">
             <header className="header">
                 <nav className="navbar">
                     <h1>My Site</h1>
@@ -17,19 +17,16 @@ export default function Home() {
 
             <main className="main-content">
                 <section className="hero">
-                    <h2>Welcome!</h2>
-                    <p>This is a typical home page.</p>
-                    <button onClick={() => window.location.href = '/calendar'}>Get Started</button>
+                    <h2>Welcome Admin!</h2>
+                    <p>Admins can do whatever they want! 🤣🤣</p>
                 </section>
 
                 <section className="features">
-                    {localStorage.getItem('usernameB&T') === 'admin' && (
-                        <div className="feature-card">
-                            <h3>Admin Page</h3>
-                            <p>Admins can manage users and settings.</p>
-                            <button onClick={() => window.location.href = '/admin'}>Go to Admin</button>
-                        </div>
-                    )}
+                    <div className="feature-card">
+                        <h3>Manage Users</h3>
+                        <p>Manage all users in the system.</p>
+                        <button onClick={() => window.location.href = '/admin/users'}>Get Started</button>
+                    </div>
                     <div className="feature-card">
                         <h3>Feature Two</h3>
                         <p>Another great thing.</p>
@@ -40,6 +37,9 @@ export default function Home() {
                     </div>
                 </section>
             </main>
+            <button  className="logout-btn" onClick={() => window.location.href = '/home'}>
+                Back to Home
+            </button>
             <button className="logout-btn" onClick={() => {
                 if (!window.confirm('Are you sure you want to logout?')) {
                     return
