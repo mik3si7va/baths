@@ -32,7 +32,44 @@ async function createSala({ nome, capacidade, equipamento, precoHora }) {
   return mapSalaRow(result.rows[0]);
 }
 
+async function addServicoToSala({ salaId, tipoServicoId }) {
+  const result = await query(
+    `INSERT INTO sala_servico (id, sala_id, tipo_servico_id)
+     VALUES (gen_random_uuid(), $1, $2)
+     RETURNING id, sala_id, tipo_servico_id, data_associacao;`,
+    [salaId, tipoServicoId]
+  );
+  return {
+    id: result.rows[0].id,
+    salaId: result.rows[0].sala_id,
+    tipoServicoId: result.rows[0].tipo_servico_id,
+    dataAssociacao: result.rows[0].data_associacao,
+  };
+}
+
+async function getServicosBySala(salaId) {
+  const result = await query(
+    `SELECT ss.id, ss.sala_id, ss.tipo_servico_id, ss.data_associacao,
+            ts.tipo, ts.ativo
+     FROM sala_servico ss
+     JOIN tipo_servico ts ON ts.id = ss.tipo_servico_id
+     WHERE ss.sala_id = $1
+     ORDER BY ts.tipo ASC;`,
+    [salaId]
+  );
+  return result.rows.map(row => ({
+    id: row.id,
+    salaId: row.sala_id,
+    tipoServicoId: row.tipo_servico_id,
+    dataAssociacao: row.data_associacao,
+    tipo: row.tipo,
+    ativo: row.ativo,
+  }));
+}
+
 module.exports = {
   getAllSalas,
   createSala,
+  addServicoToSala,
+  getServicosBySala,
 };
