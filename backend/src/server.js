@@ -3,7 +3,7 @@ const cors = require('cors');
 const { query, closePool } = require('./db/pool');
 const { getAllEvents, createEvent } = require('./repositories/eventsRepository');
 const { getAllTiposServico, createTipoServico, getAllRegrasPreco, createRegraPreco } = require('./repositories/repositorioServicos');
-const { getAllSalas, createSala, addServicoToSala, getServicosBySala } = require('./repositories/repositorioSalas');
+const { getAllSalas, createSala, addServicoToSala, getServicosBySala, removeServicoFromSala } = require('./repositories/repositorioSalas');
 
 const app = express();
 const PORT = Number(process.env.PORT || 5000);
@@ -106,6 +106,17 @@ app.get('/salas/:id/servicos', async (req, res) => {
   } catch (error) {
     console.error('Failed to fetch servicos da sala:', error);
     return res.status(500).json({ error: 'Failed to fetch servicos da sala' });
+  }
+});
+
+app.delete('/salas/:id/servicos/:servicoId', async (req, res) => {
+  const { id, servicoId } = req.params;
+  try {
+    const result = await removeServicoFromSala({ salaId: id, tipoServicoId: servicoId });
+    return res.json(result);
+  } catch (error) {
+    console.error('Failed to remove servico from sala:', error);
+    return res.status(500).json({ error: error.message });
   }
 });
 

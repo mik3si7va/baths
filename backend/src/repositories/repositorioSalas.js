@@ -17,6 +17,7 @@ async function getAllSalas() {
   const result = await query(
     `SELECT id, nome, capacidade, equipamento, preco_hora, ativo, created_at, updated_at
      FROM sala
+     WHERE ativo = true
      ORDER BY nome ASC;`
   );
   return result.rows.map(mapSalaRow);
@@ -67,9 +68,23 @@ async function getServicosBySala(salaId) {
   }));
 }
 
+async function removeServicoFromSala({ salaId, tipoServicoId}) {
+  const result = await query(
+    `DELETE FROM sala_servico
+    WHERE sala_id = $1 AND tipo_servico_id = $2
+    RETURNING id;`,
+    [salaId, tipoServicoId]
+  );
+  if (result.rowCount === 0) {
+    throw new Error('Associação não encontrada.');
+  }
+  return { removed: true};
+}
+
 module.exports = {
   getAllSalas,
   createSala,
   addServicoToSala,
   getServicosBySala,
+  removeServicoFromSala,
 };
