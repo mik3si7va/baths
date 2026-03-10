@@ -1,0 +1,10 @@
+CREATE TABLE sala (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  nome TEXT NOT NULL UNIQUE,
+  capacidade INTEGER NOT NULL,
+  equipamento TEXT NOT NULL,
+  preco_hora DECIMAL(10,2) NOT NULL,
+  ativo BOOLEAN NOT NULL DEFAULT true,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
