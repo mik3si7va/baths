@@ -1,7 +1,9 @@
 const { query } = require('../db/pool');
+const Sala = require('../domain/entities/Sala');
+const SalaServico = require('../domain/entities/SalaServico');
 
 function mapSalaRow(row) {
-  return {
+  return new Sala ({
     id: row.id,
     nome: row.nome,
     capacidade: row.capacidade,
@@ -10,7 +12,7 @@ function mapSalaRow(row) {
     ativo: row.ativo,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
-  };
+  });
 }
 
 async function getAllSalas() {
@@ -40,12 +42,12 @@ async function addServicoToSala({ salaId, tipoServicoId }) {
      RETURNING id, sala_id, tipo_servico_id, data_associacao;`,
     [salaId, tipoServicoId]
   );
-  return {
+  return new SalaServico({
     id: result.rows[0].id,
     salaId: result.rows[0].sala_id,
     tipoServicoId: result.rows[0].tipo_servico_id,
     dataAssociacao: result.rows[0].data_associacao,
-  };
+  });
 }
 
 async function getServicosBySala(salaId) {
@@ -58,17 +60,18 @@ async function getServicosBySala(salaId) {
      ORDER BY ts.tipo ASC;`,
     [salaId]
   );
-  return result.rows.map(row => ({
+  return result.rows.map(row => ({ ...new SalaServico({
     id: row.id,
     salaId: row.sala_id,
     tipoServicoId: row.tipo_servico_id,
     dataAssociacao: row.data_associacao,
-    tipo: row.tipo,
-    ativo: row.ativo,
+  }),
+  tipo: row.tipo,
+  ativo: row.ativo,
   }));
 }
 
-async function removeServicoFromSala({ salaId, tipoServicoId}) {
+async function removeServicoFromSala({ salaId, tipoServicoId }) {
   const result = await query(
     `DELETE FROM sala_servico
     WHERE sala_id = $1 AND tipo_servico_id = $2
@@ -78,7 +81,7 @@ async function removeServicoFromSala({ salaId, tipoServicoId}) {
   if (result.rowCount === 0) {
     throw new Error('Associação não encontrada.');
   }
-  return { removed: true};
+  return { removed: true };
 }
 
 module.exports = {
