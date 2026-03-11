@@ -37,7 +37,6 @@
 
 ### O que correu mal
 - ORM não identificado como requisito obrigatório desde o início
-- ORM não identificado como requisito obrigatório desde o início
 - Sprint a incluir US com dependências
 - Branch criada a partir de outra branch em vez da main, como resultado de US dependentes distribuídas entre diferentes membros da equipa
 - Migração para Prisma identificada tarde
