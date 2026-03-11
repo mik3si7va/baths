@@ -1,0 +1,96 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Event {
+  id        BigInt   @id @default(autoincrement())
+  title     String
+  startAt   DateTime @map("start_at") @db.Timestamptz(6)
+  endAt     DateTime @map("end_at") @db.Timestamptz(6)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@map("events")
+}
+
+model TipoServico {
+  id           String          @id @db.Uuid
+  tipo         TipoServicoEnum
+  ativo        Boolean         @default(true)
+  regrasPreco  RegraPreco[]
+  salasServico SalaServico[]
+
+  @@map("tipo_servico")
+}
+
+model RegraPreco {
+  id             String      @id @db.Uuid
+  tipoServicoId  String      @map("tipo_servico_id") @db.Uuid
+  porteAnimal    PorteEnum   @map("porte_animal")
+  precoBase      Decimal     @map("preco_base") @db.Decimal(10, 2)
+  duracaoMinutos Int         @map("duracao_minutos")
+  tipoServico    TipoServico @relation(fields: [tipoServicoId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_tipo_servico")
+
+  @@map("regra_preco")
+}
+
+model Sala {
+  id           String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  nome         String        @unique
+  capacidade   Int
+  equipamento  String
+  precoHora    Decimal       @map("preco_hora") @db.Decimal(10, 2)
+  ativo        Boolean       @default(true)
+  createdAt    DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime      @default(now()) @map("updated_at") @db.Timestamptz(6)
+  salasServico SalaServico[]
+
+  @@map("sala")
+}
+
+model SalaServico {
+  id             String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  salaId         String      @map("sala_id") @db.Uuid
+  tipoServicoId  String      @map("tipo_servico_id") @db.Uuid
+  dataAssociacao DateTime    @default(now()) @map("data_associacao") @db.Timestamptz(6)
+  sala           Sala        @relation(fields: [salaId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_sala")
+  tipoServico    TipoServico @relation(fields: [tipoServicoId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_tipo_servico")
+
+  @@unique([salaId, tipoServicoId], map: "unique_sala_servico")
+  @@map("sala_servico")
+}
+
+model schema_migrations {
+  id         String   @id
+  applied_at DateTime @default(now()) @db.Timestamptz(6)
+}
+
+enum TipoServicoEnum {
+  BANHO
+  TOSQUIA_COMPLETA
+  TOSQUIA_HIGIENICA
+  CORTE_UNHAS
+  LIMPEZA_OUVIDOS
+  EXPRESSAO_GLANDULAS
+  LIMPEZA_DENTES
+  APARAR_PELO_CARA
+  ANTI_PULGAS
+  ANTI_QUEDA
+  REMOCAO_NOS
+
+  @@map("tipo_servico_enum")
+}
+
+enum PorteEnum {
+  EXTRA_PEQUENO
+  PEQUENO
+  MEDIO
+  GRANDE
+  EXTRA_GRANDE
+
+  @@map("porte_enum")
+}

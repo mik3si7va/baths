@@ -8,15 +8,23 @@
     "start": "node src/server.js",
     "db:migrate": "node src/db/migrate.js",
     "db:up": "docker compose -f ../docker-compose.yml up -d postgres",
-    "db:down": "docker compose -f ../docker-compose.yml stop postgres"
+    "db:down": "docker compose -f ../docker-compose.yml stop postgres",
+    "prisma:generate": "prisma generate",
+    "prisma:pull": "prisma db pull",
+    "prisma:studio": "prisma studio"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
+    "@prisma/client": "^6.19.0",
     "cors": "^2.8.6",
+    "dotenv": "^17.3.1",
     "express": "^5.2.1",
     "pg": "^8.18.0"
+  },
+  "devDependencies": {
+    "prisma": "^6.19.0"
   }
 }

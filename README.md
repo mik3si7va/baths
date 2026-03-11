@@ -163,11 +163,21 @@ Na raiz do projeto (`\baths`):
    - `npm run db:up`
 3. Aplicar migrations da base de dados:
    - `npm run db:migrate`
-4. Iniciar o backend:
+4. Sincronizar schema Prisma com a BD (opcional, recomendado apos mudancas na BD):
+   - `npm run prisma:pull`
+5. Gerar Prisma Client:
+   - `npm run prisma:generate`
+6. Iniciar o backend:
    - `npm start`
 
 Backend API:
 - `http://localhost:5000/events`
+
+### Prisma Studio (interface grafica da BD)
+Na pasta `backend`:
+- `npm run prisma:studio`
+
+Depois abre o URL mostrado no terminal (normalmente `http://localhost:5555`).
 
 ### Terminal 2 - Frontend
 Na raiz do projeto (`\baths`):
@@ -185,5 +195,7 @@ Frontend:
 ### Ordem recomendada
 1. `db:up`
 2. `db:migrate`
-3. `backend npm start`
-4. `frontend npm start`
+3. `prisma:pull`
+4. `prisma:generate`
+5. `backend npm start`
+6. `frontend npm start`

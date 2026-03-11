@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const { query, closePool } = require('./db/pool');
+const { closePrisma } = require('./db/prismaClient');
 const { getAllEvents, createEvent } = require('./repositories/eventsRepository');
 const { getAllTiposServico, createTipoServico, getAllRegrasPreco, createRegraPreco } = require('./repositories/repositorioServicos');
 const { getAllSalas, createSala, addServicoToSala, getServicosBySala, removeServicoFromSala } = require('./repositories/repositorioSalas');
@@ -161,6 +162,7 @@ async function startServer() {
 
   const shutdown = async () => {
     server.close(async () => {
+      await closePrisma();
       await closePool();
       process.exit(0);
     });

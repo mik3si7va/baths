@@ -1,4 +1,5 @@
 const { query } = require('../db/pool');
+const { prisma } = require('../db/prismaClient');
 
 function mapEventRow(row) {
   return {
@@ -11,15 +12,19 @@ function mapEventRow(row) {
 }
 
 async function getAllEvents() {
-  const result = await query(
-    `
-      SELECT id, title, start_at, end_at, created_at
-      FROM events
-      ORDER BY start_at ASC;
-    `
-  );
+  const events = await prisma.event.findMany({
+    orderBy: {
+      startAt: 'asc',
+    },
+  });
 
-  return result.rows.map(mapEventRow);
+  return events.map((event) => ({
+    id: String(event.id),
+    title: event.title,
+    start: event.startAt.toISOString(),
+    end: event.endAt.toISOString(),
+    createdAt: event.createdAt.toISOString(),
+  }));
 }
 
 async function createEvent({ title, start, end }) {
