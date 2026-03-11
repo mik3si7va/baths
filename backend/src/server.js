@@ -2,12 +2,61 @@ const express = require('express');
 const cors = require('cors');
 const { query, closePool } = require('./db/pool');
 const { getAllEvents, createEvent } = require('./repositories/eventsRepository');
+const { getAllTiposServico, createTipoServico, getAllRegrasPreco, createRegraPreco } = require('./repositories/repositorioServicos');
 
 const app = express();
 const PORT = Number(process.env.PORT || 5000);
 
 app.use(cors({ origin: 'http://localhost:3000' }));
 app.use(express.json());
+
+app.get('/servicos', async (_req, res) => {
+  try {
+    const servicos = await getAllTiposServico();
+    return res.json(servicos);
+  } catch (error) {
+    console.error('Failed to fetch servicos:', error);
+    return res.status(500).json({ error: 'Failed to fetch servicos' });
+  }
+});
+
+app.post('/servicos', async (req, res) => {
+  const { tipo } = req.body || {};
+  if (!tipo) {
+    return res.status(400).json({ error: 'tipo é obrigatório' });
+  }
+  try {
+    const novo = await createTipoServico({ tipo });
+    return res.status(201).json(novo);
+  } catch (error) {
+    console.error('Failed to create servico:', error);
+    return res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/regras-preco', async (_req, res) => {
+  try {
+    const regras = await getAllRegrasPreco();
+    return res.json(regras);
+  } catch (error) {
+    console.error('Failed to fetch regras:', error);
+    return res.status(500).json({ error: 'Failed to fetch regras' });
+  }
+});
+
+app.post('/regras-preco', async (req, res) => {
+  const { tipoServicoId, porteAnimal, precoBase, duracaoMinutos } = req.body || {};
+  if (!tipoServicoId || !porteAnimal || !precoBase || !duracaoMinutos) {
+    return res.status(400).json({ error: 'tipoServicoId, porteAnimal, precoBase e duracaoMinutos são obrigatórios' });
+  }
+  try {
+    const nova = await createRegraPreco({ tipoServicoId, porteAnimal, precoBase, duracaoMinutos });
+    return res.status(201).json(nova);
+  } catch (error) {
+    console.error('Failed to create regra:', error);
+    return res.status(500).json({ error: error.message });
+  }
+});
 
 app.get('/events', async (_req, res) => {
   try {
