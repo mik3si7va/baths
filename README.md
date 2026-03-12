@@ -163,11 +163,16 @@ Na raiz do projeto (`\baths`):
    - `npm run db:full`
 3. OU manualmente:
    - `npm run db:up`
+   - `npm run db:prepare`
+   - `npm run db:wait`
+   - `npm run db:baseline`
    - `npm run db:migrate`
-   - `npm run prisma:pull`
    - `npm run prisma:generate`
+   - `npm run db:seed`
 4. Iniciar o backend:
    - `npm start`
+
+Nota: `npm run prisma:pull` fica apenas para introspecao pontual, nao faz parte do fluxo normal de migracoes.
 
 Backend API:
 - `http://localhost:5000/events`

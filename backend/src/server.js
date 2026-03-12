@@ -1,7 +1,6 @@
 const express = require('express');
 const cors = require('cors');
-const { query, closePool } = require('./db/pool');
-const { closePrisma } = require('./db/prismaClient');
+const { prisma, closePrisma } = require('./db/prismaClient');
 const { getAllEvents, createEvent } = require('./repositories/eventsRepository');
 const { getAllTiposServico, createTipoServico, getAllRegrasPreco, createRegraPreco } = require('./repositories/repositorioServicos');
 const { getAllSalas, createSala, addServicoToSala, getServicosBySala, removeServicoFromSala } = require('./repositories/repositorioSalas');
@@ -149,7 +148,7 @@ app.post('/events', async (req, res) => {
 
 async function startServer() {
   try {
-    await query('SELECT 1;');
+    await prisma.$connect();
     console.log('Database connection ready.');
   } catch (error) {
     console.error('Database connection failed:', error);
@@ -163,7 +162,6 @@ async function startServer() {
   const shutdown = async () => {
     server.close(async () => {
       await closePrisma();
-      await closePool();
       process.exit(0);
     });
   };
