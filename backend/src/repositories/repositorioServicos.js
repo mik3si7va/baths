@@ -1,4 +1,5 @@
-const { query } = require('../db/pool');
+const { randomUUID } = require('node:crypto');
+const { prisma } = require('../db/prismaClient');
 const TipoServicoEnum = require('../domain/enums/TipoServicoEnum');
 const PorteEnum = require('../domain/enums/PorteEnum');
 
@@ -37,10 +38,10 @@ function mapTipoServicoRow(row) {
 function mapRegraPrecoRow(row) {
     return {
         id: row.id,
-        tipoServicoId: row.tipo_servico_id,
-        porteAnimal: row.porte_animal,
-        precoBase: Number(row.preco_base),
-        duracaoMinutos: row.duracao_minutos,
+        tipoServicoId: row.tipoServicoId,
+        porteAnimal: row.porteAnimal,
+        precoBase: Number(row.precoBase),
+        duracaoMinutos: row.duracaoMinutos,
     };
 }
 
@@ -53,15 +54,13 @@ function mapRegraPrecoRow(row) {
  *   Lista de tipos de serviço ordenados alfabeticamente pelo nome.
  */
 async function getAllTiposServico() {
-    const result = await query(
-        `
-            SELECT id, tipo, ativo
-            FROM tipo_servico
-            ORDER BY tipo ASC;
-        `
-    );
+    const tiposServico = await prisma.tipoServico.findMany({
+        orderBy: {
+            tipo: 'asc',
+        },
+    });
 
-    return result.rows.map(mapTipoServicoRow);
+    return tiposServico.map(mapTipoServicoRow);
 }
 
 /**
@@ -90,16 +89,15 @@ async function createTipoServico({ tipo }) {
         );
     }
 
-    const result = await query(
-        `
-            INSERT INTO tipo_servico (id, tipo, ativo)
-            VALUES (gen_random_uuid(), $1::tipo_servico_enum, true)
-            RETURNING id, tipo, ativo;
-        `,
-        [tipo]
-    );
+    const novoTipoServico = await prisma.tipoServico.create({
+        data: {
+            id: randomUUID(),
+            tipo,
+            ativo: true,
+        },
+    });
 
-    return mapTipoServicoRow(result.rows[0]);
+    return mapTipoServicoRow(novoTipoServico);
 }
 
 /**
@@ -111,15 +109,13 @@ async function createTipoServico({ tipo }) {
  *   Lista de regras de preço ordenadas pelo porte do animal.
  */
 async function getAllRegrasPreco() {
-    const result = await query(
-        `
-            SELECT id, tipo_servico_id, porte_animal, preco_base, duracao_minutos
-            FROM regra_preco
-            ORDER BY porte_animal ASC;
-        `
-    );
+    const regrasPreco = await prisma.regraPreco.findMany({
+        orderBy: {
+            porteAnimal: 'asc',
+        },
+    });
 
-    return result.rows.map(mapRegraPrecoRow);
+    return regrasPreco.map(mapRegraPrecoRow);
 }
 
 /**
@@ -147,16 +143,17 @@ async function createRegraPreco({ tipoServicoId, porteAnimal, precoBase, duracao
         );
     }
 
-    const result = await query(
-        `
-            INSERT INTO regra_preco (id, tipo_servico_id, porte_animal, preco_base, duracao_minutos)
-            VALUES (gen_random_uuid(), $1, $2::porte_enum, $3, $4)
-            RETURNING id, tipo_servico_id, porte_animal, preco_base, duracao_minutos;
-        `,
-        [tipoServicoId, porteAnimal, precoBase, duracaoMinutos]
-    );
+    const novaRegraPreco = await prisma.regraPreco.create({
+        data: {
+            id: randomUUID(),
+            tipoServicoId,
+            porteAnimal,
+            precoBase,
+            duracaoMinutos,
+        },
+    });
 
-    return mapRegraPrecoRow(result.rows[0]);
+    return mapRegraPrecoRow(novaRegraPreco);
 }
 
 module.exports = {

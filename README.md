@@ -159,15 +159,24 @@ Na raiz do projeto (`\baths`):
 
 1. Entrar no backend:
    - `cd backend`
-2. Subir apenas o Postgres:
+2. Bootstrap completo da BD + Prisma (atalho recomendado):
+   - `npm run db:full`
+3. OU manualmente:
    - `npm run db:up`
-3. Aplicar migrations da base de dados:
    - `npm run db:migrate`
+   - `npm run prisma:pull`
+   - `npm run prisma:generate`
 4. Iniciar o backend:
    - `npm start`
 
 Backend API:
 - `http://localhost:5000/events`
+
+### Prisma Studio (interface grafica da BD)
+Na pasta `backend`:
+- `npm run prisma:studio`
+
+Depois abre o URL mostrado no terminal (normalmente `http://localhost:5555`).
 
 ### Terminal 2 - Frontend
 Na raiz do projeto (`\baths`):
@@ -183,7 +192,6 @@ Frontend:
 - `http://localhost:3000`
 
 ### Ordem recomendada
-1. `db:up`
-2. `db:migrate`
-3. `backend npm start`
-4. `frontend npm start`
+1. `db:full`
+2. `backend npm start`
+3. `frontend npm start`
