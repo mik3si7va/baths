@@ -1,9 +1,10 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import Home from './pages/home/home';
-import LoginPage from './pages/login/login';
+import { MainLayout, CompactLayout } from './layouts';
+import { Home, Calendar, Login, CriarSala } from './pages'
 import App from './App';
-import CalendarView from './pages/calendar/calendar';
+
+
 
 const PrivateRoute = ({ element }) => {
     const user = localStorage.getItem('usernameB&T');
@@ -12,7 +13,7 @@ const PrivateRoute = ({ element }) => {
 
 const PublicLoginRoute = () => {
     const user = localStorage.getItem('usernameB&T');
-    return user ? <Navigate to="/home" replace /> : <LoginPage />;
+    return user ? <Navigate to="/home" replace /> : <Login />;
 };
 
 export default function AppRoutes() {
@@ -20,8 +21,42 @@ export default function AppRoutes() {
         <BrowserRouter>
             <Routes>
                 <Route path="/" element={<App />} />
-                <Route path="/home" element={<PrivateRoute element={<Home />} />} />
-                <Route path="/calendar" element={<PrivateRoute element={<CalendarView />} />} />
+                <Route 
+                    path="/home" 
+                    element={
+                        <PrivateRoute 
+                            element={
+                                <MainLayout>
+                                    <Home />
+                                </MainLayout>
+                            } 
+                        />
+                    } 
+                />
+                <Route 
+                    path="/calendar" 
+                    element={
+                        <PrivateRoute 
+                            element={
+                                <CompactLayout>
+                                    <Calendar />
+                                </CompactLayout>
+                            } 
+                        />
+                    } 
+                />
+                <Route 
+                    path="/salas/nova" 
+                    element={
+                        <PrivateRoute 
+                            element={
+                                <CompactLayout>
+                                    <CriarSala />
+                                </CompactLayout>
+                            } 
+                        />
+                    } 
+                />
                 <Route path="/login" element={<PublicLoginRoute />} />
             </Routes>
         </BrowserRouter>
