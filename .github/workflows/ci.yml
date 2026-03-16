@@ -1,0 +1,71 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: ["**"]
+
+jobs:
+  backend-tests:
+    name: Backend Tests
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: camunda
+          POSTGRES_PASSWORD: camunda
+          POSTGRES_DB: camunda
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgresql://baths_user:baths_password@localhost:5432/baths_app?schema=public
+
+    steps:
+      - name: Checkout codigo
+        uses: actions/checkout@v4
+
+      - name: Instalar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Instalar dependencias backend
+        working-directory: ./backend
+        run: npm install
+
+      - name: Preparar base de dados
+        working-directory: ./backend
+        run: node src/db/prepareDatabases.js
+
+      - name: Aguardar base de dados
+        working-directory: ./backend
+        run: node src/db/waitForDb.js
+
+      - name: Baseline Prisma
+        working-directory: ./backend
+        run: node src/db/baselinePrisma.js
+
+      - name: Correr migracoes
+        working-directory: ./backend
+        run: npx prisma migrate deploy
+
+      - name: Gerar Prisma Client
+        working-directory: ./backend
+        run: npx prisma generate
+
+      - name: Correr seed
+        working-directory: ./backend
+        run: npm run db:seed
+
+      - name: Correr testes
+        working-directory: ./backend
+        run: npm test
