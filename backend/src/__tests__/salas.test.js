@@ -37,12 +37,21 @@ describe('Gestão de Salas - Testes Unitários', () => {
     });
 
     test('createSala falha se o nome já existir', async () => {
+        await createSala({
+            nome: 'Sala Duplicada Teste',
+            capacidade: 1,
+            equipamento: 'Teste',
+            precoHora: 10,
+        });
+
         await expect(createSala({
-            nome: 'Sala de Banho 1',
+            nome: 'Sala Duplicada Teste',
             capacidade: 1,
             equipamento: 'Teste duplicado',
             precoHora: 10,
         })).rejects.toThrow();
+
+        await prisma.sala.deleteMany({ where: { nome: 'Sala Duplicada Teste' } });
     });
 
     test('addServicoToSala associa um serviço a uma sala', async () => {
