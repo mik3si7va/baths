@@ -15,9 +15,9 @@ jobs:
       postgres:
         image: postgres:15
         env:
-          POSTGRES_USER: baths_user
-          POSTGRES_PASSWORD: baths_password
-          POSTGRES_DB: baths_app
+          POSTGRES_USER: camunda
+          POSTGRES_PASSWORD: camunda
+          POSTGRES_DB: camunda
         ports:
           - 5432:5432
         options: >-
