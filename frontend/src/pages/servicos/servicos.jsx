@@ -1,7 +1,10 @@
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Box, Typography, Button, Chip, Paper, CircularProgress } from '@mui/material';
+import AddIcon from '@mui/icons-material/Add';
+import { useThemeContext } from '../../contexts/ThemeContext';
 import './servicos.css';
 
-// Mapeamento de ícones e labels amigáveis para cada tipo de serviço
 const TIPO_META = {
   BANHO:               { icon: '🛁', label: 'Banho' },
   TOSQUIA_COMPLETA:    { icon: '✂️', label: 'Tosquia Completa' },
@@ -16,14 +19,12 @@ const TIPO_META = {
   REMOCAO_NOS:         { icon: '🪢', label: 'Remoção de Nós' },
 };
 
-// Tipos que requerem porte do animal (preço variável por tamanho)
-const REQUIRES_SIZE = new Set([
-  'BANHO',
-  'TOSQUIA_COMPLETA',
-  'TOSQUIA_HIGIENICA',
-]);
+const REQUIRES_SIZE = new Set(['BANHO', 'TOSQUIA_COMPLETA', 'TOSQUIA_HIGIENICA']);
 
 export default function ServicosPage() {
+  const { colors } = useThemeContext();
+  const navigate = useNavigate();
+
   const [servicos, setServicos] = useState([]);
   const [regras, setRegras] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -36,31 +37,23 @@ export default function ServicosPage() {
       try {
         setLoading(true);
         setError('');
-
         const [resServicos, resRegras] = await Promise.all([
           fetch(`${API_BASE_URL}/servicos`),
           fetch(`${API_BASE_URL}/regras-preco`),
         ]);
-
         if (!resServicos.ok) throw new Error(`Erro ao carregar serviços (${resServicos.status})`);
         if (!resRegras.ok) throw new Error(`Erro ao carregar regras de preço (${resRegras.status})`);
-
-        const dataServicos = await resServicos.json();
-        const dataRegras = await resRegras.json();
-
-        setServicos(Array.isArray(dataServicos) ? dataServicos : []);
-        setRegras(Array.isArray(dataRegras) ? dataRegras : []);
+        setServicos(await resServicos.json());
+        setRegras(await resRegras.json());
       } catch (err) {
         setError(err.message || 'Não foi possível carregar os serviços.');
       } finally {
         setLoading(false);
       }
     };
-
     load();
   }, [API_BASE_URL]);
 
-  // Conta quantas regras de preço existem por serviço
   const regrasCountByServico = regras.reduce((acc, r) => {
     acc[r.tipoServicoId] = (acc[r.tipoServicoId] || 0) + 1;
     return acc;
@@ -70,137 +63,134 @@ export default function ServicosPage() {
   const totalInativos = servicos.length - totalAtivos;
 
   return (
-    <div className="servicos-container">
-      {/* ── Navbar ── */}
-      <header className="header">
-        <nav className="navbar">
-          <h1>BATHS &amp; TRIMS</h1>
-          <ul>
-            <li><a href="/home">Home</a></li>
-            <li><a href="/calendar">Calendário</a></li>
-            <li><a href="/servicos" aria-current="page">Serviços</a></li>
-          </ul>
-        </nav>
-      </header>
+    <>
+      {/* Cabeçalho da página */}
+      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1, flexWrap: 'wrap', gap: 2 }}>
+        <Box>
+          <Typography variant="h1" sx={{ color: colors.text }}>
+            Serviços da Clínica
+          </Typography>
+          <Typography variant="body1" sx={{ color: colors.textSecondary, mt: 0.5 }}>
+            Gere os serviços disponíveis e as suas regras de preço.
+          </Typography>
+        </Box>
+        <Button
+          variant="contained"
+          startIcon={<AddIcon />}
+          onClick={() => navigate('/servicos/novo')}
+          sx={{ backgroundColor: colors.primary, '&:hover': { backgroundColor: colors.primary + 'dd' } }}
+        >
+          Novo Serviço
+        </Button>
+      </Box>
 
-      <main className="servicos-main">
-        {/* ── Page header ── */}
-        <div className="servicos-page-header">
-          <h2>Serviços da Clínica</h2>
-          <button
-            className="btn-primary"
-            onClick={() => window.location.href = '/servicos/novo'}
-          >
-            <span>＋</span> Novo Serviço
-          </button>
-        </div>
+      {/* Chips de resumo */}
+      {!loading && !error && (
+        <Box sx={{ display: 'flex', gap: 2, mb: 3, flexWrap: 'wrap' }}>
+          {[
+            { value: servicos.length, label: 'Total' },
+            { value: totalAtivos,     label: 'Ativos' },
+            { value: totalInativos,   label: 'Inativos' },
+            { value: regras.length,   label: 'Regras Preço' },
+          ].map((chip) => (
+            <Paper key={chip.label} elevation={2} sx={{ borderRadius: 3, px: 3, py: 1.5, textAlign: 'center', minWidth: 100 }}>
+              <Typography variant="h1" sx={{ color: colors.primary, fontSize: '28px' }}>
+                {chip.value}
+              </Typography>
+              <Typography variant="caption" sx={{ color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                {chip.label}
+              </Typography>
+            </Paper>
+          ))}
+        </Box>
+      )}
 
-        {/* ── Summary chips ── */}
-        {!loading && !error && (
-          <div className="servicos-summary">
-            <div className="summary-chip">
-              <span className="chip-value">{servicos.length}</span>
-              <span className="chip-label">Total</span>
-            </div>
-            <div className="summary-chip">
-              <span className="chip-value">{totalAtivos}</span>
-              <span className="chip-label">Ativos</span>
-            </div>
-            <div className="summary-chip">
-              <span className="chip-value">{totalInativos}</span>
-              <span className="chip-label">Inativos</span>
-            </div>
-            <div className="summary-chip">
-              <span className="chip-value">{regras.length}</span>
-              <span className="chip-label">Regras Preço</span>
-            </div>
-          </div>
+      {/* Tabela */}
+      <Paper elevation={2} sx={{ borderRadius: 3, overflow: 'hidden' }}>
+        {loading && (
+          <Box sx={{ display: 'flex', justifyContent: 'center', py: 6 }}>
+            <CircularProgress sx={{ color: colors.primary }} />
+          </Box>
         )}
 
-        {/* ── Table card ── */}
-        <div className="servicos-card">
-          {loading && (
-            <p className="state-message">A carregar serviços…</p>
-          )}
+        {!loading && error && (
+          <Typography sx={{ p: 4, textAlign: 'center', color: 'error.main' }}>⚠️ {error}</Typography>
+        )}
 
-          {!loading && error && (
-            <p className="state-message error">⚠️ {error}</p>
-          )}
+        {!loading && !error && servicos.length === 0 && (
+          <Box sx={{ py: 8, textAlign: 'center' }}>
+            <Typography sx={{ fontSize: '3rem', mb: 1 }}>🐾</Typography>
+            <Typography variant="body1" sx={{ color: colors.textSecondary, mb: 2 }}>
+              Ainda não existem serviços registados.
+            </Typography>
+            <Button variant="contained" startIcon={<AddIcon />} onClick={() => navigate('/servicos/novo')}
+              sx={{ backgroundColor: colors.primary }}>
+              Criar primeiro serviço
+            </Button>
+          </Box>
+        )}
 
-          {!loading && !error && servicos.length === 0 && (
-            <div className="empty-state">
-              <span className="empty-icon">🐾</span>
-              <p>Ainda não existem serviços registados.</p>
-              <button
-                className="btn-primary"
-                onClick={() => alert('Formulário de criação (em breve)')}
-              >
-                ＋ Criar primeiro serviço
-              </button>
-            </div>
-          )}
-
-          {!loading && !error && servicos.length > 0 && (
-            <table className="servicos-table">
-              <thead>
-                <tr>
-                  <th>Serviço</th>
-                  <th>Requer Porte</th>
-                  <th>Regras de Preço</th>
-                  <th>Estado</th>
-                </tr>
-              </thead>
-              <tbody>
-                {servicos.map((servico) => {
-                  const meta = TIPO_META[servico.tipo] || { icon: '🐾', label: servico.tipo };
-                  const requiresSize = REQUIRES_SIZE.has(servico.tipo);
-                  const nRegras = regrasCountByServico[servico.id] || 0;
-
-                  return (
-                    <tr key={servico.id}>
-                      {/* Nome */}
-                      <td>
-                        <span className="tipo-label">
-                          <span className="tipo-icon">{meta.icon}</span>
-                          {meta.label}
-                        </span>
-                      </td>
-
-                      {/* Requer porte */}
-                      <td>
-                        {requiresSize ? (
-                          <span className="badge badge-yes">Sim</span>
-                        ) : (
-                          <span className="badge badge-no">Não</span>
-                        )}
-                      </td>
-
-                      {/* Regras de preço */}
-                      <td>
-                        <span className="regras-count">
-                          {nRegras > 0 ? `${nRegras} regra${nRegras !== 1 ? 's' : ''}` : '—'}
-                        </span>
-                      </td>
-
-                      {/* Estado */}
-                      <td>
-                        <span className={`status-badge ${servico.ativo ? 'status-active' : 'status-inactive'}`}>
-                          <span className="status-dot" />
-                          {servico.ativo ? 'Ativo' : 'Inativo'}
-                        </span>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          )}
-        </div>
-      </main>
-
-      <footer className="footer">
-        <p>&copy; 2024 BATHS &amp; TRIMS. Todos os direitos reservados.</p>
-      </footer>
-    </div>
+        {!loading && !error && servicos.length > 0 && (
+          <table className="servicos-table">
+            <thead>
+              <tr>
+                <th>Serviço</th>
+                <th>Requer Porte</th>
+                <th>Regras de Preço</th>
+                <th>Estado</th>
+              </tr>
+            </thead>
+            <tbody>
+              {servicos.map((servico) => {
+                const meta = TIPO_META[servico.tipo] || { icon: '🐾', label: servico.tipo };
+                const requiresSize = REQUIRES_SIZE.has(servico.tipo);
+                const nRegras = regrasCountByServico[servico.id] || 0;
+                return (
+                  <tr key={servico.id}>
+                    <td>
+                      <span className="tipo-label">
+                        <span className="tipo-icon">{meta.icon}</span>
+                        {meta.label}
+                      </span>
+                    </td>
+                    <td>
+                      <Chip
+                        label={requiresSize ? 'Sim' : 'Não'}
+                        size="small"
+                        sx={{
+                          fontWeight: 700,
+                          fontSize: '0.72rem',
+                          backgroundColor: requiresSize ? 'rgba(71,92,81,0.12)' : '#f4f4f5',
+                          color: requiresSize ? colors.primary : '#71717a',
+                          border: `1px solid ${requiresSize ? colors.primary + '55' : '#e4e4e7'}`,
+                        }}
+                      />
+                    </td>
+                    <td>
+                      <Typography variant="body1" sx={{ color: colors.primary, fontWeight: 600 }}>
+                        {nRegras > 0 ? `${nRegras} regra${nRegras !== 1 ? 's' : ''}` : '—'}
+                      </Typography>
+                    </td>
+                    <td>
+                      <Chip
+                        label={servico.ativo ? 'Ativo' : 'Inativo'}
+                        size="small"
+                        sx={{
+                          fontWeight: 700,
+                          fontSize: '0.75rem',
+                          backgroundColor: servico.ativo ? 'rgba(34,197,94,0.1)' : '#fef2f2',
+                          color: servico.ativo ? '#16a34a' : '#dc2626',
+                          border: `1px solid ${servico.ativo ? 'rgba(34,197,94,0.3)' : '#fecaca'}`,
+                        }}
+                      />
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        )}
+      </Paper>
+    </>
   );
 }

@@ -1,173 +1,4 @@
-:root {
-  --tq-50: #eefcfb;
-  --tq-100: #d5f7f5;
-  --tq-200: #afeeea;
-  --tq-300: #7fe2db;
-  --tq-400: #4ccfc8;
-  --tq-500: #24b7b0;
-  --tq-600: #159991;
-  --tq-700: #117b75;
-  --tq-800: #115f5b;
-  --tq-900: #134e4b;
-}
-
-/* ── Layout ───────────────────────────────────────────── */
-.servicos-container {
-  min-height: 100vh;
-  background: linear-gradient(180deg, #f6ffff 0%, #e8fcfc 100%);
-  color: #0d5f66;
-  display: flex;
-  flex-direction: column;
-  font-family: 'Segoe UI', system-ui, sans-serif;
-}
-
-/* ── Navbar (reutiliza padrão do home) ────────────────── */
-.header {
-  width: 100%;
-  padding: 18px 24px;
-  box-sizing: border-box;
-}
-
-.navbar {
-  max-width: 1080px;
-  margin: 0 auto;
-  background: #ffffff;
-  border: 2px solid var(--tq-200);
-  border-radius: 16px;
-  padding: 14px 20px;
-  box-shadow: 0 10px 28px rgba(12, 157, 167, 0.12);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-}
-
-.navbar h1 {
-  margin: 0;
-  color: #0ea5a8;
-  font-size: 1.4rem;
-}
-
-.navbar ul {
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  display: flex;
-  gap: 14px;
-}
-
-.navbar a {
-  text-decoration: none;
-  color: #0d7f89;
-  font-weight: 600;
-  padding: 8px 12px;
-  border-radius: 10px;
-  transition: background-color 0.2s ease, color 0.2s ease;
-}
-
-.navbar a:hover {
-  background: var(--tq-50);
-  color: #0a6d75;
-}
-
-/* ── Main ─────────────────────────────────────────────── */
-.servicos-main {
-  width: min(1080px, 92%);
-  margin: 24px auto;
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-  padding-bottom: 32px;
-}
-
-/* ── Page header row ──────────────────────────────────── */
-.servicos-page-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 12px;
-}
-
-.servicos-page-header h2 {
-  margin: 0;
-  font-size: clamp(1.5rem, 3vw, 2rem);
-  color: var(--tq-800);
-  font-weight: 800;
-  letter-spacing: -0.3px;
-}
-
-/* ── Primary action button ────────────────────────────── */
-.btn-primary {
-  border: none;
-  border-radius: 12px;
-  padding: 11px 20px;
-  font-size: 0.95rem;
-  font-weight: 700;
-  color: #ffffff;
-  background: linear-gradient(135deg, #11bcc0 0%, #089ca7 100%);
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  transition: transform 0.12s ease, box-shadow 0.2s ease;
-  box-shadow: 0 4px 14px rgba(8, 156, 167, 0.22);
-}
-
-.btn-primary:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 8px 20px rgba(8, 156, 167, 0.3);
-}
-
-.btn-primary:active {
-  transform: translateY(0);
-}
-
-/* ── Summary chips ────────────────────────────────────── */
-.servicos-summary {
-  display: flex;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-
-.summary-chip {
-  background: #ffffff;
-  border: 2px solid var(--tq-200);
-  border-radius: 12px;
-  padding: 10px 18px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  box-shadow: 0 4px 12px rgba(12, 157, 167, 0.08);
-  min-width: 120px;
-}
-
-.summary-chip .chip-value {
-  font-size: 1.6rem;
-  font-weight: 800;
-  color: var(--tq-600);
-  line-height: 1;
-}
-
-.summary-chip .chip-label {
-  font-size: 0.75rem;
-  color: var(--tq-700);
-  font-weight: 600;
-  margin-top: 4px;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-/* ── Table card ───────────────────────────────────────── */
-.servicos-card {
-  background: #ffffff;
-  border: 2px solid var(--tq-200);
-  border-radius: 20px;
-  box-shadow: 0 12px 32px rgba(12, 157, 167, 0.1);
-  overflow: hidden;
-}
-
-/* ── Table ────────────────────────────────────────────── */
+/* ── Tabela de serviços ───────────────────────────────── */
 .servicos-table {
   width: 100%;
   border-collapse: collapse;
@@ -175,14 +6,14 @@
 }
 
 .servicos-table thead {
-  background: var(--tq-50);
-  border-bottom: 2px solid var(--tq-200);
+  background: #F5F0E8;
+  border-bottom: 2px solid #e0dbd0;
 }
 
 .servicos-table thead th {
   padding: 13px 18px;
   text-align: left;
-  color: var(--tq-800);
+  color: #102622;
   font-weight: 700;
   font-size: 0.78rem;
   text-transform: uppercase;
@@ -191,7 +22,7 @@
 }
 
 .servicos-table tbody tr {
-  border-bottom: 1px solid var(--tq-100);
+  border-bottom: 1px solid #ede8e0;
   transition: background-color 0.15s ease;
 }
 
@@ -200,12 +31,12 @@
 }
 
 .servicos-table tbody tr:hover {
-  background-color: var(--tq-50);
+  background-color: #faf7f2;
 }
 
 .servicos-table tbody td {
   padding: 14px 18px;
-  color: #2a7a80;
+  color: #475C51;
   vertical-align: middle;
 }
 
@@ -215,131 +46,9 @@
   align-items: center;
   gap: 8px;
   font-weight: 700;
-  color: var(--tq-800);
+  color: #102622;
 }
 
 .tipo-icon {
   font-size: 1.1rem;
-}
-
-/* ── Requires size badge ──────────────────────────────── */
-.badge {
-  display: inline-block;
-  padding: 3px 10px;
-  border-radius: 20px;
-  font-size: 0.72rem;
-  font-weight: 700;
-  letter-spacing: 0.3px;
-}
-
-.badge-yes {
-  background: rgba(36, 183, 176, 0.12);
-  color: var(--tq-700);
-  border: 1px solid var(--tq-300);
-}
-
-.badge-no {
-  background: #f4f4f5;
-  color: #71717a;
-  border: 1px solid #e4e4e7;
-}
-
-/* ── Status badge ─────────────────────────────────────── */
-.status-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 4px 10px;
-  border-radius: 20px;
-  font-size: 0.75rem;
-  font-weight: 700;
-}
-
-.status-active {
-  background: rgba(34, 197, 94, 0.1);
-  color: #16a34a;
-  border: 1px solid rgba(34, 197, 94, 0.3);
-}
-
-.status-inactive {
-  background: #fef2f2;
-  color: #dc2626;
-  border: 1px solid #fecaca;
-}
-
-.status-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-}
-
-.status-active .status-dot { background: #22c55e; }
-.status-inactive .status-dot { background: #ef4444; }
-
-/* ── Preço regras count ───────────────────────────────── */
-.regras-count {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  color: var(--tq-600);
-  font-weight: 600;
-}
-
-/* ── Empty state ──────────────────────────────────────── */
-.empty-state {
-  padding: 64px 24px;
-  text-align: center;
-}
-
-.empty-icon {
-  font-size: 3.5rem;
-  margin-bottom: 12px;
-  display: block;
-  opacity: 0.5;
-}
-
-.empty-state p {
-  color: var(--tq-700);
-  font-size: 1rem;
-  margin: 0 0 18px;
-}
-
-/* ── Loading / error ──────────────────────────────────── */
-.state-message {
-  padding: 40px 24px;
-  text-align: center;
-  color: var(--tq-700);
-  font-size: 1rem;
-}
-
-.state-message.error {
-  color: #dc2626;
-}
-
-/* ── Footer ───────────────────────────────────────────── */
-.footer {
-  margin-top: auto;
-  text-align: center;
-  padding: 18px 12px 24px;
-  color: #4b9198;
-  font-size: 0.88rem;
-}
-
-@media (max-width: 860px) {
-  .navbar {
-    flex-direction: column;
-    text-align: center;
-  }
-
-  .servicos-table thead th:nth-child(4),
-  .servicos-table tbody td:nth-child(4) {
-    display: none;
-  }
-}
-
-@media (max-width: 560px) {
-  .servicos-table thead th:nth-child(3),
-  .servicos-table tbody td:nth-child(3) {
-    display: none;
-  }
 }
