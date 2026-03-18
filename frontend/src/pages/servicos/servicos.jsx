@@ -89,7 +89,7 @@ export default function ServicosPage() {
           <h2>Serviços da Clínica</h2>
           <button
             className="btn-primary"
-            onClick={() => alert('Formulário de criação (em breve)')}
+            onClick={() => window.location.href = '/servicos/novo'}
           >
             <span>＋</span> Novo Serviço
           </button>

@@ -5,6 +5,8 @@ import LoginPage from './pages/login/login';
 import App from './App';
 import CalendarView from './pages/calendar/calendar';
 import ServicosPage from './pages/servicos/servicos';
+import CriarServicoPage from './pages/servicos/criarServico';
+
 
 const PrivateRoute = ({ element }) => {
     const user = localStorage.getItem('usernameB&T');
@@ -23,6 +25,7 @@ export default function AppRoutes() {
                 <Route path="/" element={<App />} />
                 <Route path="/home" element={<PrivateRoute element={<Home />} />} />
                 <Route path="/servicos" element={<PrivateRoute element={<ServicosPage />} />} />
+                <Route path="/servicos/novo" element={<PrivateRoute element={<CriarServicoPage />} />} />
                 <Route path="/calendar" element={<PrivateRoute element={<CalendarView />} />} />
                 <Route path="/login" element={<PublicLoginRoute />} />
             </Routes>
