@@ -34,9 +34,10 @@
   },
   "devDependencies": {
     "jest": "^30.3.0",
-    "prisma": "^6.19.0"
+    "prisma": "^6.19.0",
+    "supertest": "^7.2.2"
   },
   "jest": {
-  "testEnvironment": "node"
+    "testEnvironment": "node"
   }
 }

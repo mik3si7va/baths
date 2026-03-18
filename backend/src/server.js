@@ -6,6 +6,7 @@ const { prisma, closePrisma } = require('./db/prismaClient');
 const { getAllEvents, createEvent } = require('./repositories/eventsRepository');
 const { getAllTiposServico, createTipoServico, getAllRegrasPreco, createRegraPreco } = require('./repositories/repositorioServicos');
 const { getAllSalas, createSala, addServicoToSala, getServicosBySala, removeServicoFromSala } = require('./repositories/repositorioSalas');
+const { getAllFuncionarios, getFuncionarioById, createFuncionario } = require('./repositories/repositorioFuncionarios');
 
 const app = express();
 const PORT = Number(process.env.PORT || 5000);
@@ -123,6 +124,185 @@ app.delete('/salas/:id/servicos/:servicoId', async (req, res) => {
   }
 });
 
+/**
+ * @swagger
+ * /funcionarios:
+ *   get:
+ *     summary: Lista todos os funcionarios
+ *     tags: [Funcionarios]
+ *     responses:
+ *       200:
+ *         description: Lista de funcionarios
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/Funcionario'
+ *       500:
+ *         description: Erro interno
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ */
+app.get('/funcionarios', async (_req, res) => {
+  try {
+    const funcionarios = await getAllFuncionarios();
+    return res.json(funcionarios);
+  } catch (error) {
+    console.error('Failed to fetch funcionarios:', error);
+    return res.status(500).json({ error: 'Failed to fetch funcionarios' });
+  }
+});
+
+/**
+ * @swagger
+ * /funcionarios/{id}:
+ *   get:
+ *     summary: Obtem um funcionario por id
+ *     tags: [Funcionarios]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: ID do funcionario
+ *     responses:
+ *       200:
+ *         description: Funcionario encontrado
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Funcionario'
+ *       404:
+ *         description: Funcionario nao encontrado
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *             examples:
+ *               naoEncontrado:
+ *                 summary: Sem resultado para o id
+ *                 value:
+ *                   error: Funcionario nao encontrado
+ *       500:
+ *         description: Erro interno
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ */
+app.get('/funcionarios/:id', async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const funcionario = await getFuncionarioById(id);
+    if (!funcionario) {
+      return res.status(404).json({ error: 'Funcionario nao encontrado' });
+    }
+
+    return res.json(funcionario);
+  } catch (error) {
+    console.error('Failed to fetch funcionario:', error);
+    return res.status(500).json({ error: 'Failed to fetch funcionario' });
+  }
+});
+
+/**
+ * @swagger
+ * /funcionarios:
+ *   post:
+ *     summary: Cria um novo funcionario
+ *     tags: [Funcionarios]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/CreateFuncionarioRequest'
+ *     responses:
+ *       201:
+ *         description: Funcionario criado
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Funcionario'
+ *       400:
+ *         description: Dados invalidos
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *             examples:
+ *               camposObrigatorios:
+ *                 summary: Campos obrigatorios em falta
+ *                 value:
+ *                   error: 'nomeCompleto, cargo, telefone, email e horario sao obrigatorios'
+ *               domingoInvalido:
+ *                 summary: Domingo nao permitido
+ *                 value:
+ *                   error: 'Domingo nao pode ser selecionado como dia de trabalho.'
+ *               horaInvalida:
+ *                 summary: Hora com formato invalido
+ *                 value:
+ *                   error: 'horaInicio invalido. Use formato HH:mm (ex: 09:00).'
+ *               intervaloInvalido:
+ *                 summary: Hora inicio maior ou igual a hora fim
+ *                 value:
+ *                   error: 'horaInicio deve ser menor que horaFim.'
+ *               pausaForaTurno:
+ *                 summary: Pausa fora do horario de trabalho
+ *                 value:
+ *                   error: 'A pausa de almoco deve estar dentro do horario de trabalho.'
+ *               servicoInexistente:
+ *                 summary: ID de servico invalido
+ *                 value:
+ *                   error: 'Um ou mais servicos nao existem.'
+ *       409:
+ *         description: Email ja existe
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *             examples:
+ *               emailDuplicado:
+ *                 summary: Email ja existente
+ *                 value:
+ *                   error: 'Ja existe um funcionario com o email "sofia.r@bet.com".'
+ */
+app.post('/funcionarios', async (req, res) => {
+  const { nomeCompleto, cargo, telefone, email, porteAnimais, tipoServicoIds, horario } = req.body || {};
+
+  if (!nomeCompleto || !cargo || !telefone || !email || !horario) {
+    return res.status(400).json({ error: 'nomeCompleto, cargo, telefone, email e horario sao obrigatorios' });
+  }
+
+  try {
+    const novoFuncionario = await createFuncionario({
+      nomeCompleto,
+      cargo,
+      telefone,
+      email,
+      porteAnimais,
+      tipoServicoIds,
+      horario,
+    });
+
+    return res.status(201).json(novoFuncionario);
+  } catch (error) {
+    console.error('Failed to create funcionario:', error);
+
+    if (error.message?.startsWith('Ja existe um funcionario com o email')) {
+      return res.status(409).json({ error: error.message });
+    }
+
+    return res.status(400).json({ error: error.message });
+  }
+});
+
 app.get('/events', async (_req, res) => {
   try {
     const events = await getAllEvents();
@@ -173,4 +353,8 @@ async function startServer() {
   process.on('SIGTERM', shutdown);
 }
 
-startServer();
+if (require.main === module) {
+  startServer();
+}
+
+module.exports = { app, startServer };
