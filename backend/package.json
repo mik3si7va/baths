@@ -4,11 +4,16 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "jest",
     "start": "node src/server.js",
-    "db:migrate": "node src/db/migrate.js",
+    "db:prepare": "node src/db/prepareDatabases.js",
+    "db:wait": "node src/db/waitForDb.js",
+    "db:baseline": "node src/db/baselinePrisma.js",
+    "db:migrate": "prisma migrate deploy",
+    "db:migrate:dev": "prisma migrate dev",
+    "db:seed": "node prisma/seed.js",
     "db:up": "docker compose -f ../docker-compose.yml up -d postgres",
-    "db:full": "npm run db:up && npm run db:migrate && npm run prisma:pull && npm run prisma:generate",
+    "db:full": "npm run db:up && npm run db:prepare && npm run db:wait && npm run db:baseline && npm run db:migrate && npm run prisma:generate && npm run db:seed",
     "db:down": "docker compose -f ../docker-compose.yml stop postgres",
     "prisma:generate": "prisma generate",
     "prisma:pull": "prisma db pull",
@@ -23,9 +28,15 @@
     "cors": "^2.8.6",
     "dotenv": "^17.3.1",
     "express": "^5.2.1",
-    "pg": "^8.18.0"
+    "pg": "^8.18.0",
+    "swagger-jsdoc": "^6.2.8",
+    "swagger-ui-express": "^5.0.1"
   },
   "devDependencies": {
+    "jest": "^30.3.0",
     "prisma": "^6.19.0"
+  },
+  "jest": {
+  "testEnvironment": "node"
   }
 }

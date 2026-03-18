@@ -163,11 +163,16 @@ Na raiz do projeto (`\baths`):
    - `npm run db:full`
 3. OU manualmente:
    - `npm run db:up`
+   - `npm run db:prepare`
+   - `npm run db:wait`
+   - `npm run db:baseline`
    - `npm run db:migrate`
-   - `npm run prisma:pull`
    - `npm run prisma:generate`
+   - `npm run db:seed`
 4. Iniciar o backend:
    - `npm start`
+
+Nota: `npm run prisma:pull` fica apenas para introspecao pontual, nao faz parte do fluxo normal de migracoes.
 
 Backend API:
 - `http://localhost:5000/events`
@@ -195,3 +200,34 @@ Frontend:
 1. `db:full`
 2. `backend npm start`
 3. `frontend npm start`
+
+
+## Testes Automatizados
+Os testes unitários do backend usam **Jest** e testam directamente as funções do repositório contra a base de dados.
+
+Na pasta `backend`:
+`npm test`
+
+**Requisitos antes de correr os testes:**
+1. Docker a correr (`npm run db:up`)
+2. Base de dados preparada (`npm run db:prepare`)
+3. Migrações aplicadas (`npm run db:migrate`)
+4. Seed executado (`npm run db:seed`)
+5. Ficheiro `.env` configurado com `DATABASE_URL`
+
+Ou simplesmente tudo de uma vez:
+`npm run db:full`
+
+
+## Integração Contínua (CI)
+
+O projecto tem um pipeline CI configurado com **GitHub Actions** que corre automaticamente em cada push ou pull request.
+
+O pipeline:
+1. Cria uma base de dados PostgreSQL limpa
+2. Instala as dependências
+3. Aplica as migrações
+4. Corre o seed
+5. Corre os testes do backend (`npm test`)
+
+O resultado aparece no separador **Actions** do repositório GitHub — ✅ se passar, ❌ se falhar.
