@@ -53,6 +53,16 @@ export default function Home() {
             href: '/billing',
             height: 180,
             width: 328
+        },
+        {
+            title: 'Funcionários',
+            description: 'Criar e gerir equipa, horários e especialidades.',
+            icon: BadgeIcon,
+            buttonText: 'Gerir',
+            buttonIcon: PeopleIcon,
+            href: '/funcionarios',
+            height: 180,
+            width: 328
         }
     ];
 
@@ -111,4 +121,3 @@ export default function Home() {
         </>
     );
 }
-

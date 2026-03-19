@@ -269,8 +269,175 @@ async function createFuncionario({
   }
 }
 
+async function updateFuncionario(
+  id,
+  {
+    nomeCompleto,
+    cargo,
+    telefone,
+    email,
+    porteAnimais,
+    tipoServicoIds,
+    horario,
+  }
+) {
+  if (!nomeCompleto || !cargo || !telefone || !email || !horario) {
+    throw new Error('nomeCompleto, cargo, telefone, email e horario sao obrigatorios.');
+  }
+
+  const existing = await prisma.funcionario.findUnique({
+    where: { id },
+    select: { id: true },
+  });
+
+  if (!existing) {
+    return null;
+  }
+
+  validateCargo(cargo);
+  const normalizedPorteAnimais = validatePorteAnimais(porteAnimais);
+  const normalizedDiasSemana = validateDiasSemana(horario.diasSemana);
+
+  const horaInicio = parseTimeToDate(horario.horaInicio, 'horaInicio');
+  const horaFim = parseTimeToDate(horario.horaFim, 'horaFim');
+  if (compareTimes(horaInicio, horaFim) >= 0) {
+    throw new Error('horaInicio deve ser menor que horaFim.');
+  }
+
+  const pausaInicio = parseTimeToDate(horario.pausaInicio || '13:00', 'pausaInicio');
+  const pausaFim = parseTimeToDate(horario.pausaFim || '14:00', 'pausaFim');
+  if (compareTimes(pausaInicio, pausaFim) >= 0) {
+    throw new Error('pausaInicio deve ser menor que pausaFim.');
+  }
+
+  if (compareTimes(pausaInicio, horaInicio) < 0 || compareTimes(pausaFim, horaFim) > 0) {
+    throw new Error('A pausa de almoco deve estar dentro do horario de trabalho.');
+  }
+
+  const normalizedEmail = String(email).trim().toLowerCase();
+  const normalizedServicoIds = normalizeUniqueArray(Array.isArray(tipoServicoIds) ? tipoServicoIds : []);
+  validateServicoIds(normalizedServicoIds);
+
+  if (normalizedServicoIds.length > 0) {
+    const servicosExistentes = await prisma.tipoServico.findMany({
+      where: { id: { in: normalizedServicoIds } },
+      select: { id: true },
+    });
+
+    if (servicosExistentes.length !== normalizedServicoIds.length) {
+      throw new Error('Um ou mais servicos nao existem.');
+    }
+  }
+
+  try {
+    const funcionario = await prisma.$transaction(async (tx) => {
+      await tx.utilizador.update({
+        where: { id },
+        data: {
+          nome: nomeCompleto,
+          email: normalizedEmail,
+          ativo: true,
+        },
+      });
+
+      await tx.funcionario.update({
+        where: { id },
+        data: {
+          cargo,
+          telefone,
+          porteAnimais: normalizedPorteAnimais,
+        },
+      });
+
+      await tx.horarioTrabalho.deleteMany({
+        where: { funcionarioId: id },
+      });
+
+      await tx.horarioTrabalho.create({
+        data: {
+          funcionarioId: id,
+          diasSemana: normalizedDiasSemana,
+          horaInicio,
+          horaFim,
+          pausaInicio,
+          pausaFim,
+          ativo: true,
+        },
+      });
+
+      await tx.funcionarioServico.deleteMany({
+        where: { funcionarioId: id },
+      });
+
+      if (normalizedServicoIds.length > 0) {
+        await tx.funcionarioServico.createMany({
+          data: normalizedServicoIds.map((tipoServicoId) => ({
+            funcionarioId: id,
+            tipoServicoId,
+          })),
+        });
+      }
+
+      return tx.funcionario.findUnique({
+        where: { id },
+        include: {
+          utilizador: true,
+          horariosTrabalho: true,
+          funcionarioServico: {
+            include: {
+              tipoServico: {
+                select: {
+                  tipo: true,
+                },
+              },
+            },
+          },
+        },
+      });
+    });
+
+    return mapFuncionarioRow(funcionario);
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+      throw new Error(`Ja existe um funcionario com o email "${normalizedEmail}".`);
+    }
+
+    throw error;
+  }
+}
+
+async function deleteFuncionario(id) {
+  const existing = await prisma.funcionario.findUnique({
+    where: { id },
+    select: { id: true },
+  });
+
+  if (!existing) {
+    return null;
+  }
+
+  await prisma.$transaction(async (tx) => {
+    await tx.utilizador.update({
+      where: { id },
+      data: {
+        ativo: false,
+        estadoConta: 'INATIVA',
+      },
+    });
+
+    await tx.horarioTrabalho.updateMany({
+      where: { funcionarioId: id },
+      data: { ativo: false },
+    });
+  });
+
+  return { removed: true, id };
+}
+
 module.exports = {
   getAllFuncionarios,
   getFuncionarioById,
   createFuncionario,
+  updateFuncionario,
+  deleteFuncionario,
 };

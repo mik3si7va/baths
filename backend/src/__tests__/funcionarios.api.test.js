@@ -121,4 +121,77 @@ describe('API Funcionarios - Testes de Endpoint', () => {
     expect(res.status).toBe(200);
     expect(Array.isArray(res.body)).toBe(true);
   });
+
+  test('PUT /funcionarios/{id} atualiza funcionario com 200', async () => {
+    const email = uniqueEmail('api.funcionario.update.base');
+    const novoEmail = uniqueEmail('api.funcionario.update.novo');
+
+    const createPayload = {
+      nomeCompleto: 'API Funcionario Para Update',
+      cargo: 'BANHISTA',
+      telefone: '944444444',
+      email,
+      porteAnimais: ['PEQUENO'],
+      tipoServicoIds: [servicoBanhoId],
+      horario: {
+        diasSemana: ['SEGUNDA', 'TERCA'],
+        horaInicio: '08:00',
+        horaFim: '17:00',
+      },
+    };
+
+    const created = await request(app).post('/funcionarios').send(createPayload);
+    expect(created.status).toBe(201);
+    createdEmails.push(email);
+    createdEmails.push(novoEmail);
+
+    const updatePayload = {
+      ...createPayload,
+      nomeCompleto: 'API Funcionario Atualizado',
+      telefone: '955555555',
+      email: novoEmail,
+      horario: {
+        diasSemana: ['TERCA', 'QUARTA', 'QUINTA'],
+        horaInicio: '09:00',
+        horaFim: '18:00',
+      },
+    };
+
+    const updated = await request(app).put(`/funcionarios/${created.body.id}`).send(updatePayload);
+
+    expect(updated.status).toBe(200);
+    expect(updated.body.nomeCompleto).toBe('API Funcionario Atualizado');
+    expect(updated.body.telefone).toBe('955555555');
+    expect(updated.body.email).toBe(novoEmail);
+  });
+
+  test('DELETE /funcionarios/{id} faz soft delete com 200', async () => {
+    const email = uniqueEmail('api.funcionario.delete');
+
+    const createPayload = {
+      nomeCompleto: 'API Funcionario Para Delete',
+      cargo: 'BANHISTA',
+      telefone: '966666666',
+      email,
+      porteAnimais: ['MEDIO'],
+      tipoServicoIds: [],
+      horario: {
+        diasSemana: ['SEGUNDA', 'TERCA'],
+        horaInicio: '09:00',
+        horaFim: '18:00',
+      },
+    };
+
+    const created = await request(app).post('/funcionarios').send(createPayload);
+    expect(created.status).toBe(201);
+    createdEmails.push(email);
+
+    const deleted = await request(app).delete(`/funcionarios/${created.body.id}`);
+    expect(deleted.status).toBe(200);
+    expect(deleted.body.removed).toBe(true);
+
+    const fetched = await request(app).get(`/funcionarios/${created.body.id}`);
+    expect(fetched.status).toBe(200);
+    expect(fetched.body.ativo).toBe(false);
+  });
 });

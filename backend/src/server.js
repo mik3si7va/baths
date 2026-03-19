@@ -6,7 +6,7 @@ const { prisma, closePrisma } = require('./db/prismaClient');
 const { getAllEvents, createEvent } = require('./repositories/eventsRepository');
 const { getAllTiposServico, createTipoServico, getAllRegrasPreco, createRegraPreco } = require('./repositories/repositorioServicos');
 const { getAllSalas, createSala, addServicoToSala, getServicosBySala, removeServicoFromSala } = require('./repositories/repositorioSalas');
-const { getAllFuncionarios, getFuncionarioById, createFuncionario } = require('./repositories/repositorioFuncionarios');
+const { getAllFuncionarios, getFuncionarioById, createFuncionario, updateFuncionario, deleteFuncionario } = require('./repositories/repositorioFuncionarios');
 
 const app = express();
 const PORT = Number(process.env.PORT || 5000);
@@ -300,6 +300,168 @@ app.post('/funcionarios', async (req, res) => {
     }
 
     return res.status(400).json({ error: error.message });
+  }
+});
+
+/**
+ * @swagger
+ * /funcionarios/{id}:
+ *   put:
+ *     summary: Atualiza um funcionario existente
+ *     tags: [Funcionarios]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: ID do funcionario
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/CreateFuncionarioRequest'
+ *     responses:
+ *       200:
+ *         description: Funcionario atualizado
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Funcionario'
+ *       400:
+ *         description: Dados invalidos
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *             examples:
+ *               horarioInvalido:
+ *                 summary: Horario invalido
+ *                 value:
+ *                   error: 'horaInicio deve ser menor que horaFim.'
+ *               servicosInvalidos:
+ *                 summary: Servico invalido
+ *                 value:
+ *                   error: 'tipoServicoIds deve conter apenas UUIDs validos.'
+ *       404:
+ *         description: Funcionario nao encontrado
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *             examples:
+ *               naoEncontrado:
+ *                 summary: Sem resultado para o id
+ *                 value:
+ *                   error: Funcionario nao encontrado
+ *       409:
+ *         description: Email ja existe
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *             examples:
+ *               emailDuplicado:
+ *                 summary: Email ja existente
+ *                 value:
+ *                   error: 'Ja existe um funcionario com o email "sofia.r@bet.com".'
+ */
+app.put('/funcionarios/:id', async (req, res) => {
+  const { id } = req.params;
+  const { nomeCompleto, cargo, telefone, email, porteAnimais, tipoServicoIds, horario } = req.body || {};
+
+  if (!nomeCompleto || !cargo || !telefone || !email || !horario) {
+    return res.status(400).json({ error: 'nomeCompleto, cargo, telefone, email e horario sao obrigatorios' });
+  }
+
+  try {
+    const funcionarioAtualizado = await updateFuncionario(id, {
+      nomeCompleto,
+      cargo,
+      telefone,
+      email,
+      porteAnimais,
+      tipoServicoIds,
+      horario,
+    });
+
+    if (!funcionarioAtualizado) {
+      return res.status(404).json({ error: 'Funcionario nao encontrado' });
+    }
+
+    return res.json(funcionarioAtualizado);
+  } catch (error) {
+    console.error('Failed to update funcionario:', error);
+
+    if (error.message?.startsWith('Ja existe um funcionario com o email')) {
+      return res.status(409).json({ error: error.message });
+    }
+
+    return res.status(400).json({ error: error.message });
+  }
+});
+
+/**
+ * @swagger
+ * /funcionarios/{id}:
+ *   delete:
+ *     summary: Remove (inativa) um funcionario
+ *     tags: [Funcionarios]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: ID do funcionario
+ *     responses:
+ *       200:
+ *         description: Funcionario inativado com sucesso
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 removed:
+ *                   type: boolean
+ *                   example: true
+ *                 id:
+ *                   type: string
+ *                   format: uuid
+ *       404:
+ *         description: Funcionario nao encontrado
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *             examples:
+ *               naoEncontrado:
+ *                 summary: Sem resultado para o id
+ *                 value:
+ *                   error: Funcionario nao encontrado
+ *       500:
+ *         description: Erro interno
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ */
+app.delete('/funcionarios/:id', async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const result = await deleteFuncionario(id);
+    if (!result) {
+      return res.status(404).json({ error: 'Funcionario nao encontrado' });
+    }
+
+    return res.json(result);
+  } catch (error) {
+    console.error('Failed to delete funcionario:', error);
+    return res.status(500).json({ error: 'Failed to delete funcionario' });
   }
 });
 
