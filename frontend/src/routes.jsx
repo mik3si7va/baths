@@ -1,10 +1,10 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { MainLayout, CompactLayout } from './layouts';
-import { Home, Calendar, Login, CriarSala } from './pages';
-import ServicosPage from './pages/servicos/servicos';
-import CriarServicoPage from './pages/servicos/criarServico';
+import { Home, Calendar, Login, CriarSala } from './pages'
 import App from './App';
+
+
 
 const PrivateRoute = ({ element }) => {
     const user = localStorage.getItem('usernameB&T');
@@ -21,65 +21,41 @@ export default function AppRoutes() {
         <BrowserRouter>
             <Routes>
                 <Route path="/" element={<App />} />
-                <Route
-                    path="/home"
+                <Route 
+                    path="/home" 
                     element={
-                        <PrivateRoute
+                        <PrivateRoute 
                             element={
                                 <MainLayout>
                                     <Home />
                                 </MainLayout>
-                            }
+                            } 
                         />
-                    }
+                    } 
                 />
-                <Route
-                    path="/calendar"
+                <Route 
+                    path="/calendar" 
                     element={
-                        <PrivateRoute
+                        <PrivateRoute 
                             element={
                                 <CompactLayout>
                                     <Calendar />
                                 </CompactLayout>
-                            }
+                            } 
                         />
-                    }
+                    } 
                 />
-                <Route
-                    path="/salas/nova"
+                <Route 
+                    path="/salas/nova" 
                     element={
-                        <PrivateRoute
+                        <PrivateRoute 
                             element={
                                 <CompactLayout>
                                     <CriarSala />
                                 </CompactLayout>
-                            }
+                            } 
                         />
-                    }
-                />
-                <Route
-                    path="/servicos"
-                    element={
-                        <PrivateRoute
-                            element={
-                                <CompactLayout>
-                                    <ServicosPage />
-                                </CompactLayout>
-                            }
-                        />
-                    }
-                />
-                <Route
-                    path="/servicos/novo"
-                    element={
-                        <PrivateRoute
-                            element={
-                                <CompactLayout>
-                                    <CriarServicoPage />
-                                </CompactLayout>
-                            }
-                        />
-                    }
+                    } 
                 />
                 <Route path="/login" element={<PublicLoginRoute />} />
             </Routes>
