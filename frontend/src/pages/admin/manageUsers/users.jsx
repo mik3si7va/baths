@@ -335,7 +335,7 @@ export default function Users() {
             Horario de trabalho
           </Typography>
 
-          <Alert severity="info">Domingo e dia de descanso semanal e nao pode ser selecionado.</Alert>
+          <Alert severity="info">Domingo é dia de descanso semanal e nao pode ser selecionado.</Alert>
 
           <FormGroup sx={{ display: 'grid', gridTemplateColumns: { xs: 'repeat(2, 1fr)', md: 'repeat(3, 1fr)' } }}>
             {DIA_OPTIONS.map((dia) => (

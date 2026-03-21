@@ -1,7 +1,7 @@
 ﻿import React from 'react';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import Users from '../pages/amin/manageUsers/users';
+import Users from '../pages/admin/manageUsers/users';
 import { ThemeProvider } from '../contexts/ThemeContext';
 
 let consoleErrorSpy;
