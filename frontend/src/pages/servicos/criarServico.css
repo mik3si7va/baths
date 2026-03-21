@@ -1,0 +1,136 @@
+/* ── Grelha de seleção de tipo ────────────────────────── */
+.tipo-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.tipo-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 2px solid #e0dbd0;
+  border-radius: 12px;
+  cursor: pointer;
+  background: #fff;
+  transition: all 0.15s ease;
+  text-align: left;
+  width: 100%;
+}
+
+.tipo-option:hover {
+  border-color: #475C51;
+  background: #f5f0e8;
+}
+
+.tipo-option.selected {
+  border-color: #475C51;
+  background: rgba(71, 92, 81, 0.08);
+}
+
+.tipo-option.disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.tipo-option-icon {
+  font-size: 1.3rem;
+  flex-shrink: 0;
+}
+
+.tipo-option-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.tipo-option-label {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #102622;
+  line-height: 1.2;
+  font-family: 'Inter', sans-serif;
+}
+
+.tipo-option-sub {
+  font-size: 0.7rem;
+  color: #666666;
+  margin-top: 2px;
+  font-family: 'Inter', sans-serif;
+}
+
+.tipo-option.selected .tipo-option-label {
+  color: #475C51;
+}
+
+/* ── Tabela de regras por porte ───────────────────────── */
+.regras-table-wrap {
+  overflow-x: auto;
+}
+
+.regras-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.88rem;
+}
+
+.regras-table thead tr {
+  background: #f5f0e8;
+  border-bottom: 2px solid #e0dbd0;
+}
+
+.regras-table th {
+  padding: 10px 14px;
+  text-align: left;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #102622;
+  white-space: nowrap;
+  font-family: 'Inter', sans-serif;
+}
+
+.regras-table tbody tr {
+  border-bottom: 1px solid #ede8e0;
+}
+
+.regras-table tbody tr:last-child {
+  border-bottom: none;
+}
+
+.regras-table td {
+  padding: 10px 14px;
+  vertical-align: middle;
+}
+
+/* ── Inputs inline na tabela ──────────────────────────── */
+.input-inline {
+  border: 1.5px solid #e0dbd0;
+  border-radius: 8px;
+  padding: 7px 10px;
+  font-size: 0.88rem;
+  color: #102622;
+  outline: none;
+  width: 90px;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease;
+  background: #fff;
+  font-family: 'Inter', sans-serif;
+}
+
+.input-inline:focus {
+  border-color: #475C51;
+  box-shadow: 0 0 0 3px rgba(71, 92, 81, 0.15);
+}
+
+.input-inline.error {
+  border-color: #dc2626;
+}
+
+@media (max-width: 600px) {
+  .tipo-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
