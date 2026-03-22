@@ -1,7 +1,7 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { MainLayout, CompactLayout } from './layouts';
-import { Home, Calendar, Login, CriarSala } from './pages'
+import { Home, Calendar, Login, CriarSala, Users } from './pages'
 import App from './App';
 
 
@@ -56,6 +56,18 @@ export default function AppRoutes() {
                             } 
                         />
                     } 
+                />
+                <Route
+                    path="/funcionarios"
+                    element={
+                        <PrivateRoute
+                            element={
+                                <CompactLayout>
+                                    <Users />
+                                </CompactLayout>
+                            }
+                        />
+                    }
                 />
                 <Route path="/login" element={<PublicLoginRoute />} />
             </Routes>

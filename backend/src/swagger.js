@@ -66,6 +66,36 @@ const options = {
           example: 'MEDIO',
         },
 
+        DiaSemanaEnum: {
+          type: 'string',
+          enum: [
+            'SEGUNDA',
+            'TERCA',
+            'QUARTA',
+            'QUINTA',
+            'SEXTA',
+            'SABADO',
+          ],
+          description: 'Dias da semana permitidos para horario de trabalho (domingo nao permitido).',
+          example: 'TERCA',
+        },
+
+        TipoFuncionarioEnum: {
+          type: 'string',
+          enum: [
+            'TOSQUIADOR_SENIOR',
+            'TOSQUIADOR',
+            'TOSQUIADOR_ESTAGIARIO',
+            'BANHISTA_SENIOR',
+            'BANHISTA',
+            'BANHISTA_ESTAGIARIO',
+            'RECECIONISTA',
+            'ADMINISTRACAO',
+          ],
+          description: 'Cargos de funcionario disponiveis no sistema.',
+          example: 'BANHISTA',
+        },
+
         // ─── ENTIDADES ───────────────────────────────────────────
         TipoServico: {
           type: 'object',
@@ -198,6 +228,172 @@ const options = {
               type: 'string',
               format: 'date-time',
               example: '2025-06-01T11:00:00Z',
+            },
+          },
+        },
+
+        HorarioTrabalho: {
+          type: 'object',
+          properties: {
+            id: {
+              type: 'string',
+              format: 'uuid',
+            },
+            diasSemana: {
+              type: 'array',
+              items: {
+                $ref: '#/components/schemas/DiaSemanaEnum',
+              },
+            },
+            horaInicio: {
+              type: 'string',
+              example: '09:00',
+            },
+            horaFim: {
+              type: 'string',
+              example: '18:00',
+            },
+            pausaInicio: {
+              type: 'string',
+              example: '13:00',
+            },
+            pausaFim: {
+              type: 'string',
+              example: '14:00',
+            },
+            ativo: {
+              type: 'boolean',
+              example: true,
+            },
+          },
+        },
+
+        FuncionarioServicoResumo: {
+          type: 'object',
+          properties: {
+            tipoServicoId: {
+              type: 'string',
+              format: 'uuid',
+            },
+            tipo: {
+              $ref: '#/components/schemas/TipoServicoEnum',
+            },
+          },
+        },
+
+        Funcionario: {
+          type: 'object',
+          properties: {
+            id: {
+              type: 'string',
+              format: 'uuid',
+            },
+            nomeCompleto: {
+              type: 'string',
+              example: 'Sofia Ramalho',
+            },
+            cargo: {
+              $ref: '#/components/schemas/TipoFuncionarioEnum',
+            },
+            telefone: {
+              type: 'string',
+              example: '912345678',
+            },
+            email: {
+              type: 'string',
+              format: 'email',
+              example: 'sofia.r@bet.com',
+            },
+            porteAnimais: {
+              type: 'array',
+              items: {
+                $ref: '#/components/schemas/PorteEnum',
+              },
+            },
+            ativo: {
+              type: 'boolean',
+              example: true,
+            },
+            horariosTrabalho: {
+              type: 'array',
+              items: {
+                $ref: '#/components/schemas/HorarioTrabalho',
+              },
+            },
+            servicos: {
+              type: 'array',
+              items: {
+                $ref: '#/components/schemas/FuncionarioServicoResumo',
+              },
+            },
+          },
+        },
+
+        CreateFuncionarioRequest: {
+          type: 'object',
+          required: ['nomeCompleto', 'cargo', 'telefone', 'email', 'porteAnimais', 'horario'],
+          properties: {
+            nomeCompleto: {
+              type: 'string',
+              example: 'Sofia Ramalho',
+            },
+            cargo: {
+              $ref: '#/components/schemas/TipoFuncionarioEnum',
+            },
+            telefone: {
+              type: 'string',
+              example: '912345678',
+            },
+            email: {
+              type: 'string',
+              format: 'email',
+              example: 'sofia.r@bet.com',
+            },
+            porteAnimais: {
+              type: 'array',
+              items: {
+                $ref: '#/components/schemas/PorteEnum',
+              },
+            },
+            tipoServicoIds: {
+              type: 'array',
+              items: {
+                type: 'string',
+                format: 'uuid',
+              },
+              example: [
+                '11111111-1111-1111-1111-111111111111',
+                '22222222-2222-2222-2222-222222222222',
+              ],
+            },
+            horario: {
+              type: 'object',
+              required: ['diasSemana', 'horaInicio', 'horaFim'],
+              properties: {
+                diasSemana: {
+                  type: 'array',
+                  items: {
+                    $ref: '#/components/schemas/DiaSemanaEnum',
+                  },
+                  example: ['TERCA', 'QUARTA', 'QUINTA', 'SEXTA', 'SABADO'],
+                },
+                horaInicio: {
+                  type: 'string',
+                  example: '09:00',
+                },
+                horaFim: {
+                  type: 'string',
+                  example: '18:00',
+                },
+                pausaInicio: {
+                  type: 'string',
+                  example: '13:00',
+                },
+                pausaFim: {
+                  type: 'string',
+                  example: '14:00',
+                },
+              },
             },
           },
         },
