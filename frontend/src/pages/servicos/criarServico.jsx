@@ -2,28 +2,13 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Box, Typography, Button, Paper, Alert,
-  Stepper, Step, StepLabel, TextField, Chip
+  Stepper, Step, StepLabel, TextField, Chip, Switch, FormControlLabel
 } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 import CheckIcon from '@mui/icons-material/Check';
 import { useThemeContext } from '../../contexts/ThemeContext';
 import './criarServico.css';
-
-// ── Metadados dos tipos de serviço ──────────────────────
-const TIPO_META = {
-  BANHO:               { icon: '🛁', label: 'Banho',                 sub: 'Requer porte',  requiresSize: true  },
-  TOSQUIA_COMPLETA:    { icon: '✂️', label: 'Tosquia Completa',       sub: 'Requer porte',  requiresSize: true  },
-  TOSQUIA_HIGIENICA:   { icon: '🪮', label: 'Tosquia Higiénica',      sub: 'Requer porte',  requiresSize: true  },
-  CORTE_UNHAS:         { icon: '💅', label: 'Corte de Unhas',         sub: 'Preço único',   requiresSize: false },
-  LIMPEZA_OUVIDOS:     { icon: '👂', label: 'Limpeza de Ouvidos',     sub: 'Preço único',   requiresSize: false },
-  EXPRESSAO_GLANDULAS: { icon: '💉', label: 'Expressão de Glândulas', sub: 'Preço único',   requiresSize: false },
-  LIMPEZA_DENTES:      { icon: '🦷', label: 'Limpeza de Dentes',      sub: 'Preço único',   requiresSize: false },
-  APARAR_PELO_CARA:    { icon: '🐾', label: 'Aparar Pelo da Cara',    sub: 'Preço único',   requiresSize: false },
-  ANTI_PULGAS:         { icon: '🦟', label: 'Anti-Pulgas',            sub: 'Preço único',   requiresSize: false },
-  ANTI_QUEDA:          { icon: '🧴', label: 'Anti-Queda',             sub: 'Preço único',   requiresSize: false },
-  REMOCAO_NOS:         { icon: '🪢', label: 'Remoção de Nós',         sub: 'Preço único',   requiresSize: false },
-};
 
 const PORTES = [
   { value: 'EXTRA_PEQUENO', label: 'Extra Pequeno', range: '0.5 – 4.5 kg' },
@@ -45,56 +30,60 @@ export default function CriarServicoPage() {
   const navigate = useNavigate();
   const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
 
-  const [step, setStep]                       = useState(0); // MUI Stepper é 0-indexed
-  const [tipoSelecionado, setTipo]             = useState(null);
-  const [tiposExistentes, setTiposExistentes]  = useState(new Set());
-  const [regrasPorPorte, setRegrasPorPorte]    = useState(initRegrasPorPorte());
-  const [precoUnico, setPrecoUnico]            = useState('');
-  const [duracaoUnica, setDuracaoUnica]        = useState('');
-  const [submitting, setSubmitting]            = useState(false);
-  const [submitError, setSubmitError]          = useState('');
-  const [submitSuccess, setSubmitSuccess]      = useState('');
-  const [errors, setErrors]                    = useState({});
-
-  useEffect(() => {
-    fetch(`${API_BASE_URL}/servicos`)
-      .then((r) => r.ok ? r.json() : [])
-      .then((data) => setTiposExistentes(new Set(data.map((s) => s.tipo))))
-      .catch(() => {});
-  }, [API_BASE_URL]);
-
-  const meta = tipoSelecionado ? TIPO_META[tipoSelecionado] : null;
+  const [step, setStep]                     = useState(0);
+  const [nomeServico, setNomeServico]        = useState('');
+  const [requiresSize, setRequiresSize]      = useState(false);
+  const [regrasPorPorte, setRegrasPorPorte]  = useState(initRegrasPorPorte());
+  const [precoUnico, setPrecoUnico]          = useState('');
+  const [duracaoUnica, setDuracaoUnica]      = useState('');
+  const [submitting, setSubmitting]          = useState(false);
+  const [submitError, setSubmitError]        = useState('');
+  const [submitSuccess, setSubmitSuccess]    = useState('');
+  const [errors, setErrors]                  = useState({});
 
   function updateRegraPorte(porte, field, value) {
     setRegrasPorPorte((prev) => ({ ...prev, [porte]: { ...prev[porte], [field]: value } }));
     setErrors((prev) => ({ ...prev, [`${porte}_${field}`]: null }));
   }
 
-  function validateStep2() {
+  function validateStep0() {
+    if (!nomeServico.trim()) {
+      setErrors({ nomeServico: 'O nome do serviço é obrigatório.' });
+      return false;
+    }
+    setErrors({});
+    return true;
+  }
+
+  function validateStep1() {
     const errs = {};
-    if (meta.requiresSize) {
+    if (requiresSize) {
       PORTES.forEach(({ value }) => {
         const r = regrasPorPorte[value];
-        if (!r.precoBase || Number(r.precoBase) <= 0)       errs[`${value}_precoBase`] = 'Obrigatório';
-        if (!r.duracaoMinutos || Number(r.duracaoMinutos) <= 0) errs[`${value}_duracaoMinutos`] = 'Obrigatório';
+        if (!r.precoBase || Number(r.precoBase) <= 0)
+          errs[`${value}_precoBase`] = 'Obrigatório';
+        if (!r.duracaoMinutos || Number(r.duracaoMinutos) <= 0)
+          errs[`${value}_duracaoMinutos`] = 'Obrigatório';
       });
     } else {
-      if (!precoUnico || Number(precoUnico) <= 0)     errs['precoUnico']  = 'Preço base obrigatório e deve ser positivo';
-      if (!duracaoUnica || Number(duracaoUnica) <= 0) errs['duracaoUnica'] = 'Duração obrigatória e deve ser positiva';
+      if (!precoUnico || Number(precoUnico) <= 0)
+        errs['precoUnico'] = 'Preço base obrigatório e deve ser positivo';
+      if (!duracaoUnica || Number(duracaoUnica) <= 0)
+        errs['duracaoUnica'] = 'Duração obrigatória e deve ser positiva';
     }
     setErrors(errs);
     return Object.keys(errs).length === 0;
   }
 
   async function handleSubmit() {
-    if (!validateStep2()) return;
+    if (!validateStep1()) return;
     setSubmitting(true);
     setSubmitError('');
     try {
       const resServico = await fetch(`${API_BASE_URL}/servicos`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tipo: tipoSelecionado }),
+        body: JSON.stringify({ tipo: nomeServico.trim() }),
       });
       if (!resServico.ok) {
         const err = await resServico.json();
@@ -103,7 +92,7 @@ export default function CriarServicoPage() {
       const novoServico = await resServico.json();
       const tipoServicoId = novoServico.id;
 
-      const regrasPayload = meta.requiresSize
+      const regrasPayload = requiresSize
         ? PORTES.map(({ value }) => ({
             tipoServicoId,
             porteAnimal: value,
@@ -127,7 +116,7 @@ export default function CriarServicoPage() {
         throw new Error(err.error || 'Erro ao criar regras de preço');
       }
 
-      setSubmitSuccess(`Serviço "${meta.label}" criado com sucesso!`);
+      setSubmitSuccess(`Serviço "${nomeServico.trim()}" criado com sucesso!`);
       setTimeout(() => navigate('/servicos'), 1800);
     } catch (err) {
       setSubmitError(err.message);
@@ -153,63 +142,69 @@ export default function CriarServicoPage() {
 
       <Typography variant="h1" sx={{ mb: 0.5, color: colors.text }}>Criar Novo Serviço</Typography>
       <Typography variant="body1" sx={{ mb: 3, color: colors.textSecondary }}>
-        Define o tipo de serviço e as regras de preço por porte de animal.
+        Define o nome do serviço e as regras de preço.
       </Typography>
 
       {/* Stepper */}
       <Stepper activeStep={step} sx={{ mb: 3 }}>
-        <Step>
-          <StepLabel>Tipo de Serviço</StepLabel>
-        </Step>
-        <Step>
-          <StepLabel>Preços &amp; Duração</StepLabel>
-        </Step>
+        <Step><StepLabel>Nome do Serviço</StepLabel></Step>
+        <Step><StepLabel>Preços &amp; Duração</StepLabel></Step>
       </Stepper>
 
-      {/* ── STEP 0: Escolha do tipo ── */}
+      {/* ── STEP 0: Nome do serviço ── */}
       {step === 0 && (
         <Paper elevation={2} sx={{ borderRadius: 3, overflow: 'hidden' }}>
-          <Box sx={{ p: 3 }}>
-            <Typography variant="h2" sx={{ color: colors.text, mb: 2 }}>
-              Escolhe o tipo de serviço
+          <Box sx={{ p: 3, display: 'flex', flexDirection: 'column', gap: 3 }}>
+            <Typography variant="h2" sx={{ color: colors.text }}>
+              Nome do serviço
             </Typography>
-            <div className="tipo-grid">
-              {Object.entries(TIPO_META).map(([value, info]) => {
-                const jaExiste = tiposExistentes.has(value);
-                return (
-                  <button
-                    key={value}
-                    type="button"
-                    className={[
-                      'tipo-option',
-                      tipoSelecionado === value ? 'selected' : '',
-                      jaExiste ? 'disabled' : '',
-                    ].join(' ')}
-                    onClick={() => !jaExiste && setTipo(value)}
-                    title={jaExiste ? 'Este serviço já está registado' : info.label}
-                  >
-                    <span className="tipo-option-icon">{info.icon}</span>
-                    <span className="tipo-option-info">
-                      <span className="tipo-option-label">{info.label}</span>
-                      <span className="tipo-option-sub">
-                        {jaExiste ? '⚠️ Já existe' : info.sub}
-                      </span>
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
+
+            <TextField
+              label="Nome do serviço"
+              placeholder="Ex: Banho completo, Tosquia, Corte de unhas..."
+              value={nomeServico}
+              onChange={(e) => {
+                setNomeServico(e.target.value);
+                setErrors({});
+              }}
+              error={!!errors.nomeServico}
+              helperText={errors.nomeServico}
+              fullWidth
+              autoFocus
+            />
+
+            <Box>
+              <Typography variant="body1" sx={{ color: colors.text, mb: 1, fontWeight: 600 }}>
+                O preço varia consoante o porte do animal?
+              </Typography>
+              <FormControlLabel
+                control={
+                  <Switch
+                    checked={requiresSize}
+                    onChange={(e) => setRequiresSize(e.target.checked)}
+                    sx={{
+                      '& .MuiSwitch-switchBase.Mui-checked': { color: colors.primary },
+                      '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': { backgroundColor: colors.primary },
+                    }}
+                  />
+                }
+                label={requiresSize ? 'Sim — preço por porte' : 'Não — preço único'}
+              />
+            </Box>
           </Box>
+
           <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1.5, px: 3, py: 2, borderTop: '1px solid #ede8e0' }}>
-            <Button variant="outlined" onClick={() => navigate('/servicos')}
-              sx={{ borderColor: colors.primary, color: colors.primary }}>
+            <Button
+              variant="outlined"
+              onClick={() => navigate('/servicos')}
+              sx={{ borderColor: colors.primary, color: colors.primary }}
+            >
               Cancelar
             </Button>
             <Button
               variant="contained"
               endIcon={<ArrowForwardIcon />}
-              disabled={!tipoSelecionado}
-              onClick={() => setStep(1)}
+              onClick={() => { if (validateStep0()) setStep(1); }}
               sx={{ backgroundColor: colors.primary, '&:hover': { backgroundColor: colors.primary + 'dd' } }}
             >
               Continuar
@@ -219,18 +214,17 @@ export default function CriarServicoPage() {
       )}
 
       {/* ── STEP 1: Preços e duração ── */}
-      {step === 1 && meta && (
+      {step === 1 && (
         <Paper elevation={2} sx={{ borderRadius: 3, overflow: 'hidden' }}>
           <Box sx={{ p: 3 }}>
             <Typography variant="h2" sx={{ color: colors.text, mb: 2 }}>
-              {meta.icon} {meta.label}
+              {nomeServico.trim()}
             </Typography>
 
             {submitSuccess && <Alert severity="success" sx={{ mb: 2 }}>{submitSuccess}</Alert>}
-            {submitError  && <Alert severity="error"   sx={{ mb: 2 }}>{submitError}</Alert>}
+            {submitError   && <Alert severity="error"   sx={{ mb: 2 }}>{submitError}</Alert>}
 
-            {meta.requiresSize ? (
-              /* Tabela de preços por porte */
+            {requiresSize ? (
               <>
                 <Alert severity="info" sx={{ mb: 2 }}>
                   Este serviço varia consoante o porte do animal. Preenche o preço base e a duração estimada para cada porte.
@@ -280,7 +274,6 @@ export default function CriarServicoPage() {
                 </div>
               </>
             ) : (
-              /* Preço único */
               <>
                 <Alert severity="info" sx={{ mb: 3 }}>
                   Este serviço tem um preço único independente do porte do animal.
@@ -314,8 +307,12 @@ export default function CriarServicoPage() {
           </Box>
 
           <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1.5, px: 3, py: 2, borderTop: '1px solid #ede8e0' }}>
-            <Button variant="outlined" startIcon={<ArrowBackIcon />} onClick={() => setStep(0)}
-              sx={{ borderColor: colors.primary, color: colors.primary }}>
+            <Button
+              variant="outlined"
+              startIcon={<ArrowBackIcon />}
+              onClick={() => setStep(0)}
+              sx={{ borderColor: colors.primary, color: colors.primary }}
+            >
               Voltar
             </Button>
             <Button

@@ -66,37 +66,45 @@ async function getAllTiposServico() {
 /**
  * Cria um novo tipo de serviço na base de dados.
  *
- * Valida se o valor de `tipo` pertence ao enum `TipoServicoEnum` antes de
- * executar o INSERT. O cast `::tipo_servico_enum` na query serve como
- * segunda linha de defesa ao nível da base de dados.
+ * O campo `tipo` é agora uma string livre definida pelo utilizador.
+ * Validações aplicadas:
+ *   - Obrigatório e não pode estar vazio
+ *   - Não pode duplicar um nome já existente (case-insensitive)
  *
- * @async
- * @function createTipoServico
- * @param {Object} params - Parâmetros do serviço.
- * @param {string} params.tipo - Valor do enum do serviço.
- *   Valores aceites: 'BANHO' | 'TOSQUIA_COMPLETA' | 'TOSQUIA_HIGIENICA' |
- *   'CORTE_UNHAS' | 'LIMPEZA_OUVIDOS' | 'EXPRESSAO_GLANDULAS' |
- *   'LIMPEZA_DENTES' | 'APARAR_PELO_CARA' | 'ANTI_PULGAS' |
- *   'ANTI_QUEDA' | 'REMOCAO_NOS'
+ * @param {Object} params
+ * @param {string} params.tipo - Nome do serviço (string livre)
  * @returns {Promise<{ id: string, tipo: string, ativo: boolean }>}
- *   O serviço criado com o seu novo UUID e `ativo: true`.
- * @throws {Error} Se `tipo` não for um valor válido de `TipoServicoEnum`.
+ * @throws {Error} Se tipo estiver vazio ou já existir
  */
 async function createTipoServico({ tipo }) {
-    if (!TIPOS_SERVICO_VALIDOS.has(tipo)) {
-        throw new Error(
-            `Tipo de serviço inválido: "${tipo}". Valores aceites: ${[...TIPOS_SERVICO_VALIDOS].join(', ')}`
-        );
+    if (!tipo || typeof tipo !== 'string' || tipo.trim() === '') {
+        throw new Error('O nome do serviço é obrigatório e não pode estar vazio.');
     }
-
+ 
+    const tipoNormalizado = tipo.trim();
+ 
+    // Verificar duplicado (case-insensitive)
+    const existente = await prisma.tipoServico.findFirst({
+        where: {
+            tipo: {
+                equals: tipoNormalizado,
+                mode: 'insensitive',
+            },
+        },
+    });
+ 
+    if (existente) {
+        throw new Error(`Já existe um serviço com o nome "${tipoNormalizado}".`);
+    }
+ 
     const novoTipoServico = await prisma.tipoServico.create({
         data: {
             id: randomUUID(),
-            tipo,
+            tipo: tipoNormalizado,
             ativo: true,
         },
     });
-
+ 
     return mapTipoServicoRow(novoTipoServico);
 }
 
