@@ -1,6 +1,27 @@
+const { Prisma } = require('@prisma/client');
 const { prisma } = require('../db/prismaClient');
 const Sala = require('../domain/entities/Sala');
 const SalaServico = require('../domain/entities/SalaServico');
+
+function isUuid(value) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+}
+
+function normalizeUniqueArray(values = []) {
+  return [...new Set(values)];
+}
+
+function validateServicoIds(servicoIds) {
+  if (!Array.isArray(servicoIds) || servicoIds.length === 0) {
+    throw new Error('tipoServicoIds e obrigatorio e deve ter pelo menos um servico.');
+  }
+
+  for (const id of servicoIds) {
+    if (!isUuid(id)) {
+      throw new Error('tipoServicoIds deve conter apenas UUIDs validos.');
+    }
+  }
+}
 
 function mapSalaRow(row) {
   return new Sala({
@@ -17,10 +38,10 @@ function mapSalaRow(row) {
 
 async function getAllSalas() {
   const salas = await prisma.sala.findMany({
-    where: {
+    where: { 
       ativo: true,
     },
-    orderBy: {
+    orderBy: { 
       nome: 'asc',
     },
   });
@@ -28,52 +49,240 @@ async function getAllSalas() {
   return salas.map(mapSalaRow);
 }
 
-async function createSala({ nome, capacidade, equipamento, precoHora }) {
-  const sala = await prisma.sala.create({
-    data: {
-      nome,
-      capacidade,
-      equipamento,
-      precoHora,
-    },
+async function getSalaById(id) {
+  const sala = await prisma.sala.findUnique({ 
+    where: { id },
   });
+
+  if (!sala) {
+    return null;
+  }
 
   return mapSalaRow(sala);
 }
 
-async function addServicoToSala({ salaId, tipoServicoId }) {
-  const resultado = await prisma.salaServico.create({
-    data: {
-      salaId,
-      tipoServicoId,
-    },
+async function createSala({ nome, capacidade, equipamento, precoHora, tipoServicoIds }) {
+  if (nome === undefined || nome === null || nome.trim() === '') {
+    throw new Error('nome, capacidade, equipamento e precoHora sao obrigatorios.');
+  }
+  
+  if (capacidade === undefined || capacidade === null) {
+    throw new Error('nome, capacidade, equipamento e precoHora sao obrigatorios.');
+  }
+  
+  if (equipamento === undefined || equipamento === null || equipamento.trim() === '') {
+    throw new Error('nome, capacidade, equipamento e precoHora sao obrigatorios.');
+  }
+  
+  if (precoHora === undefined || precoHora === null) {
+    throw new Error('nome, capacidade, equipamento e precoHora sao obrigatorios.');
+  }
+
+  if (typeof capacidade !== 'number' || capacidade < 1 || !Number.isInteger(capacidade)) {
+    throw new Error('capacidade deve ser um numero inteiro positivo.');
+  }
+
+  if (typeof precoHora !== 'number' || precoHora <= 0) {
+    throw new Error('precoHora deve ser um numero positivo.');
+  }
+
+
+  const normalizedServicoIds = normalizeUniqueArray(Array.isArray(tipoServicoIds) ? tipoServicoIds : []);
+  validateServicoIds(normalizedServicoIds);
+
+  const servicosExistentes = await prisma.tipoServico.findMany({
+    where: { id: { in: normalizedServicoIds } },
+    select: { id: true },
   });
 
-  return new SalaServico({
-    id: resultado.id,
-    salaId: resultado.salaId,
-    tipoServicoId: resultado.tipoServicoId,
-    dataAssociacao: resultado.dataAssociacao,
+  if (servicosExistentes.length !== normalizedServicoIds.length) {
+    throw new Error('Um ou mais servicos nao existem.');
+  }
+
+  try {
+    const sala = await prisma.$transaction(async (tx) => {
+      const novaSala = await tx.sala.create({
+        data: { 
+          nome, 
+          capacidade, 
+          equipamento, 
+          precoHora,
+        },
+      });
+
+      await tx.salaServico.createMany({
+        data: normalizedServicoIds.map((tipoServicoId) => ({
+          salaId: novaSala.id,
+          tipoServicoId,
+        })),
+      });
+
+      return tx.sala.findUnique({
+        where: { id: novaSala.id },
+        include: {
+          salasServico: {
+            include: {
+              tipoServico: true,
+            },
+          },
+        },
+      });
+    });
+
+    return mapSalaRow(sala);
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+      throw new Error(`Ja existe uma sala com o nome "${nome}".`);
+    }
+
+    throw error;
+  }
+}
+
+async function updateSala(id, { nome, capacidade, equipamento, precoHora, tipoServicoIds }) {
+  if (nome === undefined || nome === null || nome.trim() === '') {
+    throw new Error('nome, capacidade, equipamento e precoHora sao obrigatorios.');
+  }
+  
+  if (capacidade === undefined || capacidade === null) {
+    throw new Error('nome, capacidade, equipamento e precoHora sao obrigatorios.');
+  }
+  
+  if (equipamento === undefined || equipamento === null || equipamento.trim() === '') {
+    throw new Error('nome, capacidade, equipamento e precoHora sao obrigatorios.');
+  }
+  
+  if (precoHora === undefined || precoHora === null) {
+    throw new Error('nome, capacidade, equipamento e precoHora sao obrigatorios.');
+  }
+
+  if (typeof capacidade !== 'number' || capacidade < 1 || !Number.isInteger(capacidade)) {
+    throw new Error('capacidade deve ser um numero inteiro positivo.');
+  }
+
+  if (typeof precoHora !== 'number' || precoHora <= 0) {
+    throw new Error('precoHora deve ser um numero positivo.');
+  }
+
+  const existing = await prisma.sala.findUnique({
+    where: { id },
+    select: { id: true },
   });
+
+  if (!existing) {
+    return null;
+  }
+
+  const normalizedServicoIds = normalizeUniqueArray(Array.isArray(tipoServicoIds) ? tipoServicoIds : []);
+  validateServicoIds(normalizedServicoIds);
+
+  const servicosExistentes = await prisma.tipoServico.findMany({
+    where: { id: { in: normalizedServicoIds } },
+    select: { id: true },
+  });
+
+  if (servicosExistentes.length !== normalizedServicoIds.length) {
+    throw new Error('Um ou mais servicos nao existem.');
+  }
+
+  try {
+    const sala = await prisma.$transaction(async (tx) => {
+      const salaAtualizada = await tx.sala.update({
+        where: { id },
+        data: { nome, capacidade, equipamento, precoHora, updatedAt: new Date() },
+      });
+
+      await tx.salaServico.deleteMany({ where: { salaId: id } });
+
+      await tx.salaServico.createMany({
+        data: normalizedServicoIds.map((tipoServicoId) => ({
+          salaId: id,
+          tipoServicoId,
+        })),
+      });
+
+      return salaAtualizada;
+    });
+
+    return mapSalaRow(sala);
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+      throw new Error(`Ja existe uma sala com o nome "${nome}".`);
+    }
+
+    throw error;
+  }
+}
+
+async function deleteSala(id) {
+  const existing = await prisma.sala.findUnique({
+    where: { id },
+    select: { id: true },
+  });
+
+  if (!existing) {
+    return null;
+  }
+
+  await prisma.sala.update({
+    where: { id },
+    data: { ativo: false, updatedAt: new Date() },
+  });
+
+  return { removed: true, id };
+}
+
+async function addServicoToSala({ salaId, tipoServicoId }) {
+  if (!isUuid(salaId)) {
+    throw new Error('salaId invalido. Deve ser um UUID valido.');
+  }
+
+  if (!isUuid(tipoServicoId)) {
+    throw new Error('tipoServicoId invalido. Deve ser um UUID valido.');
+  }
+
+  const sala = await prisma.sala.findUnique({ where: { id: salaId }, select: { id: true } });
+
+  if (!sala) {
+    throw new Error('Sala nao encontrada.');
+  }
+
+  const servico = await prisma.tipoServico.findUnique({ where: { id: tipoServicoId }, select: { id: true } });
+
+  if (!servico) {
+    throw new Error('Tipo de servico nao encontrado.');
+  }
+
+  try {
+    const resultado = await prisma.salaServico.create({
+      data: { salaId, tipoServicoId },
+    });
+
+    return new SalaServico({
+      id: resultado.id,
+      salaId: resultado.salaId,
+      tipoServicoId: resultado.tipoServicoId,
+      dataAssociacao: resultado.dataAssociacao,
+    });
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+      throw new Error('Este servico ja esta associado a esta sala.');
+    }
+
+    throw error;
+  }
 }
 
 async function getServicosBySala(salaId) {
   const servicosSala = await prisma.salaServico.findMany({
-    where: {
-      salaId,
-    },
+    where: { salaId },
     include: {
       tipoServico: {
-        select: {
-          tipo: true,
-          ativo: true,
-        },
+        select: { tipo: true, ativo: true },
       },
     },
     orderBy: {
-      tipoServico: {
-        tipo: 'asc',
-      },
+      tipoServico: { tipo: 'asc' },
     },
   });
 
@@ -91,10 +300,7 @@ async function getServicosBySala(salaId) {
 
 async function removeServicoFromSala({ salaId, tipoServicoId }) {
   const resultado = await prisma.salaServico.deleteMany({
-    where: {
-      salaId,
-      tipoServicoId,
-    },
+    where: { salaId, tipoServicoId },
   });
 
   if (resultado.count === 0) {
@@ -106,7 +312,10 @@ async function removeServicoFromSala({ salaId, tipoServicoId }) {
 
 module.exports = {
   getAllSalas,
+  getSalaById,
   createSala,
+  updateSala,
+  deleteSala,
   addServicoToSala,
   getServicosBySala,
   removeServicoFromSala,
