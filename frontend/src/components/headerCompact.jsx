@@ -1,10 +1,11 @@
 import React from 'react';
-import { Box, Typography, Button } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
+import { Box, Typography, Button, IconButton } from '@mui/material';
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import { useThemeContext } from '../contexts/ThemeContext';
 
 
-export default function HeaderCompact() {
+export default function HeaderCompact({ showBack = false }) {
     const { colors} = useThemeContext();
     const navigate = useNavigate();
 
@@ -25,7 +26,27 @@ export default function HeaderCompact() {
             boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
         }}>
 
-            {/* Logo B&T */}
+            {/* Esquerda — botão voltar (opcional) + logo */}
+            <Box
+            sx={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 1
+
+            }}>
+                {showBack && (
+                    <IconButton
+                        onClick ={() => navigate(-1)}
+                        sx={{
+                            color: colors.white,
+                            '&:hover': {backgroundColor: 'rgba(255,255,255,0.15)'},
+                        }}
+                        title="Voltar"
+                    >
+                        <ArrowBackIcon />
+                    </IconButton>
+                )}
+                
             <Typography 
                 sx={{ 
                     color: colors.white,
@@ -39,12 +60,13 @@ export default function HeaderCompact() {
             >
                 B&T
             </Typography>
+        </Box>
 
-            {/* Navegação */}
-             <Box sx={{ 
-                display: 'flex', 
-                alignItems: 'center',
-                gap: 2  // ← Espaço entre os botões
+            {/* Direita — navegação */}
+                <Box sx={{ 
+                    display: 'flex', 
+                    alignItems: 'center',
+                    gap: 2  // ← Espaço entre os botões
             }}>
                 <Button 
                     sx={{ 

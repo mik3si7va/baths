@@ -58,6 +58,125 @@ async function seedServicos() {
   }
 }
 
+async function seedSalas() {
+  const servicoIdByTipo = await getServicoIdsByTipo();
+ 
+  const salas = [
+    {
+      nome: 'Sala de Banho 1',
+      capacidade: 1,
+      equipamento: 'Sala equipada para banhos e serviços de higiene',
+      precoHora: 15,
+      servicos: [
+        'BANHO',
+        'CORTE_UNHAS',
+        'LIMPEZA_OUVIDOS',
+        'EXPRESSAO_GLANDULAS',
+        'LIMPEZA_DENTES',
+        'ANTI_PULGAS',
+        'ANTI_QUEDA',
+        'REMOCAO_NOS',
+      ],
+    },
+    {
+      nome: 'Sala de Banho 2',
+      capacidade: 1,
+      equipamento: 'Sala equipada para banhos e serviços de higiene',
+      precoHora: 18,
+      servicos: [
+        'BANHO',
+        'CORTE_UNHAS',
+        'LIMPEZA_OUVIDOS',
+        'EXPRESSAO_GLANDULAS',
+        'LIMPEZA_DENTES',
+        'ANTI_PULGAS',
+        'ANTI_QUEDA',
+        'REMOCAO_NOS',
+      ],
+    },
+    {
+      nome: 'Sala de Tosquia 1',
+      capacidade: 1,
+      equipamento: 'Sala equipada para tosquias completas e higiénicas',
+      precoHora: 20,
+      servicos: ['TOSQUIA_COMPLETA', 'TOSQUIA_HIGIENICA', 'APARAR_PELO_CARA', 'REMOCAO_NOS'],
+    },
+    {
+      nome: 'Sala de Tosquia 2',
+      capacidade: 1,
+      equipamento: 'Sala equipada para tosquias completas e higiénicas',
+      precoHora: 22,
+      servicos: ['TOSQUIA_COMPLETA', 'TOSQUIA_HIGIENICA', 'APARAR_PELO_CARA', 'REMOCAO_NOS'],
+    },
+    {
+      nome: 'Sala de Tratamentos',
+      capacidade: 2,
+      equipamento: 'Sala equipada para serviços de higiene',
+      precoHora: 25,
+      servicos: ['CORTE_UNHAS', 'LIMPEZA_OUVIDOS', 'EXPRESSAO_GLANDULAS', 'LIMPEZA_DENTES', 'ANTI_PULGAS'],
+    },
+    {
+      nome: 'Sala Polivalente Grande',
+      capacidade: 3,
+      equipamento: 'Sala equipada para banhos, tosquias e serviços de higiene',
+      precoHora: 35,
+      servicos: [
+        'BANHO',
+        'TOSQUIA_COMPLETA',
+        'TOSQUIA_HIGIENICA',
+        'CORTE_UNHAS',
+        'LIMPEZA_OUVIDOS',
+        'EXPRESSAO_GLANDULAS',
+        'LIMPEZA_DENTES',
+        'APARAR_PELO_CARA',
+        'ANTI_PULGAS',
+        'ANTI_QUEDA',
+        'REMOCAO_NOS',
+      ],
+    },
+  ];
+ 
+  for (const s of salas) {
+    const exists = await prisma.sala.findFirst({
+      where: { nome: s.nome },
+      select: { id: true },
+    });
+ 
+    if (exists) {
+      continue;
+    }
+ 
+    const servicoIds = s.servicos.map((tipo) => {
+      const servicoId = servicoIdByTipo.get(tipo);
+      if (!servicoId) {
+        throw new Error(`Servico nao encontrado no seed: ${tipo}`);
+      }
+      return servicoId;
+    });
+ 
+    await prisma.$transaction(async (tx) => {
+      const sala = await tx.sala.create({
+        data: {
+          nome: s.nome,
+          capacidade: s.capacidade,
+          equipamento: s.equipamento,
+          precoHora: s.precoHora,
+          ativo: true,
+        },
+      });
+ 
+      if (servicoIds.length > 0) {
+        await tx.salaServico.createMany({
+          data: servicoIds.map((tipoServicoId) => ({
+            salaId: sala.id,
+            tipoServicoId,
+          })),
+        });
+      }
+    });
+  }
+}
+
 function asTime(time) {
   return new Date(`1970-01-01T${time}:00.000Z`);
 }
@@ -248,6 +367,7 @@ async function seedFuncionarios() {
 async function main() {
   await seedEvents();
   await seedServicos();
+  await seedSalas();
   await seedFuncionarios();
 }
 

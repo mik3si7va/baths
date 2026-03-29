@@ -5,7 +5,7 @@ const swaggerSpec = require('./swagger');
 const { prisma, closePrisma } = require('./db/prismaClient');
 const { getAllEvents, createEvent } = require('./repositories/eventsRepository');
 const { getAllTiposServico, createTipoServico, getAllRegrasPreco, createRegraPreco } = require('./repositories/repositorioServicos');
-const { getAllSalas, createSala, addServicoToSala, getServicosBySala, removeServicoFromSala } = require('./repositories/repositorioSalas');
+const { getAllSalas, getAllSalasWithStatus, getSalaById, createSala, updateSala, deleteSala, addServicoToSala, getServicosBySala, removeServicoFromSala } = require('./repositories/repositorioSalas');
 const { getAllFuncionarios, getFuncionarioById, createFuncionario, updateFuncionario, deleteFuncionario } = require('./repositories/repositorioFuncionarios');
 
 const app = express();
@@ -63,6 +63,28 @@ app.post('/regras-preco', async (req, res) => {
   }
 });
 
+/**
+ * @swagger
+ * /salas:
+ *   get:
+ *     summary: Lista todas as salas ativas
+ *     tags: [Salas]
+ *     responses:
+ *       200:
+ *         description: Lista de salas
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/Sala'
+ *       500:
+ *         description: Erro interno
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ */
 app.get('/salas', async (_req, res) => {
   try {
     const salas = await getAllSalas();
@@ -73,35 +95,425 @@ app.get('/salas', async (_req, res) => {
   }
 });
 
-app.post('/salas', async (req, res) => {
-  const { nome, capacidade, equipamento, precoHora } = req.body || {};
-  if (!nome || !capacidade || !equipamento || !precoHora) {
-    return res.status(400).json({ error: 'nome, capacidade, equipamento e precoHora são obrigatórios' });
-  }
+/**
+ * @swagger
+ * /salas/todas:
+ *   get:
+ *     summary: Lista todas as salas (ativas e inativas) — uso exclusivo do backoffice
+ *     tags: [Salas]
+ *     responses:
+ *       200:
+ *         description: Lista de todas as salas
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/Sala'
+ *       500:
+ *         description: Erro interno
+ */
+app.get('/salas/todas', async (_req, res) => {
   try {
-    const nova = await createSala({ nome, capacidade, equipamento, precoHora });
+    const salas = await getAllSalasWithStatus();
+    return res.json(salas);
+  } catch (error) {
+    console.error('Failed to fetch all salas:', error);
+    return res.status(500).json({ error: 'Failed to fetch all salas' });
+  }
+});
+ 
+/**
+ * @swagger
+ * /salas/{id}:
+ *   get:
+ *     summary: Obtem uma sala por id
+ *     tags: [Salas]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: ID da sala
+ *     responses:
+ *       200:
+ *         description: Sala encontrada
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Sala'
+ *       404:
+ *         description: Sala nao encontrada
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *             examples:
+ *               naoEncontrada:
+ *                 summary: Sem resultado para o id
+ *                 value:
+ *                   error: Sala nao encontrada
+ *       500:
+ *         description: Erro interno
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ */
+app.get('/salas/:id', async (req, res) => {
+  const { id } = req.params;
+ 
+  try {
+    const sala = await getSalaById(id);
+    if (!sala) {
+      return res.status(404).json({ error: 'Sala nao encontrada' });
+    }
+ 
+    return res.json(sala);
+  } catch (error) {
+    console.error('Failed to fetch sala:', error);
+    return res.status(500).json({ error: 'Failed to fetch sala' });
+  }
+});
+ 
+/**
+ * @swagger
+ * /salas:
+ *   post:
+ *     summary: Cria uma nova sala
+ *     tags: [Salas]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/CreateSalaRequest'
+ *     responses:
+ *       201:
+ *         description: Sala criada
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Sala'
+ *       400:
+ *         description: Dados invalidos
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *             examples:
+ *               camposObrigatorios:
+ *                 summary: Campos obrigatorios em falta
+ *                 value:
+ *                   error: 'nome, capacidade, equipamento e precoHora sao obrigatorios'
+ *       409:
+ *         description: Nome ja existe
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *             examples:
+ *               nomeDuplicado:
+ *                 summary: Nome ja existente
+ *                 value:
+ *                   error: 'Ja existe uma sala com o nome "Sala A".'
+ *       500:
+ *         description: Erro interno
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ */
+app.post('/salas', async (req, res) => {
+  const { nome, capacidade, equipamento, precoHora, tipoServicoIds } = req.body || {};
+  try {
+    const nova = await createSala({ nome, capacidade, equipamento, precoHora, tipoServicoIds });
     return res.status(201).json(nova);
   } catch (error) {
     console.error('Failed to create sala:', error);
-    return res.status(500).json({ error: error.message });
+ 
+    if (error.message?.startsWith('Ja existe uma sala com o nome')) {
+      return res.status(409).json({ error: error.message });
+    }
+ 
+    return res.status(400).json({ error: error.message });
   }
 });
-
+ 
+/**
+ * @swagger
+ * /salas/{id}:
+ *   put:
+ *     summary: Atualiza uma sala existente
+ *     tags: [Salas]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: ID da sala
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/CreateSalaRequest'
+ *     responses:
+ *       200:
+ *         description: Sala atualizada
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Sala'
+ *       400:
+ *         description: Dados invalidos
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *             examples:
+ *               camposObrigatorios:
+ *                 summary: Campos obrigatorios em falta
+ *                 value:
+ *                   error: 'nome, capacidade, equipamento e precoHora sao obrigatorios.'
+ *       404:
+ *         description: Sala nao encontrada
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *             examples:
+ *               naoEncontrada:
+ *                 summary: Sem resultado para o id
+ *                 value:
+ *                   error: Sala nao encontrada
+ *       409:
+ *         description: Nome ja existe
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *             examples:
+ *               nomeDuplicado:
+ *                 summary: Nome ja existente
+ *                 value:
+ *                   error: 'Ja existe uma sala com o nome "Sala A".'
+ *       500:
+ *         description: Erro interno
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ */
+app.put('/salas/:id', async (req, res) => {
+  const { id } = req.params;
+  const { nome, capacidade, equipamento, precoHora, tipoServicoIds } = req.body || {};
+ 
+  try {
+    const salaAtualizada = await updateSala(id, { nome, capacidade, equipamento, precoHora, tipoServicoIds });
+ 
+    if (!salaAtualizada) {
+      return res.status(404).json({ error: 'Sala nao encontrada' });
+    }
+ 
+    return res.json(salaAtualizada);
+  } catch (error) {
+    console.error('Failed to update sala:', error);
+ 
+    if (error.message?.startsWith('Ja existe uma sala com o nome')) {
+      return res.status(409).json({ error: error.message });
+    }
+ 
+    return res.status(400).json({ error: error.message });
+  }
+});
+ 
+/**
+ * @swagger
+ * /salas/{id}:
+ *   delete:
+ *     summary: Remove (inativa) uma sala
+ *     tags: [Salas]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: ID da sala
+ *     responses:
+ *       200:
+ *         description: Sala inativada com sucesso
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 removed:
+ *                   type: boolean
+ *                   example: true
+ *                 id:
+ *                   type: string
+ *                   format: uuid
+ *       404:
+ *         description: Sala nao encontrada
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *             examples:
+ *               naoEncontrada:
+ *                 summary: Sem resultado para o id
+ *                 value:
+ *                   error: Sala nao encontrada
+ *       500:
+ *         description: Erro interno
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ */
+app.delete('/salas/:id', async (req, res) => {
+  const { id } = req.params;
+ 
+  try {
+    const result = await deleteSala(id);
+    if (!result) {
+      return res.status(404).json({ error: 'Sala nao encontrada' });
+    }
+ 
+    return res.json(result);
+  } catch (error) {
+    console.error('Failed to delete sala:', error);
+    return res.status(500).json({ error: 'Failed to delete sala' });
+  }
+});
+ 
+/**
+ * @swagger
+ * /salas/{id}/servicos:
+ *   post:
+ *     summary: Associa um tipo de servico a uma sala
+ *     tags: [Salas]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: ID da sala
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [tipoServicoId]
+ *             properties:
+ *               tipoServicoId:
+ *                 type: string
+ *                 format: uuid
+ *                 example: '11111111-1111-1111-1111-111111111111'
+ *     responses:
+ *       201:
+ *         description: Servico associado com sucesso
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/SalaServico'
+ *       400:
+ *         description: Dados invalidos
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *             examples:
+ *               campoObrigatorio:
+ *                 summary: Campo obrigatorio em falta
+ *                 value:
+ *                   error: 'tipoServicoId e obrigatorio'
+ *               uuidInvalido:
+ *                 summary: UUID invalido
+ *                 value:
+ *                   error: 'tipoServicoId invalido. Deve ser um UUID valido.'
+ *               naoEncontrado:
+ *                 summary: Sala ou servico nao encontrado
+ *                 value:
+ *                   error: 'Sala nao encontrada.'
+ *       409:
+ *         description: Associacao ja existe
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *             examples:
+ *               associacaoDuplicada:
+ *                 summary: Servico ja associado
+ *                 value:
+ *                   error: 'Este servico ja esta associado a esta sala.'
+ *       500:
+ *         description: Erro interno
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ */
 app.post('/salas/:id/servicos', async (req, res) => {
   const { id } = req.params;
   const { tipoServicoId } = req.body || {};
   if (!tipoServicoId) {
-    return res.status(400).json({ error: 'tipoServicoId é obrigatório' });
+    return res.status(400).json({ error: 'tipoServicoId e obrigatorio' });
   }
   try {
     const associacao = await addServicoToSala({ salaId: id, tipoServicoId });
     return res.status(201).json(associacao);
   } catch (error) {
     console.error('Failed to add servico to sala:', error);
-    return res.status(500).json({ error: error.message });
+ 
+    if (error.message?.startsWith('Este servico ja esta associado')) {
+      return res.status(409).json({ error: error.message });
+    }
+ 
+    return res.status(400).json({ error: error.message });
   }
 });
-
+ 
+/**
+ * @swagger
+ * /salas/{id}/servicos:
+ *   get:
+ *     summary: Lista os servicos associados a uma sala
+ *     tags: [Salas]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: ID da sala
+ *     responses:
+ *       200:
+ *         description: Lista de servicos da sala
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/SalaServico'
+ *       500:
+ *         description: Erro interno
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ */
 app.get('/salas/:id/servicos', async (req, res) => {
   const { id } = req.params;
   try {
@@ -112,7 +524,57 @@ app.get('/salas/:id/servicos', async (req, res) => {
     return res.status(500).json({ error: 'Failed to fetch servicos da sala' });
   }
 });
-
+ 
+/**
+ * @swagger
+ * /salas/{id}/servicos/{servicoId}:
+ *   delete:
+ *     summary: Remove a associacao de um servico a uma sala
+ *     tags: [Salas]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: ID da sala
+ *       - in: path
+ *         name: servicoId
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: ID do tipo de servico
+ *     responses:
+ *       200:
+ *         description: Associacao removida com sucesso
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 removed:
+ *                   type: boolean
+ *                   example: true
+ *       404:
+ *         description: Associacao nao encontrada
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *             examples:
+ *               naoEncontrada:
+ *                 summary: Associacao inexistente
+ *                 value:
+ *                   error: 'Associacao nao encontrada.'
+ *       500:
+ *         description: Erro interno
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ */
 app.delete('/salas/:id/servicos/:servicoId', async (req, res) => {
   const { id, servicoId } = req.params;
   try {
@@ -120,6 +582,9 @@ app.delete('/salas/:id/servicos/:servicoId', async (req, res) => {
     return res.json(result);
   } catch (error) {
     console.error('Failed to remove servico from sala:', error);
+    if (error.message?.startsWith('Associacao nao encontrada')) {
+      return res.status(404).json({ error: error.message });
+    }
     return res.status(500).json({ error: error.message });
   }
 });
