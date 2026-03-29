@@ -233,9 +233,42 @@ describe('API Salas - Testes de Endpoint', () => {
     expect(deleted.status).toBe(200);
     expect(deleted.body.removed).toBe(true);
 
+    const lista = await request(app).get('/salas/todas');
+    const salaInativa = lista.body.find((s) => s.id === criada.body.id);
+    expect(salaInativa).toBeDefined();
+    expect(salaInativa.ativo).toBe(false);
+
     const fetched = await request(app).get(`/salas/${criada.body.id}`);
     expect(fetched.status).toBe(200);
     expect(fetched.body.ativo).toBe(false);
+  });
+
+  test('PUT /salas/{id} reativa sala inativa', async () => {
+    const nome = uniqueNome('api.sala.reativar');
+
+    const criada = await request(app).post('/salas').send({
+      nome, capacidade: 1, equipamento: 'Teste', precoHora: 10, tipoServicoIds: [servicoId],
+    });
+
+    expect(criada.status).toBe(201);
+    createdIds.push(criada.body.id);
+
+    // Inativar
+    const deleted = await request(app).delete(`/salas/${criada.body.id}`);
+    expect(deleted.status).toBe(200);
+
+    // Reativar via PUT
+    const reativada = await request(app).put(`/salas/${criada.body.id}`).send({
+      nome,
+      capacidade: 1,
+      equipamento: 'Teste',
+      precoHora: 10,
+      tipoServicoIds: [servicoId],
+    });
+
+    expect(reativada.status).toBe(200);
+    expect(reativada.body.ativo).toBe(true);
+    expect(Array.isArray(reativada.body.servicos)).toBe(true);
   });
 
   test('DELETE /salas/{id} devolve 404 para id inexistente', async () => {

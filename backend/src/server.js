@@ -5,7 +5,7 @@ const swaggerSpec = require('./swagger');
 const { prisma, closePrisma } = require('./db/prismaClient');
 const { getAllEvents, createEvent } = require('./repositories/eventsRepository');
 const { getAllTiposServico, createTipoServico, getAllRegrasPreco, createRegraPreco } = require('./repositories/repositorioServicos');
-const { getAllSalas, getSalaById, createSala, updateSala, deleteSala, addServicoToSala, getServicosBySala, removeServicoFromSala } = require('./repositories/repositorioSalas');
+const { getAllSalas, getAllSalasWithStatus, getSalaById, createSala, updateSala, deleteSala, addServicoToSala, getServicosBySala, removeServicoFromSala } = require('./repositories/repositorioSalas');
 const { getAllFuncionarios, getFuncionarioById, createFuncionario, updateFuncionario, deleteFuncionario } = require('./repositories/repositorioFuncionarios');
 
 const app = express();
@@ -92,6 +92,34 @@ app.get('/salas', async (_req, res) => {
   } catch (error) {
     console.error('Failed to fetch salas:', error);
     return res.status(500).json({ error: 'Failed to fetch salas' });
+  }
+});
+
+/**
+ * @swagger
+ * /salas/todas:
+ *   get:
+ *     summary: Lista todas as salas (ativas e inativas) — uso exclusivo do backoffice
+ *     tags: [Salas]
+ *     responses:
+ *       200:
+ *         description: Lista de todas as salas
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/Sala'
+ *       500:
+ *         description: Erro interno
+ */
+app.get('/salas/todas', async (_req, res) => {
+  try {
+    const salas = await getAllSalasWithStatus();
+    return res.json(salas);
+  } catch (error) {
+    console.error('Failed to fetch all salas:', error);
+    return res.status(500).json({ error: 'Failed to fetch all salas' });
   }
 });
  

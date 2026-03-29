@@ -1,5 +1,6 @@
 const {
   getAllSalas,
+  getAllSalasWithStatus,
   getSalaById,
   createSala,
   updateSala,
@@ -38,10 +39,26 @@ describe('Gestao de Salas - Testes Unitarios', () => {
 
   test('getAllSalas retorna apenas salas ativas', async () => {
     const salas = await getAllSalas();
+    expect(Array.isArray(salas)).toBe(true);
     salas.forEach((sala) => {
       expect(sala.ativo).toBe(true);
     });
   });
+
+  // ─── getAllSalasWithStatus ───────────────────────────────────────────────────────────
+
+  test('getAllSalasWithStatus retorna salas ativas e inativas ordenadas (ativas primeiro)', async () => {
+  const salas = await getAllSalasWithStatus();
+  expect(Array.isArray(salas)).toBe(true);
+  salas.forEach((sala) => {
+    expect(typeof sala.ativo).toBe('boolean');
+  });
+  const primeiraInativa = salas.findIndex((s) => !s.ativo);
+  if (primeiraInativa !== -1) {
+    const salasDepois = salas.slice(primeiraInativa);
+    salasDepois.forEach((s) => expect(s.ativo).toBe(false));
+  }
+});
 
   // ─── getSalaById ──────────────────────────────────────────────────────────
 
@@ -201,6 +218,30 @@ describe('Gestao de Salas - Testes Unitarios', () => {
   test('deleteSala retorna null para ID inexistente', async () => {
     const resultado = await deleteSala('00000000-0000-4000-8000-000000000000');
     expect(resultado).toBeNull();
+  });
+
+  test('updateSala reativa sala inativa', async () => {
+    const nome = uniqueNome('Sala Reativar');
+    const sala = await createSala({ nome, capacidade: 1, equipamento: 'Teste', precoHora: 10, tipoServicoIds: [servicoId] });
+
+    // Inativar
+    await deleteSala(sala.id);
+    const inativa = await getSalaById(sala.id);
+    expect(inativa.ativo).toBe(false);
+
+    // Reativar via updateSala
+    const reativada = await updateSala(sala.id, {
+      nome,
+      capacidade: 1,
+      equipamento: 'Teste',
+      precoHora: 10,
+      tipoServicoIds: [servicoId],
+    });
+
+    expect(reativada.ativo).toBe(true);
+
+    await prisma.salaServico.deleteMany({ where: { salaId: sala.id } });
+    await prisma.sala.delete({ where: { id: sala.id } });
   });
 
   // ─── addServicoToSala ─────────────────────────────────────────────────────

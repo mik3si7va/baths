@@ -7,6 +7,7 @@ import PeopleIcon from '@mui/icons-material/People';
 import PetsIcon from '@mui/icons-material/Pets';
 import BadgeIcon from '@mui/icons-material/Badge';
 import MeetingRoomIcon from '@mui/icons-material/MeetingRoom';
+import AddBusinessIcon from '@mui/icons-material/AddBusiness';
 import AddIcon from '@mui/icons-material/Add';
 import SearchIcon from '@mui/icons-material/Search';
 import PaymentIcon from '@mui/icons-material/Payment';
@@ -61,6 +62,16 @@ export default function Home() {
             buttonText: 'Gerir',
             buttonIcon: PeopleIcon,
             href: '/funcionarios',
+            height: 180,
+            width: 328
+        },
+        {
+            title: 'Salas',
+            description: 'Criar e gerir salas, equipamentos, serviços e preço.',
+            icon: MeetingRoomIcon,
+            buttonText: 'Gerir',
+            buttonIcon: AddBusinessIcon,
+            href: '/salas',
             height: 180,
             width: 328
         }
