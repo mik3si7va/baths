@@ -6,12 +6,12 @@ export default function SummaryCard({ icon: Icon, label, value = '—', height, 
     const { colors, cardStyles } = useThemeContext();
 
     return (
-        <Card elevation={2} sx={{...cardStyles, height, ...(width && { width }) }}>
-            <CardContent sx={{ 
-                display: 'flex', 
-                alignItems: 'center', 
-                gap: 2, 
-                height: '100%' 
+        <Card elevation={2} sx={{ ...cardStyles, height, ...(width && { width }) }}>
+            <CardContent sx={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 2,
+                height: '100%'
             }}>
                 <Icon sx={{ fontSize: 40, color: colors.primary }} />
                 <Box>

@@ -35,21 +35,21 @@ export default function QuickAcessCard({
 
     return (
         <Card elevation={2} sx={cardStyles}>
-            <CardContent sx={{ 
+            <CardContent sx={{
                 flex: 1,
                 display: 'flex',
                 flexDirection: 'column',
                 height: '100%'
             }}>
-                <Box sx={{ 
-                    display: 'flex', 
-                    alignItems: 'center', 
+                <Box sx={{
+                    display: 'flex',
+                    alignItems: 'center',
                     gap: 1.5,
                     mb: 1
                 }}>
                     {Icon && (
-                        <Icon sx={{ 
-                            fontSize: 32, 
+                        <Icon sx={{
+                            fontSize: 32,
                             color: colors.primary
                         }} />
                     )}
@@ -57,22 +57,22 @@ export default function QuickAcessCard({
                         {title}
                     </Typography>
                 </Box>
-                
+
                 {/* Descrição */}
-                <Typography variant="body1" sx={{ 
-                    mb: 2, 
+                <Typography variant="body1" sx={{
+                    mb: 2,
                     color: colors.textSecondary,
                     flex: 1
                 }}>
                     {description}
                 </Typography>
-                
+
                 {/* Botão */}
                 <Button
                     variant="contained"
                     startIcon={ButtonIcon && <ButtonIcon />}
                     href={href}
-                    sx={{ 
+                    sx={{
                         mt: 'auto',
                         alignSelf: 'flex-start'
                     }}
