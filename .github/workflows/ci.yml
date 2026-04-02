@@ -7,9 +7,56 @@ on:
     branches: ["**"]
 
 jobs:
+  backend-lint:
+    name: Backend Lint
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout codigo
+        uses: actions/checkout@v4
+
+      - name: Instalar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Instalar dependencias backend
+        working-directory: ./backend
+        run: npm ci --include=dev
+              
+      - name: Correr ESLint
+        working-directory: ./backend
+        run: npm run lint
+
+  frontend-lint:
+    name: Frontend Lint
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout codigo
+        uses: actions/checkout@v4
+
+      - name: Instalar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "18"
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Instalar dependencias frontend
+        working-directory: ./frontend
+        run: npm ci
+
+      - name: Correr ESLint
+        working-directory: ./frontend
+        run: npm run lint
+
   backend-tests:
     name: Backend Tests
     runs-on: ubuntu-latest
+    needs: [backend-lint]
 
     services:
       postgres:
@@ -85,3 +132,55 @@ jobs:
       - name: Correr testes
         working-directory: ./backend
         run: npx jest --runInBand
+
+  frontend-tests:
+    name: Frontend Tests
+    runs-on: ubuntu-latest
+    needs: [frontend-lint]
+    
+    steps:
+      - name: Checkout codigo
+        uses: actions/checkout@v4
+
+      - name: Instalar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "18"
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Instalar dependencias frontend
+        working-directory: ./frontend
+        run: npm ci
+
+      - name: Correr testes
+        working-directory: ./frontend
+        run: npm test
+        env:
+          CI: true
+
+  frontend-build:
+    name: Frontend Build
+    runs-on: ubuntu-latest
+    needs: [frontend-tests]
+    
+    steps:
+      - name: Checkout codigo
+        uses: actions/checkout@v4
+
+      - name: Instalar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "18"
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Instalar dependencias frontend
+        working-directory: ./frontend
+        run: npm ci
+
+      - name: Build frontend
+        working-directory: ./frontend
+        run: npm run build
+        env:
+          CI: false

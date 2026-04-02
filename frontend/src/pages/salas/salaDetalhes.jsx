@@ -33,7 +33,13 @@ export default function SalaDetalhes() {
     const nomeExibicao = sala?.nome
         ?? (nome ? decodeURIComponent(nome).replace(/_/g, ' ') : 'Sala sem nome');
 
-    const loadData = async () => {
+    const navigateRef = React.useRef(navigate);
+
+    React.useEffect(() => {
+        navigateRef.current = navigate;
+    }, [navigate]);
+
+    const loadData = React.useCallback(async () => {
         setLoading(true);
         setErro('');
 
@@ -44,7 +50,7 @@ export default function SalaDetalhes() {
 
             // Verificar se a sala existe
             if (salaRes.status === 404) {
-                navigate('/salas');
+                navigateRef.current('/salas');
                 return;
             }
 
@@ -81,11 +87,11 @@ export default function SalaDetalhes() {
         } finally {
             setLoading(false);
         }
-    };
+    }, [id]);
 
     useEffect(() => {
         loadData();
-    }, [id]);
+    }, [loadData]);
 
     if (loading) {
         return (

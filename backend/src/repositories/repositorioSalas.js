@@ -159,7 +159,7 @@ async function createSala({ nome, capacidade, equipamento, precoHora, tipoServic
     return mapSalaComServicos(sala);
   } catch (error) {
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
-      throw new Error(`Ja existe uma sala com o nome "${nome}".`);
+      throw new Error(`Ja existe uma sala com o nome "${nome}".`, { cause: error });
     }
 
     throw error;
@@ -237,7 +237,7 @@ async function updateSala(id, { nome, capacidade, equipamento, precoHora, tipoSe
     return mapSalaComServicos(sala);
   } catch (error) {
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
-      throw new Error(`Ja existe uma sala com o nome "${nome}".`);
+      throw new Error(`Ja existe uma sala com o nome "${nome}".`, { cause: error });
     }
 
     throw error;
@@ -296,7 +296,7 @@ async function addServicoToSala({ salaId, tipoServicoId }) {
     });
   } catch (error) {
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
-      throw new Error('Este servico ja esta associado a esta sala.');
+      throw new Error('Este servico ja esta associado a esta sala.', { cause: error });
     }
 
     throw error;
