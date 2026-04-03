@@ -83,7 +83,7 @@ export default function Home() {
             <Typography variant="h1" sx={{ mb: 1, color: colors.text }}>
                 Bem-vindo
             </Typography>
-            
+
             {/* Subtítulo */}
             <Typography variant="body1" sx={{ mb: 4, color: colors.textSecondary }}>
                 Aqui tens um resumo do estado actual da clínica.
@@ -93,9 +93,9 @@ export default function Home() {
             <Grid container spacing={3} sx={{ mb: 4 }}>
                 {cardData.map((item, index) => (
                     <Grid item xs={12} sm={6} md={4} key={index}>
-                        <SummaryCard 
-                            icon={item.icon} 
-                            label={item.label} 
+                        <SummaryCard
+                            icon={item.icon}
+                            label={item.label}
                             height={item.height}
                             width={item.width}
                         />
@@ -109,9 +109,9 @@ export default function Home() {
             </Typography>
 
             {/* Grid de Quick Acess Cards */}
-            <Box sx={{ 
-                display: 'flex', 
-                gap: 3, 
+            <Box sx={{
+                display: 'flex',
+                gap: 3,
                 flexWrap: 'wrap',
                 justifyContent: 'flex-start'
             }}>

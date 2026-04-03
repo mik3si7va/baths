@@ -14,20 +14,20 @@ export default function Header() {
     };
 
     return (
-        <Box sx={{ 
-            position: 'relative', 
-            width: '100%', 
-            height: sizes.headerHeight, 
-            overflow: 'hidden' 
+        <Box sx={{
+            position: 'relative',
+            width: '100%',
+            height: sizes.headerHeight,
+            overflow: 'hidden'
         }}>
             <img
                 src={header}
                 alt="Header"
-                style={{ 
-                    width: '100%', 
-                    height: '100%', 
-                    objectFit: 'cover', 
-                    display: 'block' 
+                style={{
+                    width: '100%',
+                    height: '100%',
+                    objectFit: 'cover',
+                    display: 'block'
                 }}
             />
             <Box sx={{
@@ -42,53 +42,53 @@ export default function Header() {
                 py: 1,
                 background: colors.headerOverlay,
             }}>
-                <Typography 
-                    sx={{ 
+                <Typography
+                    sx={{
                         color: colors.black,
                         fontSize: sizes.logoFont,
                         fontWeight: 700,
                         fontFamily: '"Bubblegum Sans", cursive',
                         lineHeight: 1.7,
                         flexShrink: 0,
-                        cursor: 'pointer'
+                        //cursor: 'pointer'
                     }}
-                    onClick={() => navigate('/home')}
+                //onClick={() => navigate('/home')}
                 >
                     B&T
                 </Typography>
                 <Box sx={{ display: 'flex', gap: 0 }}>
-                    <Button 
-                        sx={{ 
+                    {/*<Button
+                        sx={{
                             color: colors.black,
                             fontSize: sizes.buttonFont,
-                            minWidth: 'auto', 
-                            px: { xs: 1, sm: 2 } 
-                        }} 
+                            minWidth: 'auto',
+                            px: { xs: 1, sm: 2 }
+                        }}
                         onClick={() => navigate('/home')}
                     >
                         Home
-                    </Button>
-                    <Button 
-                        sx={{ 
+                    </Button>*/}
+                    <Button
+                        sx={{
                             color: colors.black,
                             fontSize: sizes.buttonFont,
-                            minWidth: 'auto', 
-                            px: { xs: 1, sm: 2 } 
-                        }} 
+                            minWidth: 'auto',
+                            px: { xs: 1, sm: 2 }
+                        }}
                         onClick={() => navigate('/calendar')}
                     >
                         Agenda
                     </Button>
-                    <Button 
-                        variant="contained" 
-                        sx={{ 
-                            backgroundColor: '#ffffff6d', 
+                    <Button
+                        variant="contained"
+                        sx={{
+                            backgroundColor: '#ffffff6d',
                             color: colors.black,
                             fontSize: sizes.buttonFont,
-                            px: { xs: 1, sm: 2 }, 
+                            px: { xs: 1, sm: 2 },
                             minWidth: 'auto',
                             '&:hover': { backgroundColor: '#f0f0f0' }
-                        }} 
+                        }}
                         onClick={handleLogout}
                     >
                         Logout

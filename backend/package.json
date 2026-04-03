@@ -17,7 +17,8 @@
     "db:down": "docker compose -f ../docker-compose.yml stop postgres",
     "prisma:generate": "prisma generate",
     "prisma:pull": "prisma db pull",
-    "prisma:studio": "prisma studio"
+    "prisma:studio": "prisma studio",
+    "lint": "eslint src"
   },
   "keywords": [],
   "author": "",
@@ -33,6 +34,9 @@
     "swagger-ui-express": "^5.0.1"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.1.0",
+    "globals": "^17.4.0",
     "jest": "^30.3.0",
     "prisma": "^6.19.0",
     "supertest": "^7.2.2"

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
     Box, Typography, TextField, Button, Checkbox,
@@ -13,6 +13,9 @@ import MeetingRoomIcon from '@mui/icons-material/MeetingRoom';
 import CancelIcon from '@mui/icons-material/Cancel';
 import SaveIcon from '@mui/icons-material/Save';
 import RestoreIcon from '@mui/icons-material/Restore';
+
+import TextareaAutosize from "@mui/material/TextareaAutosize";
+
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
 
@@ -29,33 +32,62 @@ export default function Sala() {
     const [servicos, setServicos] = useState([]);
     const [servicosSelecionados, setServicosSelecionados] = useState([]);
     const [salas, setSalas] = useState([]);
-    const [sucesso, setSucesso] = useState(false);
+    const [sucesso, setSucesso] = useState('');
     const [erro, setErro] = useState('');
     const [loading, setLoading] = useState(false);
     const [loadingSalas, setLoadingSalas] = useState(true);
-    
+
     // Estado para controlar se está em modo edição
     const [editMode, setEditMode] = useState(false);
     const [editSalaId, setEditSalaId] = useState(null);
     const [editSalaAtiva, setEditSalaAtiva] = useState(true);
-    
+
     // Estado para o diálogo de confirmação
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
     const [salaToDelete, setSalaToDelete] = useState(null);
+
+    // Ref para timeout de sucesso
+    const successTimeoutRef = useRef(null);
 
     // Mapa de serviços por ID
     const servicosById = useMemo(() => {
         return Object.fromEntries(servicos.map((s) => [s.id, s.tipo]));
     }, [servicos]);
 
+    // Limpar timeout ao desmontar
+    useEffect(() => {
+        return () => {
+            if (successTimeoutRef.current) {
+                clearTimeout(successTimeoutRef.current);
+            }
+        };
+    }, []);
+
+    // Auto-limpar mensagem de sucesso
+    useEffect(() => {
+        if (sucesso) {
+            successTimeoutRef.current = setTimeout(() => {
+                setSucesso('');
+            }, 3000);
+        }
+        return () => {
+            if (successTimeoutRef.current) {
+                clearTimeout(successTimeoutRef.current);
+            }
+        };
+    }, [sucesso]);
+
     const carregarServicos = async () => {
         try {
             const res = await fetch(`${API_BASE_URL}/servicos`);
-            if (!res.ok) throw new Error('Erro ao carregar serviços');
+            if (!res.ok) {
+                const errorData = await res.json().catch(() => ({}));
+                throw new Error(errorData.error || 'Erro ao carregar serviços.');
+            }
             const data = await res.json();
             setServicos(Array.isArray(data) ? data : []);
         } catch (err) {
-            setErro(err.message);
+            setErro(err.message || 'Erro ao carregar serviços.');
         }
     };
 
@@ -63,11 +95,15 @@ export default function Sala() {
         setLoadingSalas(true);
         try {
             const res = await fetch(`${API_BASE_URL}/salas/todas`);
-            if (!res.ok) throw new Error('Erro ao carregar salas');
+            if (!res.ok) {
+                const errorData = await res.json().catch(() => ({}));
+                throw new Error(errorData.error || 'Erro ao carregar salas.');
+            }
             const data = await res.json();
             setSalas(Array.isArray(data) ? data : []);
         } catch (err) {
-            setErro(err.message);
+            setErro(err.message || 'Erro ao carregar salas.');
+            setSalas([]);
         } finally {
             setLoadingSalas(false);
         }
@@ -116,7 +152,7 @@ export default function Sala() {
         // Extrair IDs dos serviços associados
         const servicosIds = sala.servicos?.map(s => s.tipoServicoId) || [];
         setServicosSelecionados(servicosIds);
-        
+
         // Scroll suave para o topo
         window.scrollTo({ top: 0, behavior: 'smooth' });
     };
@@ -126,18 +162,51 @@ export default function Sala() {
         resetForm();
     };
 
+    const validateForm = () => {
+        if (!form.nome.trim()) {
+            return 'Nome da sala é obrigatório';
+        }
+
+        const capacidadeNum = parseInt(form.capacidade);
+        if (isNaN(capacidadeNum) || capacidadeNum < 1) {
+            return 'Capacidade deve ser um número positivo maior que zero';
+        }
+
+        if (!form.equipamento.trim()) {
+            return 'Equipamento é obrigatório';
+        }
+
+        const precoNum = parseFloat(form.precoHora);
+        if (isNaN(precoNum) || precoNum <= 0) {
+            return 'Preço por hora deve ser um valor positivo maior que zero';
+        }
+
+        if (servicosSelecionados.length === 0) {
+            return 'Selecione pelo menos um serviço para a sala';
+        }
+
+        return null;
+    };
+
     // Reativar sala (soft delete reverso)
     const handleReativar = async () => {
         if (!editSalaId) return;
-        
+
+        const validationError = validateForm();
+        if (validationError) {
+            setErro(validationError);
+            return;
+        }
+
         setLoading(true);
         try {
             const response = await fetch(`${API_BASE_URL}/salas/${editSalaId}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    ...form,
+                    nome: form.nome.trim(),
                     capacidade: parseInt(form.capacidade),
+                    equipamento: form.equipamento.trim(),
                     precoHora: parseFloat(parseFloat(form.precoHora).toFixed(2)),
                     tipoServicoIds: servicosSelecionados
                 }),
@@ -151,7 +220,6 @@ export default function Sala() {
             setSucesso('Sala reativada com sucesso!');
             resetForm();
             await carregarSalas();
-            setTimeout(() => setSucesso(false), 3000);
         } catch (err) {
             setErro(err.message);
         } finally {
@@ -163,64 +231,40 @@ export default function Sala() {
     const handleSubmit = async (e) => {
         e.preventDefault();
         setErro('');
-        setSucesso(false);
+        setSucesso('');
         setLoading(true);
 
         // Validações
-        if (!form.nome.trim()) {
-            setErro('Nome da sala é obrigatório');
-            setLoading(false);
-            return;
-        }
-        if (!form.capacidade || parseInt(form.capacidade) < 1) {
-            setErro('Capacidade deve ser um número positivo');
-            setLoading(false);
-            return;
-        }
-        if (!form.equipamento.trim()) {
-            setErro('Equipamento é obrigatório');
-            setLoading(false);
-            return;
-        }
-        if (!form.precoHora || parseFloat(form.precoHora) <= 0) {
-            setErro('Preço por hora deve ser um valor positivo');
-            setLoading(false);
-            return;
-        }
-        if (servicosSelecionados.length === 0) {
-            setErro('Selecione pelo menos um serviço para a sala');
+        const validationError = validateForm();
+        if (validationError) {
+            setErro(validationError);
             setLoading(false);
             return;
         }
 
         try {
             let response;
-            
+            const payload = {
+                nome: form.nome.trim(),
+                capacidade: parseInt(form.capacidade),
+                equipamento: form.equipamento.trim(),
+                precoHora: parseFloat(parseFloat(form.precoHora).toFixed(2)),
+                tipoServicoIds: servicosSelecionados
+            };
+
             if (editMode && editSalaId) {
                 // UPDATE - Editar sala existente
                 response = await fetch(`${API_BASE_URL}/salas/${editSalaId}`, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        nome: form.nome.trim(),
-                        capacidade: parseInt(form.capacidade),
-                        equipamento: form.equipamento.trim(),
-                        precoHora: parseFloat(parseFloat(form.precoHora).toFixed(2)),
-                        tipoServicoIds: servicosSelecionados
-                    }),
+                    body: JSON.stringify(payload),
                 });
             } else {
                 // CREATE - Criar nova sala
                 response = await fetch(`${API_BASE_URL}/salas`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        nome: form.nome.trim(),
-                        capacidade: parseInt(form.capacidade),
-                        equipamento: form.equipamento.trim(),
-                        precoHora: parseFloat(parseFloat(form.precoHora).toFixed(2)),
-                        tipoServicoIds: servicosSelecionados
-                    }),
+                    body: JSON.stringify(payload),
                 });
             }
 
@@ -232,8 +276,6 @@ export default function Sala() {
             setSucesso(editMode ? 'Sala atualizada com sucesso!' : 'Sala criada com sucesso!');
             resetForm();
             await carregarSalas();
-
-            setTimeout(() => setSucesso(false), 3000);
         } catch (err) {
             setErro(err.message);
         } finally {
@@ -250,7 +292,7 @@ export default function Sala() {
     // Confirmar e eliminar
     const handleConfirmDelete = async () => {
         if (!salaToDelete) return;
-        
+
         try {
             const res = await fetch(`${API_BASE_URL}/salas/${salaToDelete.id}`, {
                 method: 'DELETE',
@@ -267,8 +309,7 @@ export default function Sala() {
             }
 
             await carregarSalas();
-            setSucesso(`Sala "${salaToDelete.nome}" ${salaToDelete.ativo ? 'inativada' : 'eliminada'} com sucesso!`);
-            setTimeout(() => setSucesso(false), 3000);
+            setSucesso(`Sala "${salaToDelete.nome}" inativada com sucesso!`);
         } catch (err) {
             setErro(err.message);
         } finally {
@@ -305,15 +346,15 @@ export default function Sala() {
                                 {editMode ? 'Editar Sala' : 'Criar Nova Sala'}
                             </Typography>
                             {editMode && (
-                                <Chip 
-                                    size="small" 
+                                <Chip
+                                    size="small"
                                     label={editSalaAtiva ? "Modo edição" : "Sala Inativa"}
                                     color={editSalaAtiva ? "warning" : "default"}
                                     variant="outlined"
                                 />
                             )}
                         </Box>
-                        
+
                         {/* Botão Reativar (só aparece se sala estiver inativa) */}
                         {editMode && !editSalaAtiva && (
                             <Button
@@ -330,6 +371,8 @@ export default function Sala() {
                     </Box>
 
                     <TextField
+                        id="sala-nome"
+                        name="nome"
                         label="Nome da sala"
                         value={form.nome}
                         onChange={e => setForm({ ...form, nome: e.target.value })}
@@ -340,34 +383,60 @@ export default function Sala() {
 
                     <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 2 }}>
                         <TextField
+                            id="sala-capacidade"
+                            name="capacidade"
                             label="Capacidade (nº de animais)"
                             type="number"
                             value={form.capacidade}
                             onChange={e => setForm({ ...form, capacidade: e.target.value })}
                             required
                             fullWidth
-                            inputProps={{ min: 1 }}
+                            inputProps={{ min: 1, step: 1 }}
                         />
 
                         <TextField
+                            id="sala-preco-hora"
+                            name="precoHora"
                             label="Preço por hora (€)"
                             type="number"
                             value={form.precoHora}
                             onChange={e => setForm({ ...form, precoHora: e.target.value })}
                             required
                             fullWidth
+                            inputProps={{
+                                min: 0.01,
+                                step: 0.01,
+                            }}
+                            placeholder="Ex: 10.50"
                         />
                     </Box>
 
                     <TextField
+                        id="sala-equipamento"
+                        name="equipamento"
                         label="Equipamento"
                         value={form.equipamento}
                         onChange={e => setForm({ ...form, equipamento: e.target.value })}
                         required
                         fullWidth
                         multiline
-                        rows={2}
-                        placeholder="Ex: Banheira, mesa de tosquia, secador..."
+                        InputProps={{
+                            inputComponent: TextareaAutosize,
+                            inputProps: {
+                                minRows: 2,
+                                placeholder: "Ex: Banheira, mesa de tosquia, secador..."
+                            }
+                        }}
+                    /*minRows={2}
+                    maxRows={2}
+                    rows={2}
+                    sx={{
+                        '& .MuiInputBase-inputMultiline': {
+                            padding: '16.5px 14px',
+                            //height: '40px',
+                        },
+                    }}
+                    placeholder="Ex: Banheira, mesa de tosquia, secador..."*/
                     />
 
                     <Typography variant="h2" sx={{ mt: 1, color: colors.text }}>
@@ -416,7 +485,7 @@ export default function Sala() {
                         >
                             {loading ? <CircularProgress size={24} sx={{ color: colors.white }} /> : (editMode ? 'Atualizar Sala' : 'Criar Sala')}
                         </Button>
-                        
+
                         {editMode && (
                             <Button
                                 type="button"
@@ -485,7 +554,7 @@ export default function Sala() {
                                     </Box>
 
                                     <Typography variant="body2" sx={{ color: colors.textSecondary, mt: 0.5 }}>
-                                        Capacidade: {sala.capacidade} {sala.capacidade === 1 ? 'animal' : 'animais'} | 
+                                        Capacidade: {sala.capacidade} {sala.capacidade === 1 ? 'animal' : 'animais'} |
                                         Preço: €{sala.precoHora}/hora
                                     </Typography>
 
