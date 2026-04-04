@@ -117,6 +117,7 @@ model FuncionarioServico {
   @@map("funcionario_servico")
 }
 
+// Mantido para referência — já não é usado na tabela tipo_servico
 enum TipoServicoEnum {
   BANHO
   TOSQUIA_COMPLETA

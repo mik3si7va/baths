@@ -1,10 +1,8 @@
 const { randomUUID } = require('node:crypto');
 const { prisma } = require('../db/prismaClient');
-const TipoServicoEnum = require('../domain/enums/TipoServicoEnum');
 const PorteEnum = require('../domain/enums/PorteEnum');
 
-// Conjuntos de valores válidos extraídos dos enums (para validação eficiente)
-const TIPOS_SERVICO_VALIDOS = new Set(Object.values(TipoServicoEnum).map(e => e.value));
+
 const PORTES_VALIDOS = new Set(Object.values(PorteEnum).map(e => e.value));
 
 /**
@@ -83,20 +81,34 @@ async function getAllTiposServico() {
  * @throws {Error} Se `tipo` não for um valor válido de `TipoServicoEnum`.
  */
 async function createTipoServico({ tipo }) {
-    if (!TIPOS_SERVICO_VALIDOS.has(tipo)) {
-        throw new Error(
-            `Tipo de serviço inválido: "${tipo}". Valores aceites: ${[...TIPOS_SERVICO_VALIDOS].join(', ')}`
-        );
+    if (!tipo || typeof tipo !== 'string' || tipo.trim() === '') {
+        throw new Error('O nome do serviço é obrigatório e não pode estar vazio.');
     }
-
+ 
+    const tipoNormalizado = tipo.trim();
+ 
+    // Verificar duplicado (case-insensitive)
+    const existente = await prisma.tipoServico.findFirst({
+        where: {
+            tipo: {
+                equals: tipoNormalizado,
+                mode: 'insensitive',
+            },
+        },
+    });
+ 
+    if (existente) {
+        throw new Error(`Já existe um serviço com o nome "${tipoNormalizado}".`);
+    }
+ 
     const novoTipoServico = await prisma.tipoServico.create({
         data: {
             id: randomUUID(),
-            tipo,
+            tipo: tipoNormalizado,
             ativo: true,
         },
     });
-
+ 
     return mapTipoServicoRow(novoTipoServico);
 }
 
