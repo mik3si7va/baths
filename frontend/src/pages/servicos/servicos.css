@@ -1,0 +1,54 @@
+/* ── Tabela de serviços ───────────────────────────────── */
+.servicos-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.93rem;
+}
+
+.servicos-table thead {
+  background: #F5F0E8;
+  border-bottom: 2px solid #e0dbd0;
+}
+
+.servicos-table thead th {
+  padding: 13px 18px;
+  text-align: left;
+  color: #102622;
+  font-weight: 700;
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  white-space: nowrap;
+}
+
+.servicos-table tbody tr {
+  border-bottom: 1px solid #ede8e0;
+  transition: background-color 0.15s ease;
+}
+
+.servicos-table tbody tr:last-child {
+  border-bottom: none;
+}
+
+.servicos-table tbody tr:hover {
+  background-color: #faf7f2;
+}
+
+.servicos-table tbody td {
+  padding: 14px 18px;
+  color: #475C51;
+  vertical-align: middle;
+}
+
+/* ── Tipo label ───────────────────────────────────────── */
+.tipo-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 700;
+  color: #102622;
+}
+
+.tipo-icon {
+  font-size: 1.1rem;
+}
