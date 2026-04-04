@@ -28,56 +28,92 @@ describe('Gestão de Serviços - Testes Unitários', () => {
     });
   });
 
-  test('getAllTiposServico retorna todos os tipos de serviço esperados', async () => {
-  const servicos = await getAllTiposServico();
-  const tipos = servicos.map((s) => s.tipo);
+  test('getAllTiposServico retorna todos os tipos de serviço do seed', async () => {
+    const servicos = await getAllTiposServico();
+    const tipos = servicos.map((s) => s.tipo);
 
-  const tiposEsperados = [
-    'BANHO',
-    'TOSQUIA_COMPLETA',
-    'TOSQUIA_HIGIENICA',
-    'CORTE_UNHAS',
-    'LIMPEZA_OUVIDOS',
-    'EXPRESSAO_GLANDULAS',
-    'LIMPEZA_DENTES',
-    'APARAR_PELO_CARA',
-    'ANTI_PULGAS',
-    'ANTI_QUEDA',
-    'REMOCAO_NOS',
-  ];
+    // O seed continua a inserir estes nomes — agora como strings livres
+    const tiposEsperados = [
+      'BANHO',
+      'TOSQUIA_COMPLETA',
+      'TOSQUIA_HIGIENICA',
+      'CORTE_UNHAS',
+      'LIMPEZA_OUVIDOS',
+      'EXPRESSAO_GLANDULAS',
+      'LIMPEZA_DENTES',
+      'APARAR_PELO_CARA',
+      'ANTI_PULGAS',
+      'ANTI_QUEDA',
+      'REMOCAO_NOS',
+    ];
 
-  tiposEsperados.forEach((tipo) => {
-    expect(tipos).toContain(tipo);
-  });
-});
-
-  test('createTipoServico falha com um tipo inválido', async () => {
-    await expect(
-      createTipoServico({ tipo: 'TIPO_INEXISTENTE' })
-    ).rejects.toThrow();
+    tiposEsperados.forEach((tipo) => {
+      expect(tipos).toContain(tipo);
+    });
   });
 
-  test('createTipoServico falha quando tipo não é fornecido', async () => {
+  test('createTipoServico falha quando tipo nao e fornecido', async () => {
     await expect(
       createTipoServico({ tipo: undefined })
-    ).rejects.toThrow();
+    ).rejects.toThrow('O nome do serviço é obrigatório e não pode estar vazio.');
   });
 
-  test('createTipoServico cria um serviço com os dados correctos', async () => {
-    // Garante que o tipo ainda não existe (o seed pode já o ter criado)
-    const existente = await prisma.tipoServico.findFirst({ where: { tipo: 'BANHO' } });
+  test('createTipoServico falha quando tipo e string vazia', async () => {
+    await expect(
+      createTipoServico({ tipo: '' })
+    ).rejects.toThrow('O nome do serviço é obrigatório e não pode estar vazio.');
+  });
 
-    if (!existente) {
-      const novo = await createTipoServico({ tipo: 'BANHO' });
-      expect(novo.tipo).toBe('BANHO');
-      expect(novo.ativo).toBe(true);
-      expect(novo).toHaveProperty('id');
-      await prisma.tipoServico.delete({ where: { id: novo.id } });
-    } else {
-      // Serviço já existente via seed — valida apenas o formato
-      expect(existente.tipo).toBe('BANHO');
-      expect(existente.ativo).toBe(true);
-    }
+  test('createTipoServico falha quando tipo e apenas espacos', async () => {
+    await expect(
+      createTipoServico({ tipo: '   ' })
+    ).rejects.toThrow('O nome do serviço é obrigatório e não pode estar vazio.');
+  });
+
+  test('createTipoServico cria um servico com os dados correctos', async () => {
+    const nomeUnico = `Servico Teste ${Date.now()}`;
+
+    const novo = await createTipoServico({ tipo: nomeUnico });
+
+    expect(novo.tipo).toBe(nomeUnico);
+    expect(novo.ativo).toBe(true);
+    expect(novo).toHaveProperty('id');
+
+    await prisma.tipoServico.delete({ where: { id: novo.id } });
+  });
+
+  test('createTipoServico faz trim ao nome antes de guardar', async () => {
+    const nomeUnico = `Servico Trim ${Date.now()}`;
+
+    const novo = await createTipoServico({ tipo: `  ${nomeUnico}  ` });
+
+    expect(novo.tipo).toBe(nomeUnico);
+
+    await prisma.tipoServico.delete({ where: { id: novo.id } });
+  });
+
+  test('createTipoServico falha com nome duplicado', async () => {
+    const nomeUnico = `Servico Duplicado ${Date.now()}`;
+
+    const primeiro = await createTipoServico({ tipo: nomeUnico });
+
+    await expect(
+      createTipoServico({ tipo: nomeUnico })
+    ).rejects.toThrow(`Já existe um serviço com o nome "${nomeUnico}".`);
+
+    await prisma.tipoServico.delete({ where: { id: primeiro.id } });
+  });
+
+  test('createTipoServico falha com nome duplicado independente de maiusculas', async () => {
+    const nomeUnico = `Servico Case ${Date.now()}`;
+
+    const primeiro = await createTipoServico({ tipo: nomeUnico });
+
+    await expect(
+      createTipoServico({ tipo: nomeUnico.toUpperCase() })
+    ).rejects.toThrow();
+
+    await prisma.tipoServico.delete({ where: { id: primeiro.id } });
   });
 
 });
