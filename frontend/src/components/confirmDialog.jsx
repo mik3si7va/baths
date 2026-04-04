@@ -45,7 +45,7 @@ export default function ConfirmDialog({
         <Button onClick={onClose} variant="outlined">
           Cancelar
         </Button>
-        <Button onClick={onConfirm} variant="contained" color={confirmColor} autoFocus>
+        <Button onClick={onConfirm} variant="contained" color={confirmColor} autoFocus data-testid="confirm-dialog-confirm">
           {confirmLabel}
         </Button>
       </DialogActions>
