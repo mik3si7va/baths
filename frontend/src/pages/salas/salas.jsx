@@ -208,7 +208,8 @@ export default function Sala() {
                     capacidade: parseInt(form.capacidade),
                     equipamento: form.equipamento.trim(),
                     precoHora: parseFloat(parseFloat(form.precoHora).toFixed(2)),
-                    tipoServicoIds: servicosSelecionados
+                    tipoServicoIds: servicosSelecionados,
+                    ativo: true
                 }),
             });
 

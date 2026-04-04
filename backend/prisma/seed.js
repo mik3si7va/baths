@@ -58,9 +58,56 @@ async function seedServicos() {
   }
 }
 
+async function seedRegrasPreco() {
+  const servicoIdByTipo = await getServicoIdsByTipo();
+
+  const portes = ['EXTRA_PEQUENO', 'PEQUENO', 'MEDIO', 'GRANDE', 'EXTRA_GRANDE'];
+
+  const regras = [
+    // Serviços com preço variável por porte
+    { tipo: 'BANHO', precos: [20, 25, 30, 35, 40], duracoes: [30, 30, 35, 40, 45] },
+    { tipo: 'TOSQUIA_COMPLETA', precos: [50, 55, 60, 65, 70], duracoes: [60, 60, 75, 75, 90] },
+    { tipo: 'TOSQUIA_HIGIENICA', precos: [40, 45, 50, 55, 60], duracoes: [30, 30, 40, 40, 45] },
+    // Serviços com preço fixo — mesmo preço para todos os portes
+    { tipo: 'CORTE_UNHAS', precos: [5, 5, 5, 5, 5], duracoes: [15, 15, 15, 15, 15] },
+    { tipo: 'LIMPEZA_OUVIDOS', precos: [7, 7, 7, 7, 7], duracoes: [15, 15, 15, 15, 15] },
+    { tipo: 'EXPRESSAO_GLANDULAS', precos: [10, 10, 10, 10, 10], duracoes: [15, 15, 15, 15, 15] },
+    { tipo: 'LIMPEZA_DENTES', precos: [12, 12, 12, 12, 12], duracoes: [20, 20, 20, 20, 20] },
+    { tipo: 'APARAR_PELO_CARA', precos: [15, 15, 15, 15, 15], duracoes: [25, 25, 25, 25, 25] },
+    { tipo: 'ANTI_PULGAS', precos: [30, 30, 30, 30, 30], duracoes: [20, 20, 20, 20, 20] },
+    { tipo: 'ANTI_QUEDA', precos: [20, 20, 20, 20, 20], duracoes: [30, 30, 30, 30, 30] },
+    { tipo: 'REMOCAO_NOS', precos: [20, 20, 20, 20, 20], duracoes: [40, 40, 40, 40, 40] },
+  ];
+
+  for (const r of regras) {
+    const tipoServicoId = servicoIdByTipo.get(r.tipo);
+    if (!tipoServicoId) {
+      throw new Error(`Servico nao encontrado no seed: ${r.tipo}`);
+    }
+
+    for (let i = 0; i < portes.length; i++) {
+      const exists = await prisma.regraPreco.findFirst({
+        where: { tipoServicoId, porteAnimal: portes[i] },
+      });
+
+      if (exists) continue;
+
+      await prisma.regraPreco.create({
+        data: {
+          id: randomUUID(),
+          tipoServicoId,
+          porteAnimal: portes[i],
+          precoBase: r.precos[i],
+          duracaoMinutos: r.duracoes[i],
+        },
+      });
+    }
+  }
+}
+
 async function seedSalas() {
   const servicoIdByTipo = await getServicoIdsByTipo();
- 
+
   const salas = [
     {
       nome: 'Sala de Banho 1',
@@ -135,17 +182,17 @@ async function seedSalas() {
       ],
     },
   ];
- 
+
   for (const s of salas) {
     const exists = await prisma.sala.findFirst({
       where: { nome: s.nome },
       select: { id: true },
     });
- 
+
     if (exists) {
       continue;
     }
- 
+
     const servicoIds = s.servicos.map((tipo) => {
       const servicoId = servicoIdByTipo.get(tipo);
       if (!servicoId) {
@@ -153,7 +200,7 @@ async function seedSalas() {
       }
       return servicoId;
     });
- 
+
     await prisma.$transaction(async (tx) => {
       const sala = await tx.sala.create({
         data: {
@@ -164,7 +211,7 @@ async function seedSalas() {
           ativo: true,
         },
       });
- 
+
       if (servicoIds.length > 0) {
         await tx.salaServico.createMany({
           data: servicoIds.map((tipoServicoId) => ({
@@ -353,10 +400,10 @@ async function seedFuncionarios() {
           funcionarioServico:
             servicoIds.length > 0
               ? {
-                  create: servicoIds.map((tipoServicoId) => ({
-                    tipoServicoId,
-                  })),
-                }
+                create: servicoIds.map((tipoServicoId) => ({
+                  tipoServicoId,
+                })),
+              }
               : undefined,
         },
       });
@@ -367,6 +414,7 @@ async function seedFuncionarios() {
 async function main() {
   await seedEvents();
   await seedServicos();
+  await seedRegrasPreco();
   await seedSalas();
   await seedFuncionarios();
 }

@@ -7,7 +7,7 @@ function isUuid(value) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 }
 
-function normalizeUniqueArray(values = []) {
+function unique(values = []) {
   return [...new Set(values)];
 }
 
@@ -20,6 +20,32 @@ function validateServicoIds(servicoIds) {
     if (!isUuid(id)) {
       throw new Error('tipoServicoIds deve conter apenas UUIDs validos.');
     }
+  }
+}
+
+function validateSalaFields({ nome, capacidade, equipamento, precoHora }) {
+  if (!nome || nome.trim() === '') {
+    throw new Error('nome, capacidade, equipamento e precoHora sao obrigatorios.');
+  }
+
+  if (capacidade === undefined || capacidade === null) {
+    throw new Error('nome, capacidade, equipamento e precoHora sao obrigatorios.');
+  }
+
+  if (!equipamento || equipamento.trim() === '') {
+    throw new Error('nome, capacidade, equipamento e precoHora sao obrigatorios.');
+  }
+
+  if (precoHora === undefined || precoHora === null) {
+    throw new Error('nome, capacidade, equipamento e precoHora sao obrigatorios.');
+  }
+
+  if (typeof capacidade !== 'number' || capacidade < 1 || !Number.isInteger(capacidade)) {
+    throw new Error('capacidade deve ser um numero inteiro positivo.');
+  }
+
+  if (typeof precoHora !== 'number' || precoHora <= 0) {
+    throw new Error('precoHora deve ser um numero positivo.');
   }
 }
 
@@ -37,14 +63,15 @@ function mapSalaRow(row) {
 }
 
 function mapSalaComServicos(sala) {
-  return {
-    ...mapSalaRow(sala),
-    servicos: (sala.salasServico || []).map((ss) => ({
-      tipoServicoId: ss.tipoServico.id,
-      tipo: ss.tipoServico.tipo,
-      ativo: ss.tipoServico.ativo,
-    })),
-  };
+  const entidade = mapSalaRow(sala);
+
+  entidade.servicos = (sala.salasServico || []).map((ss) => ({
+    tipoServicoId: ss.tipoServico.id,
+    tipo: ss.tipoServico.tipo,
+    ativo: ss.tipoServico.ativo,
+  }));
+
+  return entidade;
 }
 
 const INCLUDE_SERVICOS = {
@@ -82,6 +109,7 @@ async function getSalaById(id) {
   if (!isUuid(id)) {
     return null;
   }
+
   const sala = await prisma.sala.findUnique({
     where: { id },
     include: INCLUDE_SERVICOS,
@@ -95,32 +123,9 @@ async function getSalaById(id) {
 }
 
 async function createSala({ nome, capacidade, equipamento, precoHora, tipoServicoIds }) {
-  if (nome === undefined || nome === null || nome.trim() === '') {
-    throw new Error('nome, capacidade, equipamento e precoHora sao obrigatorios.');
-  }
-  
-  if (capacidade === undefined || capacidade === null) {
-    throw new Error('nome, capacidade, equipamento e precoHora sao obrigatorios.');
-  }
-  
-  if (equipamento === undefined || equipamento === null || equipamento.trim() === '') {
-    throw new Error('nome, capacidade, equipamento e precoHora sao obrigatorios.');
-  }
-  
-  if (precoHora === undefined || precoHora === null) {
-    throw new Error('nome, capacidade, equipamento e precoHora sao obrigatorios.');
-  }
+  validateSalaFields({ nome, capacidade, equipamento, precoHora });
 
-  if (typeof capacidade !== 'number' || capacidade < 1 || !Number.isInteger(capacidade)) {
-    throw new Error('capacidade deve ser um numero inteiro positivo.');
-  }
-
-  if (typeof precoHora !== 'number' || precoHora <= 0) {
-    throw new Error('precoHora deve ser um numero positivo.');
-  }
-
-
-  const normalizedServicoIds = normalizeUniqueArray(Array.isArray(tipoServicoIds) ? tipoServicoIds : []);
+  const normalizedServicoIds = unique(Array.isArray(tipoServicoIds) ? tipoServicoIds : []);
   validateServicoIds(normalizedServicoIds);
 
   const servicosExistentes = await prisma.tipoServico.findMany({
@@ -135,12 +140,7 @@ async function createSala({ nome, capacidade, equipamento, precoHora, tipoServic
   try {
     const sala = await prisma.$transaction(async (tx) => {
       const novaSala = await tx.sala.create({
-        data: { 
-          nome, 
-          capacidade, 
-          equipamento, 
-          precoHora,
-        },
+        data: { nome, capacidade, equipamento, precoHora },
       });
 
       await tx.salaServico.createMany({
@@ -148,6 +148,7 @@ async function createSala({ nome, capacidade, equipamento, precoHora, tipoServic
           salaId: novaSala.id,
           tipoServicoId,
         })),
+        skipDuplicates: true,
       });
 
       return tx.sala.findUnique({
@@ -166,30 +167,12 @@ async function createSala({ nome, capacidade, equipamento, precoHora, tipoServic
   }
 }
 
-async function updateSala(id, { nome, capacidade, equipamento, precoHora, tipoServicoIds }) {
-  if (nome === undefined || nome === null || nome.trim() === '') {
-    throw new Error('nome, capacidade, equipamento e precoHora sao obrigatorios.');
-  }
-  
-  if (capacidade === undefined || capacidade === null) {
-    throw new Error('nome, capacidade, equipamento e precoHora sao obrigatorios.');
-  }
-  
-  if (equipamento === undefined || equipamento === null || equipamento.trim() === '') {
-    throw new Error('nome, capacidade, equipamento e precoHora sao obrigatorios.');
-  }
-  
-  if (precoHora === undefined || precoHora === null) {
-    throw new Error('nome, capacidade, equipamento e precoHora sao obrigatorios.');
+async function updateSala(id, { nome, capacidade, equipamento, precoHora, tipoServicoIds, ativo }) {
+  if (!isUuid(id)) {
+    return null;
   }
 
-  if (typeof capacidade !== 'number' || capacidade < 1 || !Number.isInteger(capacidade)) {
-    throw new Error('capacidade deve ser um numero inteiro positivo.');
-  }
-
-  if (typeof precoHora !== 'number' || precoHora <= 0) {
-    throw new Error('precoHora deve ser um numero positivo.');
-  }
+  validateSalaFields({ nome, capacidade, equipamento, precoHora });
 
   const existing = await prisma.sala.findUnique({
     where: { id },
@@ -200,7 +183,7 @@ async function updateSala(id, { nome, capacidade, equipamento, precoHora, tipoSe
     return null;
   }
 
-  const normalizedServicoIds = normalizeUniqueArray(Array.isArray(tipoServicoIds) ? tipoServicoIds : []);
+  const normalizedServicoIds = unique(Array.isArray(tipoServicoIds) ? tipoServicoIds : []);
   validateServicoIds(normalizedServicoIds);
 
   const servicosExistentes = await prisma.tipoServico.findMany({
@@ -216,7 +199,7 @@ async function updateSala(id, { nome, capacidade, equipamento, precoHora, tipoSe
     const sala = await prisma.$transaction(async (tx) => {
       await tx.sala.update({
         where: { id },
-        data: { nome, capacidade, equipamento, precoHora, ativo: true, updatedAt: new Date() },
+        data: { nome, capacidade, equipamento, precoHora, updatedAt: new Date(), ...(ativo !== undefined && { ativo }), },
       });
 
       await tx.salaServico.deleteMany({ where: { salaId: id } });
@@ -226,6 +209,7 @@ async function updateSala(id, { nome, capacidade, equipamento, precoHora, tipoSe
           salaId: id,
           tipoServicoId,
         })),
+        skipDuplicates: true,
       });
 
       return tx.sala.findUnique({
@@ -304,6 +288,10 @@ async function addServicoToSala({ salaId, tipoServicoId }) {
 }
 
 async function getServicosBySala(salaId) {
+  if (!isUuid(salaId)) {
+    throw new Error('salaId invalido. Deve ser um UUID valido.');
+  }
+
   const servicosSala = await prisma.salaServico.findMany({
     where: { salaId },
     include: {

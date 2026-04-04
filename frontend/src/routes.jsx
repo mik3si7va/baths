@@ -39,7 +39,7 @@ export default function AppRoutes() {
                     element={
                         <PrivateRoute
                             element={
-                                <CompactLayout>
+                                <CompactLayout showBack>
                                     <ServicosPage />
                                 </CompactLayout>
                             }

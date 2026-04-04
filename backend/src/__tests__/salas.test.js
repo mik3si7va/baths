@@ -236,6 +236,7 @@ describe('Gestao de Salas - Testes Unitarios', () => {
       equipamento: 'Teste',
       precoHora: 10,
       tipoServicoIds: [servicoId],
+      ativo: true,
     });
 
     expect(reativada.ativo).toBe(true);

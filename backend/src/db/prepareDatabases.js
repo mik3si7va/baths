@@ -64,6 +64,26 @@ async function ensureAppPermissions() {
     await appAdminClient.query(`GRANT ALL ON SCHEMA public TO ${quoteIdentifier(appUser)};`);
     await appAdminClient.query(`GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO ${quoteIdentifier(appUser)};`);
     await appAdminClient.query(`GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO ${quoteIdentifier(appUser)};`);
+
+    // Corrige tabelas existentes que possam ter owner errado — exceto as do sistema
+    await appAdminClient.query(`
+      DO $$
+      DECLARE
+        r RECORD;
+      BEGIN
+        FOR r IN SELECT tablename FROM pg_tables 
+                WHERE schemaname = 'public' 
+                AND tablename NOT IN ('_prisma_migrations', 'events')
+        LOOP
+          EXECUTE 'ALTER TABLE public.' || quote_ident(r.tablename) || ' OWNER TO ${appUser}';
+        END LOOP;
+      END $$;
+    `);
+
+    // Garante que tabelas criadas no futuro pelo camunda também ficam acessíveis
+    await appAdminClient.query(`ALTER DEFAULT PRIVILEGES FOR ROLE camunda IN SCHEMA public GRANT ALL ON TABLES TO ${quoteIdentifier(appUser)};`);
+    await appAdminClient.query(`ALTER DEFAULT PRIVILEGES FOR ROLE camunda IN SCHEMA public GRANT ALL ON SEQUENCES TO ${quoteIdentifier(appUser)};`);
+
   } finally {
     await appAdminClient.end();
   }
