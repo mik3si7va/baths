@@ -159,7 +159,7 @@ const options = {
             },
             equipamento: {
               type: 'string',
-              example: 'Banheira grande, secador',
+              example: 'Banheira, secador',
             },
             precoHora: {
               type: 'number',
@@ -179,6 +179,42 @@ const options = {
               type: 'string',
               format: 'date-time',
               example: '2025-01-15T10:00:00Z',
+            },
+          },
+        },
+
+        CreateSalaRequest: {
+          type: 'object',
+          required: ['nome', 'capacidade', 'equipamento', 'precoHora', 'tipoServicoIds'],
+          properties: {
+            nome: {
+              type: 'string',
+              example: 'Sala A',
+            },
+            capacidade: {
+              type: 'integer',
+              example: 5,
+            },
+            equipamento: {
+              type: 'string',
+              example: 'Banheira grande, secador',
+            },
+            precoHora: {
+              type: 'number',
+              format: 'float',
+              example: 20.00,
+            },
+            tipoServicoIds: {
+              type: 'array',
+              items: {
+                type: 'string',
+                format: 'uuid',
+              },
+              description: 'IDs dos tipos de servico associados a esta sala. Obrigatorio ter pelo menos um.',
+              example: [
+                '11111111-1111-1111-1111-111111111111',
+                '22222222-2222-2222-2222-222222222222',
+              ],
             },
           },
         },

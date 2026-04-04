@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { MainLayout, CompactLayout } from './layouts';
 import { Home, Calendar, Login, CriarSala, Users} from './pages'
 import ServicosPage from './pages/servicos/servicos';
+import { Home, Calendar, Login, Salas, SalaDetalhes, Users } from './pages'
 import App from './App';
 
 
@@ -51,7 +52,7 @@ export default function AppRoutes() {
                     element={
                         <PrivateRoute 
                             element={
-                                <CompactLayout>
+                                <CompactLayout showBack>
                                     <Calendar />
                                 </CompactLayout>
                             } 
@@ -59,16 +60,28 @@ export default function AppRoutes() {
                     } 
                 />
                 <Route 
-                    path="/salas/nova" 
+                    path="/salas" 
                     element={
                         <PrivateRoute 
                             element={
-                                <CompactLayout>
-                                    <CriarSala />
+                                <CompactLayout showBack>
+                                    <Salas />
                                 </CompactLayout>
                             } 
                         />
                     } 
+                />
+                <Route
+                    path="/salas/:id/:nome"
+                    element={
+                        <PrivateRoute
+                            element={
+                                <CompactLayout showBack>
+                                    <SalaDetalhes />
+                                </CompactLayout>
+                            }
+                        />
+                    }
                 />
                 <Route
                     path="/funcionarios"

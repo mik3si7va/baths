@@ -7,6 +7,7 @@ import PeopleIcon from '@mui/icons-material/People';
 import PetsIcon from '@mui/icons-material/Pets';
 import BadgeIcon from '@mui/icons-material/Badge';
 import MeetingRoomIcon from '@mui/icons-material/MeetingRoom';
+import AddBusinessIcon from '@mui/icons-material/AddBusiness';
 import AddIcon from '@mui/icons-material/Add';
 import SearchIcon from '@mui/icons-material/Search';
 import PaymentIcon from '@mui/icons-material/Payment';
@@ -63,6 +64,16 @@ export default function Home() {
             href: '/funcionarios',
             height: 180,
             width: 328
+        },
+        {
+            title: 'Salas',
+            description: 'Criar e gerir salas, equipamentos, serviços e preço.',
+            icon: MeetingRoomIcon,
+            buttonText: 'Gerir',
+            buttonIcon: AddBusinessIcon,
+            href: '/salas',
+            height: 180,
+            width: 328
         }
     ];
 
@@ -72,7 +83,7 @@ export default function Home() {
             <Typography variant="h1" sx={{ mb: 1, color: colors.text }}>
                 Bem-vindo
             </Typography>
-            
+
             {/* Subtítulo */}
             <Typography variant="body1" sx={{ mb: 4, color: colors.textSecondary }}>
                 Aqui tens um resumo do estado actual da clínica.
@@ -82,9 +93,9 @@ export default function Home() {
             <Grid container spacing={3} sx={{ mb: 4 }}>
                 {cardData.map((item, index) => (
                     <Grid item xs={12} sm={6} md={4} key={index}>
-                        <SummaryCard 
-                            icon={item.icon} 
-                            label={item.label} 
+                        <SummaryCard
+                            icon={item.icon}
+                            label={item.label}
                             height={item.height}
                             width={item.width}
                         />
@@ -98,9 +109,9 @@ export default function Home() {
             </Typography>
 
             {/* Grid de Quick Acess Cards */}
-            <Box sx={{ 
-                display: 'flex', 
-                gap: 3, 
+            <Box sx={{
+                display: 'flex',
+                gap: 3,
                 flexWrap: 'wrap',
                 justifyContent: 'flex-start'
             }}>

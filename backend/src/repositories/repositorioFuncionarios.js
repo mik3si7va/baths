@@ -262,7 +262,7 @@ async function createFuncionario({
     return mapFuncionarioRow(funcionario);
   } catch (error) {
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
-      throw new Error(`Ja existe um funcionario com o email "${normalizedEmail}".`);
+      throw new Error(`Ja existe um funcionario com o email "${normalizedEmail}".`, { cause: error });
     }
 
     throw error;
@@ -399,7 +399,7 @@ async function updateFuncionario(
     return mapFuncionarioRow(funcionario);
   } catch (error) {
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
-      throw new Error(`Ja existe um funcionario com o email "${normalizedEmail}".`);
+      throw new Error(`Ja existe um funcionario com o email "${normalizedEmail}".`, { cause: error });
     }
 
     throw error;

@@ -1,132 +1,124 @@
 :root {
-  --tq-50: #eefcfb;
-  --tq-100: #d5f7f5;
-  --tq-200: #afeeea;
-  --tq-300: #7fe2db;
-  --tq-400: #4ccfc8;
-  --tq-500: #24b7b0;
-  --tq-600: #159991;
-  --tq-700: #117b75;
-  --tq-800: #115f5b;
-  --tq-900: #134e4b;
+  --bt-500: #475C51;
+  --bt-600: #3d5047;
+  --bt-700: #32433b;
+  --bt-800: #263530;
+  --bt-900: #1a2721;
+  --bt-200: #b0bfb4;
+  --bt-100: #d4dcd6;
+  --bt-50:  #eef1ef;
 }
 
 .fc {
-  --fc-border-color: var(--tq-200);
+  --fc-border-color: #c8d0ca;
   --fc-page-bg-color: #ffffff;
-  --fc-neutral-bg-color: var(--tq-50);
-  --fc-today-bg-color: rgba(36, 183, 176, 0.07);
-  --fc-event-bg-color: var(--tq-500);
-  --fc-event-border-color: var(--tq-600);
+  --fc-neutral-bg-color: #f5f7f5;
+  --fc-today-bg-color: rgba(71, 92, 81, 0.06);
+  --fc-event-bg-color: var(--bt-500);
+  --fc-event-border-color: var(--bt-600);
   --fc-event-text-color: #ffffff;
   --fc-button-text-color: #ffffff;
-  --fc-button-bg-color: var(--tq-700);
-  --fc-button-border-color: var(--tq-700);
-  --fc-button-hover-bg-color: var(--tq-800);
-  --fc-button-hover-border-color: var(--tq-800);
-  --fc-button-active-bg-color: var(--tq-900);
-  --fc-button-active-border-color: var(--tq-900);
-  --fc-now-indicator-color: #0d9488;
+  --fc-button-bg-color: var(--bt-600);
+  --fc-button-border-color: var(--bt-600);
+  --fc-button-hover-bg-color: var(--bt-700);
+  --fc-button-hover-border-color: var(--bt-700);
+  --fc-button-active-bg-color: var(--bt-800);
+  --fc-button-active-border-color: var(--bt-800);
+  --fc-now-indicator-color: var(--bt-500);
 
-  border: 1px solid var(--tq-200);
-  border-radius: 16px;
+  border: 1px solid #c8d0ca;
+  border-radius: 12px;
   padding: 12px;
-  background:
-    radial-gradient(circle at top right, rgba(127, 226, 219, 0.2), transparent 40%),
-    radial-gradient(circle at bottom left, rgba(36, 183, 176, 0.12), transparent 35%),
-    #ffffff;
-  box-shadow: 0 12px 28px rgba(17, 95, 91, 0.12);
+  background: #ffffff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
 }
 
 .fc .fc-toolbar-title {
-  color: var(--tq-900);
+  color: #102622;
   font-weight: 700;
-  letter-spacing: 0.2px;
 }
 
 .fc .fc-button {
-  border-radius: 10px !important;
+  border-radius: 8px !important;
   font-weight: 600;
   text-transform: capitalize;
   padding: 0.4rem 0.75rem !important;
 }
 
+/* Cabeçalho dos dias */
 .fc .fc-col-header-cell {
-  background-color: var(--tq-50);
+  background-color: #f0f3f1;
+  border-bottom: 2px solid #c8d0ca;
 }
 
 .fc .fc-col-header-cell-cushion {
-  color: var(--tq-800);
+  color: #102622;
   font-weight: 700;
   text-decoration: none;
   padding: 8px 6px;
 }
 
+/* Números das horas e labels */
 .fc .fc-daygrid-day-number,
 .fc .fc-timegrid-axis-cushion,
 .fc .fc-timegrid-slot-label-cushion {
-  color: var(--tq-800);
+  color: #102622;
+  font-weight: 500;
 }
 
+/* Linhas de hora — sólidas e visíveis */
 .fc .fc-timegrid-slot {
-  border-color: var(--tq-300);
-  border-top-width: 1px;
+  border-color: #c8d0ca;
+  border-top-style: solid;
 }
 
+/* Linhas de meia hora — mais suaves */
+.fc .fc-timegrid-slot.fc-timegrid-slot-minor {
+  border-top-color: #e0e5e2;
+  border-top-style: dashed;
+}
+
+/* Separadores verticais entre dias */
 .fc .fc-theme-standard td,
 .fc .fc-theme-standard th,
 .fc td,
 .fc th {
-  border-color: var(--tq-300);
+  border-color: #c8d0ca;
 }
 
+/* Hoje */
 .fc .fc-timegrid-col.fc-day-today {
-  background-color: rgba(36, 183, 176, 0.08);
-}
-
-.fc .fc-timegrid-col.fc-day-today .fc-timegrid-slot {
-  border-color: var(--tq-400);
+  background-color: rgba(71, 92, 81, 0.05);
 }
 
 .fc .fc-scrollgrid {
-  border-radius: 12px;
+  border-radius: 8px;
   overflow: hidden;
 }
 
 .fc .fc-event {
-  border-radius: 8px;
+  border-radius: 6px;
   padding: 2px 4px;
   font-weight: 600;
 }
 
 .fc .fc-event:hover {
-  filter: brightness(0.95);
-}
-
-.calendar-actions {
-  margin-top: 12px;
-}
-
-.back-home-btn {
-  background: linear-gradient(135deg, var(--tq-600), var(--tq-700));
-  color: #ffffff;
-  border: 1px solid var(--tq-800);
-  border-radius: 10px;
-  padding: 8px 14px;
-  font-weight: 600;
-  font-size: 0.95rem;
+  filter: brightness(0.93);
   cursor: pointer;
-  box-shadow: 0 6px 14px rgba(17, 95, 91, 0.2);
-  transition: transform 120ms ease, box-shadow 120ms ease, filter 120ms ease;
 }
 
-.back-home-btn:hover {
-  filter: brightness(1.05);
-  transform: translateY(-1px);
-  box-shadow: 0 8px 16px rgba(17, 95, 91, 0.26);
+/* Hora de almoço 13h-14h */
+.fc .fc-bg-event {
+  opacity: 1 !important;
 }
 
-.back-home-btn:active {
-  transform: translateY(0);
-  box-shadow: 0 4px 10px rgba(17, 95, 91, 0.22);
+.lunch-break {
+  background-color: rgba(71, 92, 81, 0.08) !important;
+  background-image: repeating-linear-gradient(
+    45deg,
+    transparent,
+    transparent 5px,
+    rgba(71, 92, 81, 0.06) 5px,
+    rgba(71, 92, 81, 0.06) 10px
+  ) !important;
 }

@@ -17,7 +17,7 @@ export function ThemeProvider({ children }) {
             black: '#000000',
             headerOverlay: 'linear-gradient(to bottom, rgba(0,0,0,0.4), transparent)'
         },
-        
+
         // ESTILOS DE CARDS
         cardStyles: {
             borderRadius: 3,
@@ -25,7 +25,7 @@ export function ThemeProvider({ children }) {
             //minWidth: 238,
             //maxWidth: 238
         },
-        
+
         // TAMANHOS RESPONSIVOS
         sizes: {
             headerHeight: { xs: 180, sm: 210, md: 240 },
@@ -33,7 +33,7 @@ export function ThemeProvider({ children }) {
             buttonFont: { xs: '13px', sm: '16px' }
         }
     };
-    
+
     return (
         <ThemeContext.Provider value={value}>
             {children}
