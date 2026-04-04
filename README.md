@@ -203,31 +203,55 @@ Frontend:
 
 
 ## Testes Automatizados
-Os testes unitários do backend usam **Jest** e testam directamente as funções do repositório contra a base de dados.
+
+### Backend
+Os testes do backend usam **Jest** e estão divididos em dois tipos:
+- **Testes de repositório** — testam diretamente as funções dos repositórios contra a base de dados real.
+- **Testes de API** — testam os endpoints HTTP contra a base de dados real.
 
 Na pasta `backend`:
 `npm test`
 
 **Requisitos antes de correr os testes:**
 1. Docker a correr (`npm run db:up`)
-2. Base de dados preparada (`npm run db:prepare`)
-3. Migrações aplicadas (`npm run db:migrate`)
-4. Seed executado (`npm run db:seed`)
-5. Ficheiro `.env` configurado com `DATABASE_URL`
+2. Base de dados preparada (`npm run db:full`)
+3. Ficheiro `.env` configurado (ver `.env.example`)
 
-Ou simplesmente tudo de uma vez:
-`npm run db:full`
+### Frontend
+
+Os testes do frontend usam **Jest + Testing Library** e testam componentes React de forma isolada com dados mockados.
+
+Na pasta `frontend`:
+`npm test`
+
+Não requerem backend nem base de dados a correr.
+
+### Testes de Aceitação (E2E)
+
+Os testes de aceitação usam **Cypress** e testam fluxos completos no browser com o backend e frontend a correr.
+
+Na pasta `frontend`:
+`npm run cypress:open`   # abre interface gráfica (desenvolvimento local)
+`npm run cypress:run`    # corre em modo headless (CI)
+
+**Requisitos antes de correr os testes E2E:**
+1. Backend a correr (`npm start` na pasta `backend`)
+2. Frontend a correr (`npm start` na pasta `frontend`)
+3. Ficheiro `.env` do backend com `NODE_ENV=test` (ver `.env.example`)
 
 
 ## Integração Contínua (CI)
 
 O projecto tem um pipeline CI configurado com **GitHub Actions** que corre automaticamente em cada push ou pull request.
 
-O pipeline:
-1. Cria uma base de dados PostgreSQL limpa
-2. Instala as dependências
-3. Aplica as migrações
-4. Corre o seed
-5. Corre os testes do backend (`npm test`)
+O pipeline está dividido em 5 jobs que correm pela seguinte ordem:
+`backend-lint -> backend-tests`
+`frontend-lint -> frontend-tests -> frontend-build`
+
+`backend-lint`    # Verifica qualidade do código do backend com ESLint
+`backend-tests`   # Cria BD limpa, aplica migrações, seed e corre testes
+`frontend-lint`   # Verifica qualidade do código do frontend com ESLint
+`frontend-tests`  # Corre testes Jest + Testing Library
+`frontend-build`  # Faz build de produção do frontend
 
 O resultado aparece no separador **Actions** do repositório GitHub — ✅ se passar, ❌ se falhar.
