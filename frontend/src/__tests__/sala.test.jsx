@@ -133,7 +133,7 @@ describe('Salas page', () => {
 
         await userEvent.click(screen.getByRole('button', { name: /Criar Sala/i }));
 
-        expect(await screen.findByText('Nome da sala é obrigatório')).toBeInTheDocument();
+        expect(await screen.findByText('Nome da sala é obrigatório.')).toBeInTheDocument();
     });
 
     test('mostra erro quando capacidade é negativa', async () => {
@@ -150,7 +150,7 @@ describe('Salas page', () => {
 
         await userEvent.click(screen.getByRole('button', { name: /Criar Sala/i }));
 
-        expect(await screen.findByText('Capacidade deve ser um número positivo maior que zero')).toBeInTheDocument();
+        expect(await screen.findByText('Capacidade deve ser um número positivo maior que zero.')).toBeInTheDocument();
     });
 
     test('mostra erro quando preço é negativo', async () => {
@@ -167,7 +167,7 @@ describe('Salas page', () => {
 
         await userEvent.click(screen.getByRole('button', { name: /Criar Sala/i }));
 
-        expect(await screen.findByText('Preço por hora deve ser um valor positivo maior que zero')).toBeInTheDocument();
+        expect(await screen.findByText('Preço por hora deve ser um valor positivo maior que zero.')).toBeInTheDocument();
     });
 
     test('mostra erro quando preço é zero', async () => {
@@ -184,7 +184,7 @@ describe('Salas page', () => {
 
         await userEvent.click(screen.getByRole('button', { name: /Criar Sala/i }));
 
-        expect(await screen.findByText('Preço por hora deve ser um valor positivo maior que zero')).toBeInTheDocument();
+        expect(await screen.findByText('Preço por hora deve ser um valor positivo maior que zero.')).toBeInTheDocument();
     });
 
     test('mostra erro quando preço tem formato inválido', async () => {
@@ -201,7 +201,7 @@ describe('Salas page', () => {
 
         await userEvent.click(screen.getByRole('button', { name: /Criar Sala/i }));
 
-        expect(await screen.findByText('Preço por hora deve ser um valor positivo maior que zero')).toBeInTheDocument();
+        expect(await screen.findByText('Preço por hora deve ser um valor positivo maior que zero.')).toBeInTheDocument();
     });
 
     test('mostra erro quando nenhum serviço está selecionado', async () => {
@@ -217,7 +217,7 @@ describe('Salas page', () => {
 
         await userEvent.click(screen.getByRole('button', { name: /Criar Sala/i }));
 
-        expect(await screen.findByRole('alert')).toHaveTextContent('Selecione pelo menos um serviço para a sala');
+        expect(await screen.findByRole('alert')).toHaveTextContent('Selecione pelo menos um serviço para a sala.');
     });
 
     // ─── CRIAR SALA ──────────────────────────────────────────────────────────

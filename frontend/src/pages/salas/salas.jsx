@@ -164,25 +164,25 @@ export default function Sala() {
 
     const validateForm = () => {
         if (!form.nome.trim()) {
-            return 'Nome da sala é obrigatório';
+            return 'Nome da sala é obrigatório.';
         }
 
         const capacidadeNum = parseInt(form.capacidade);
         if (isNaN(capacidadeNum) || capacidadeNum < 1) {
-            return 'Capacidade deve ser um número positivo maior que zero';
-        }
-
-        if (!form.equipamento.trim()) {
-            return 'Equipamento é obrigatório';
+            return 'Capacidade deve ser um número positivo maior que zero.';
         }
 
         const precoNum = parseFloat(form.precoHora);
         if (isNaN(precoNum) || precoNum <= 0) {
-            return 'Preço por hora deve ser um valor positivo maior que zero';
+            return 'Preço por hora deve ser um valor positivo maior que zero.';
+        }
+
+        if (!form.equipamento.trim()) {
+            return 'Equipamento é obrigatório.';
         }
 
         if (servicosSelecionados.length === 0) {
-            return 'Selecione pelo menos um serviço para a sala';
+            return 'Selecione pelo menos um serviço para a sala.';
         }
 
         return null;
@@ -335,7 +335,7 @@ export default function Sala() {
 
             {/* Formulário de criação/edição */}
             <Paper elevation={2} sx={{ borderRadius: 3, p: 3, mb: 4 }}>
-                <Box component="form" onSubmit={handleSubmit} sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                <Box component="form" onSubmit={handleSubmit} noValidate sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                     {sucesso && <Alert severity="success">{sucesso}</Alert>}
                     {erro && <Alert severity="error">{erro}</Alert>}
 

@@ -122,7 +122,7 @@ app.get('/salas/todas', async (_req, res) => {
     return res.status(500).json({ error: 'Failed to fetch all salas' });
   }
 });
- 
+
 /**
  * @swagger
  * /salas/{id}:
@@ -164,20 +164,20 @@ app.get('/salas/todas', async (_req, res) => {
  */
 app.get('/salas/:id', async (req, res) => {
   const { id } = req.params;
- 
+
   try {
     const sala = await getSalaById(id);
     if (!sala) {
       return res.status(404).json({ error: 'Sala nao encontrada' });
     }
- 
+
     return res.json(sala);
   } catch (error) {
     console.error('Failed to fetch sala:', error);
     return res.status(500).json({ error: 'Failed to fetch sala' });
   }
 });
- 
+
 /**
  * @swagger
  * /salas:
@@ -233,15 +233,15 @@ app.post('/salas', async (req, res) => {
     return res.status(201).json(nova);
   } catch (error) {
     console.error('Failed to create sala:', error);
- 
+
     if (error.message?.startsWith('Ja existe uma sala com o nome')) {
       return res.status(409).json({ error: error.message });
     }
- 
+
     return res.status(400).json({ error: error.message });
   }
 });
- 
+
 /**
  * @swagger
  * /salas/{id}:
@@ -312,26 +312,26 @@ app.post('/salas', async (req, res) => {
 app.put('/salas/:id', async (req, res) => {
   const { id } = req.params;
   const { nome, capacidade, equipamento, precoHora, tipoServicoIds } = req.body || {};
- 
+
   try {
     const salaAtualizada = await updateSala(id, { nome, capacidade, equipamento, precoHora, tipoServicoIds });
- 
+
     if (!salaAtualizada) {
       return res.status(404).json({ error: 'Sala nao encontrada' });
     }
- 
+
     return res.json(salaAtualizada);
   } catch (error) {
     console.error('Failed to update sala:', error);
- 
+
     if (error.message?.startsWith('Ja existe uma sala com o nome')) {
       return res.status(409).json({ error: error.message });
     }
- 
+
     return res.status(400).json({ error: error.message });
   }
 });
- 
+
 /**
  * @swagger
  * /salas/{id}:
@@ -380,20 +380,20 @@ app.put('/salas/:id', async (req, res) => {
  */
 app.delete('/salas/:id', async (req, res) => {
   const { id } = req.params;
- 
+
   try {
     const result = await deleteSala(id);
     if (!result) {
       return res.status(404).json({ error: 'Sala nao encontrada' });
     }
- 
+
     return res.json(result);
   } catch (error) {
     console.error('Failed to delete sala:', error);
     return res.status(500).json({ error: 'Failed to delete sala' });
   }
 });
- 
+
 /**
  * @swagger
  * /salas/{id}/servicos:
@@ -475,15 +475,15 @@ app.post('/salas/:id/servicos', async (req, res) => {
     return res.status(201).json(associacao);
   } catch (error) {
     console.error('Failed to add servico to sala:', error);
- 
+
     if (error.message?.startsWith('Este servico ja esta associado')) {
       return res.status(409).json({ error: error.message });
     }
- 
+
     return res.status(400).json({ error: error.message });
   }
 });
- 
+
 /**
  * @swagger
  * /salas/{id}/servicos:
@@ -524,7 +524,7 @@ app.get('/salas/:id/servicos', async (req, res) => {
     return res.status(500).json({ error: 'Failed to fetch servicos da sala' });
   }
 });
- 
+
 /**
  * @swagger
  * /salas/{id}/servicos/{servicoId}:
@@ -979,6 +979,34 @@ async function startServer() {
   process.on('SIGINT', shutdown);
   process.on('SIGTERM', shutdown);
 }
+
+// ROTAS DE TESTE
+// Estas rotas só estão disponíveis em ambiente de teste (NODE_ENV=test).
+// São usadas pelos testes de aceitação (Cypress) para limpar dados criados durante os testes, 
+// garantindo que a base de dados não acumula lixo.
+// NUNCA devem ser usadas em produção.
+
+app.delete('/test/salas-cypress', async (_req, res) => {
+  // Só funciona em ambiente de teste
+  if (process.env.NODE_ENV !== 'test') {
+    return res.status(403).json({ error: 'Apenas disponivel em ambiente de teste.' });
+  }
+
+  try {
+    // Apaga salas criadas pelos testes Cypress — identificadas pelo prefixo do nome
+    await prisma.salaServico.deleteMany({
+      where: { sala: { nome: { startsWith: 'Sala Cypress' } } },
+    })
+    await prisma.sala.deleteMany({
+      where: { nome: { startsWith: 'Sala Cypress' } },
+    })
+
+    return res.json({ ok: true, message: 'Salas de teste removidas com sucesso.' });
+  } catch (error) {
+    console.error('Failed to cleanup test salas:', error);
+    return res.status(500).json({ error: 'Erro ao limpar salas de teste.' });
+  }
+});
 
 if (require.main === module) {
   startServer();
