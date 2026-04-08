@@ -11,6 +11,8 @@ import AddBusinessIcon from '@mui/icons-material/AddBusiness';
 import AddIcon from '@mui/icons-material/Add';
 import SearchIcon from '@mui/icons-material/Search';
 import PaymentIcon from '@mui/icons-material/Payment';
+import ContentCutIcon from '@mui/icons-material/ContentCut';
+import ShoppingCartIcon from '@mui/icons-material/ShoppingCart';
 
 export default function Home() {
     const { colors } = useThemeContext();
@@ -52,6 +54,16 @@ export default function Home() {
             buttonText: 'Pagar',
             buttonIcon: PaymentIcon,
             href: '/billing',
+            height: 180,
+            width: 328
+        },
+                {
+            title: 'Serviços',
+            description: 'Criar e gerir serviços, portes e regras de preço.',
+            icon: ContentCutIcon,
+            buttonText: 'Gerir',
+            buttonIcon: ShoppingCartIcon,
+            href: '/servicos',
             height: 180,
             width: 328
         },

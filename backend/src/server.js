@@ -311,10 +311,10 @@ app.post('/salas', async (req, res) => {
  */
 app.put('/salas/:id', async (req, res) => {
   const { id } = req.params;
-  const { nome, capacidade, equipamento, precoHora, tipoServicoIds } = req.body || {};
+  const { nome, capacidade, equipamento, precoHora, tipoServicoIds, ativo } = req.body || {};
 
   try {
-    const salaAtualizada = await updateSala(id, { nome, capacidade, equipamento, precoHora, tipoServicoIds });
+    const salaAtualizada = await updateSala(id, { nome, capacidade, equipamento, precoHora, tipoServicoIds, ativo });
 
     if (!salaAtualizada) {
       return res.status(404).json({ error: 'Sala nao encontrada' });

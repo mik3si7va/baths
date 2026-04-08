@@ -264,6 +264,7 @@ describe('API Salas - Testes de Endpoint', () => {
       equipamento: 'Teste',
       precoHora: 10,
       tipoServicoIds: [servicoId],
+      ativo: true,
     });
 
     expect(reativada.status).toBe(200);

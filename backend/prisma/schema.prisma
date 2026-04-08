@@ -25,6 +25,8 @@ model TipoServico {
   salasServico        SalaServico[]
   funcionarioServicos FuncionarioServico[]
 
+  agendamentoServicos AgendamentoServico[]
+
   @@map("tipo_servico")
 }
 
@@ -50,6 +52,9 @@ model Sala {
   updatedAt    DateTime      @default(now()) @map("updated_at") @db.Timestamptz(6)
   salasServico SalaServico[]
 
+  agendamentos        Agendamento[]
+  reservasTemporarias ReservaTemporaria[]
+
   @@map("sala")
 }
 
@@ -74,7 +79,38 @@ model Funcionario {
   horariosTrabalho   HorarioTrabalho[]
   funcionarioServico FuncionarioServico[]
 
+  agendamentos        Agendamento[]
+  reservasTemporarias ReservaTemporaria[]
+
   @@map("funcionario")
+}
+
+model Cliente {
+  id         String     @id @db.Uuid
+  telefone   String
+  nif        String?    @unique
+  morada     String?
+  utilizador Utilizador @relation(fields: [id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_cliente_utilizador")
+  animais    Animal[]
+
+  @@map("cliente")
+}
+
+model Animal {
+  id             String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clienteId      String        @map("cliente_id") @db.Uuid
+  nome           String
+  especie        String
+  raca           String?
+  porte          PorteEnum
+  dataNascimento DateTime?     @map("data_nascimento") @db.Date
+  alergias       String?
+  observacoes    String?
+  createdAt      DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  cliente        Cliente       @relation(fields: [clienteId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_animal_cliente")
+  agendamentos   Agendamento[]
+
+  @@map("animal")
 }
 
 model Utilizador {
@@ -87,6 +123,7 @@ model Utilizador {
   createdAt    DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt    DateTime        @default(now()) @map("updated_at") @db.Timestamptz(6)
   funcionario  Funcionario?
+  cliente     Cliente?
 
   @@map("utilizador")
 }
@@ -115,6 +152,58 @@ model FuncionarioServico {
 
   @@unique([funcionarioId, tipoServicoId], map: "unique_funcionario_servico")
   @@map("funcionario_servico")
+}
+
+model Agendamento {
+  id                  String                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  animalId            String                @map("animal_id") @db.Uuid
+  funcionarioId       String                @map("funcionario_id") @db.Uuid
+  salaId              String                @map("sala_id") @db.Uuid
+  dataHoraInicio      DateTime              @map("data_hora_inicio") @db.Timestamptz(6)
+  dataHoraFim         DateTime              @map("data_hora_fim") @db.Timestamptz(6)
+  valorTotal          Decimal               @map("valor_total") @db.Decimal(10, 2)
+  estado              EstadoAgendamentoEnum @default(CONFIRMADO)
+  checkInRealizadoEm  DateTime?             @map("check_in_realizado_em") @db.Timestamptz(6)
+  checkOutRealizadoEm DateTime?             @map("check_out_realizado_em") @db.Timestamptz(6)
+  processInstanceId   String?               @map("process_instance_id")
+  createdAt           DateTime              @default(now()) @map("created_at") @db.Timestamptz(6)
+  animal              Animal                @relation(fields: [animalId], references: [id], onDelete: Restrict, map: "fk_agendamento_animal")
+  funcionario         Funcionario           @relation(fields: [funcionarioId], references: [id], onDelete: Restrict, map: "fk_agendamento_funcionario")
+  sala                Sala                  @relation(fields: [salaId], references: [id], onDelete: Restrict, map: "fk_agendamento_sala")
+  servicos            AgendamentoServico[]
+
+  metodoPagamento     MetodoPagamentoEnum?  @map("metodo_pagamento")
+  pagoEm              DateTime?             @map("pago_em") @db.Timestamptz(6)
+  faturaId            String?               @map("fatura_id")
+
+  @@map("agendamento")
+}
+
+model AgendamentoServico {
+  id               String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  agendamentoId    String      @map("agendamento_id") @db.Uuid
+  tipoServicoId    String      @map("tipo_servico_id") @db.Uuid
+  precoNoMomento   Decimal     @map("preco_no_momento") @db.Decimal(10, 2)
+  duracaoNoMomento Int         @map("duracao_no_momento")
+  ordem            Int
+  agendamento      Agendamento @relation(fields: [agendamentoId], references: [id], onDelete: Cascade, map: "fk_agendamento_servico_agendamento")
+  tipoServico      TipoServico @relation(fields: [tipoServicoId], references: [id], onDelete: Restrict, map: "fk_agendamento_servico_tipo")
+
+  @@map("agendamento_servico")
+}
+
+model ReservaTemporaria {
+  id                String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  salaId            String?      @map("sala_id") @db.Uuid
+  funcionarioId     String?      @map("funcionario_id") @db.Uuid
+  dataHoraInicio    DateTime     @map("data_hora_inicio") @db.Timestamptz(6)
+  dataHoraFim       DateTime     @map("data_hora_fim") @db.Timestamptz(6)
+  processInstanceId String       @map("process_instance_id")
+  expiresAt         DateTime     @map("expires_at") @db.Timestamptz(6)
+  sala              Sala?        @relation(fields: [salaId], references: [id], onDelete: SetNull, map: "fk_reserva_temporaria_sala")
+  funcionario       Funcionario? @relation(fields: [funcionarioId], references: [id], onDelete: SetNull, map: "fk_reserva_temporaria_funcionario")
+
+  @@map("reserva_temporaria")
 }
 
 enum TipoServicoEnum {
@@ -175,4 +264,22 @@ enum EstadoContaEnum {
   BLOQUEADA
 
   @@map("estado_conta_enum")
+}
+
+enum EstadoAgendamentoEnum {
+  CONFIRMADO
+  EM_ATENDIMENTO
+  CONCLUIDO
+  CANCELADO
+  NAO_COMPARECEU
+
+  @@map("estado_agendamento_enum")
+}
+
+enum MetodoPagamentoEnum {
+  DINHEIRO
+  MULTIBANCO
+  TRANSFERENCIA
+
+  @@map("metodo_pagamento_enum")
 }

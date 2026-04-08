@@ -1,0 +1,154 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" xmlns:dmndi="https://www.omg.org/spec/DMN/20191111/DMNDI/" xmlns:dc="http://www.omg.org/spec/DMN/20180521/DC/" xmlns:modeler="http://camunda.org/schema/modeler/1.0" xmlns:biodi="http://bpmn.io/schema/dmn/biodi/2.0" id="ordenar_servicos" name="DRD" namespace="http://camunda.org/schema/1.0/dmn" exporter="Camunda Modeler" exporterVersion="5.44.0" modeler:executionPlatform="Camunda Platform" modeler:executionPlatformVersion="7.24.0">
+  <decision id="Decision_09kdji4" name="ordenar_servicos">
+    <decisionTable id="DecisionTable_1a5zed2">
+      <input id="Input_1" biodi:width="192">
+        <inputExpression id="InputExpression_1" typeRef="boolean" expressionLanguage="feel">
+          <text>contemBanhoETosquiaCompleta</text>
+        </inputExpression>
+      </input>
+      <input id="InputClause_066i643">
+        <inputExpression id="LiteralExpression_05xcao4" typeRef="boolean" expressionLanguage="feel">
+          <text>contemBanhoETosquiaHigienica</text>
+        </inputExpression>
+      </input>
+      <input id="InputClause_1w8l1ai">
+        <inputExpression id="LiteralExpression_0czo1k7" typeRef="boolean">
+          <text>contemTosquiaCompletaEAparar</text>
+        </inputExpression>
+      </input>
+      <input id="InputClause_00omflb">
+        <inputExpression id="LiteralExpression_1u2w024" typeRef="boolean">
+          <text>contemTosquiaHigienicaEAparar</text>
+        </inputExpression>
+      </input>
+      <output id="Output_1" name="ordemAplicada" typeRef="string" />
+      <rule id="DecisionRule_165jlj4">
+        <inputEntry id="UnaryTests_1uvdokh">
+          <text>true</text>
+        </inputEntry>
+        <inputEntry id="UnaryTests_1n2raqd">
+          <text>false</text>
+        </inputEntry>
+        <inputEntry id="UnaryTests_1qxeujp">
+          <text>true</text>
+        </inputEntry>
+        <inputEntry id="UnaryTests_0i7iw73">
+          <text>false</text>
+        </inputEntry>
+        <outputEntry id="LiteralExpression_13b6uc6">
+          <text>"BANHO→TOSQUIA_COMPLETA→APARAR_PELO_CARA→RESTO"</text>
+        </outputEntry>
+      </rule>
+      <rule id="DecisionRule_114zazb">
+        <inputEntry id="UnaryTests_1kmjdd1">
+          <text>false</text>
+        </inputEntry>
+        <inputEntry id="UnaryTests_0w8prjd">
+          <text>true</text>
+        </inputEntry>
+        <inputEntry id="UnaryTests_1ws1ehy">
+          <text>false</text>
+        </inputEntry>
+        <inputEntry id="UnaryTests_03hk8ap">
+          <text>true</text>
+        </inputEntry>
+        <outputEntry id="LiteralExpression_0zbkf0t">
+          <text>"BANHO→TOSQUIA_HIGIENICA→APARAR_PELO_CARA→RESTO"</text>
+        </outputEntry>
+      </rule>
+      <rule id="DecisionRule_1rnji9q">
+        <inputEntry id="UnaryTests_1mgd0xk">
+          <text>false</text>
+        </inputEntry>
+        <inputEntry id="UnaryTests_1mpesjm">
+          <text>false</text>
+        </inputEntry>
+        <inputEntry id="UnaryTests_0i6471w">
+          <text>true</text>
+        </inputEntry>
+        <inputEntry id="UnaryTests_0l9gsd9">
+          <text>false</text>
+        </inputEntry>
+        <outputEntry id="LiteralExpression_05pt7qh">
+          <text>"TOSQUIA_COMPLETA→APARAR_PELO_CARA→RESTO"</text>
+        </outputEntry>
+      </rule>
+      <rule id="DecisionRule_0i8jd63">
+        <inputEntry id="UnaryTests_1gv8sv3">
+          <text>false</text>
+        </inputEntry>
+        <inputEntry id="UnaryTests_1lr0bdw">
+          <text>false</text>
+        </inputEntry>
+        <inputEntry id="UnaryTests_0h5o7s2">
+          <text>false</text>
+        </inputEntry>
+        <inputEntry id="UnaryTests_0sxeg4q">
+          <text>true</text>
+        </inputEntry>
+        <outputEntry id="LiteralExpression_1te96qz">
+          <text>"TOSQUIA_HIGIENICA→APARAR_PELO_CARA→RESTO"</text>
+        </outputEntry>
+      </rule>
+      <rule id="DecisionRule_0x9bpfn">
+        <inputEntry id="UnaryTests_19c3cs2">
+          <text>true</text>
+        </inputEntry>
+        <inputEntry id="UnaryTests_0bkkb7l">
+          <text>false</text>
+        </inputEntry>
+        <inputEntry id="UnaryTests_0yy52kt">
+          <text>false</text>
+        </inputEntry>
+        <inputEntry id="UnaryTests_0402744">
+          <text>false</text>
+        </inputEntry>
+        <outputEntry id="LiteralExpression_07iakvp">
+          <text>BANHO→TOSQUIA_COMPLETA→RESTO</text>
+        </outputEntry>
+      </rule>
+      <rule id="DecisionRule_0ra2f9c">
+        <inputEntry id="UnaryTests_1aid2gp">
+          <text>false</text>
+        </inputEntry>
+        <inputEntry id="UnaryTests_0tuphcn">
+          <text>true</text>
+        </inputEntry>
+        <inputEntry id="UnaryTests_0srn2bo">
+          <text>false</text>
+        </inputEntry>
+        <inputEntry id="UnaryTests_02ydgn7">
+          <text>false</text>
+        </inputEntry>
+        <outputEntry id="LiteralExpression_1pnswyn">
+          <text>BANHO→TOSQUIA_HIGIENICA→RESTO</text>
+        </outputEntry>
+      </rule>
+      <rule id="DecisionRule_0rtfqk7">
+        <inputEntry id="UnaryTests_18w6mn2">
+          <text>false</text>
+        </inputEntry>
+        <inputEntry id="UnaryTests_1yu25l7">
+          <text>false</text>
+        </inputEntry>
+        <inputEntry id="UnaryTests_1ekda5i">
+          <text>false</text>
+        </inputEntry>
+        <inputEntry id="UnaryTests_11c1rrs">
+          <text>false</text>
+        </inputEntry>
+        <outputEntry id="LiteralExpression_07mytvj">
+          <text>"ORDEM_SELECAO"</text>
+        </outputEntry>
+      </rule>
+    </decisionTable>
+  </decision>
+  <dmndi:DMNDI>
+    <dmndi:DMNDiagram>
+      <dmndi:DMNShape id="Decision_09kdji4_di" dmnElementRef="Decision_09kdji4">
+        <dc:Bounds height="80" width="180" x="160" y="100" />
+      </dmndi:DMNShape>
+    </dmndi:DMNDiagram>
+  </dmndi:DMNDI>
+</definitions>
