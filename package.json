@@ -10,9 +10,22 @@
     "camunda:restart": "docker compose down && docker compose up -d",
     "camunda:deploy": "node ./camunda/deploy-bpmn.js",
     "camunda:boot": "npm run camunda:up && node ./camunda/deploy-bpmn.js",
-    "camunda:wipe-processes": "node ./camunda/wipe-processes.js"
+    "camunda:wipe-processes": "node ./camunda/wipe-processes.js",
+    "workers": "node camunda/workers/index.js",
+    "workers:dev": "nodemon camunda/workers/index.js",
+    "prisma:generate": "npx prisma generate --schema=backend/prisma/schema.prisma",
+
+    "camunda:test-auto": "node ./camunda/test-auto.mjs"
   },
   "dependencies": {
-    "camunda-external-task-client-js": "^3.1.0"
+    "@prisma/client": "^6.19.0",
+    "camunda-external-task-client-js": "^3.1.0",
+    "date-fns": "^4.1.0",
+    "dotenv": "^17.4.0",
+    "nodemailer": "^8.0.4"
+  },
+  "devDependencies": {
+    "prisma": "^6.19.0",
+    "nodemon": "^3.1.0"
   }
 }

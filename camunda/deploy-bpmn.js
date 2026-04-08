@@ -19,12 +19,14 @@ async function main() {
   }
 
   const bpmnFiles = fs.readdirSync(workflowsDir).filter((f) => f.endsWith(".bpmn"));
+  const dmnFiles = fs.readdirSync(workflowsDir).filter((f) => f.endsWith(".dmn"));
   const formFiles = fs.existsSync(formsDir)
     ? fs.readdirSync(formsDir).filter((f) => f.endsWith(".form"))
     : [];
 
   const deployableFiles = [
     ...bpmnFiles.map((file) => ({ dir: workflowsDir, file })),
+    ...dmnFiles.map((file) => ({ dir: workflowsDir, file })),
     ...formFiles.map((file) => ({ dir: formsDir, file })),
   ];
 
@@ -44,7 +46,7 @@ async function main() {
   form.append("deployment-name", `baths-workflows-${Date.now()}`);
 
   console.log(
-    `Deploying ${bpmnFiles.length} BPMN and ${formFiles.length} form file(s) to: http://localhost:8080`
+    `Deploying ${bpmnFiles.length} BPMN, ${dmnFiles.length} DMN and ${formFiles.length} form file(s) to: http://localhost:8080`
   );
 
   const res = await fetch(`${CAMUNDA_URL}/deployment/create`, {

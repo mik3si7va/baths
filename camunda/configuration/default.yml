@@ -1,6 +1,11 @@
 camunda.bpm.run:
   example.enabled: false
 
+camunda.bpm:
+  generic-properties:
+    properties:
+      enforceHistoryTimeToLive: false
+
 spring:
   datasource:
     url: jdbc:postgresql://postgres:5432/camunda
