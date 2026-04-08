@@ -411,12 +411,91 @@ async function seedFuncionarios() {
   }
 }
 
+async function seedClientes() {
+  const clientes = [
+    {
+      nome: 'João Silva',
+      email: 'joao.silva@email.com',
+      telefone: '910000001',
+      nif: '123456789',
+      animais: [
+        { nome: 'Rex', especie: 'Cão', raca: 'Labrador', porte: 'GRANDE', dataNascimento: '2020-03-15' },
+        { nome: 'Mia', especie: 'Gato', raca: 'Persa', porte: 'PEQUENO', dataNascimento: '2021-06-20' },
+      ],
+    },
+    {
+      nome: 'Maria Santos',
+      email: 'maria.santos@email.com',
+      telefone: '910000002',
+      nif: '987654321',
+      animais: [
+        { nome: 'Bolinha', especie: 'Cão', raca: 'Chihuahua', porte: 'EXTRA_PEQUENO', dataNascimento: '2022-01-10' },
+      ],
+    },
+    {
+      nome: 'Carlos Ferreira',
+      email: 'carlos.ferreira@email.com',
+      telefone: '910000003',
+      nif: '456789123',
+      animais: [
+        { nome: 'Thor', especie: 'Cão', raca: 'Pastor Alemão', porte: 'EXTRA_GRANDE', dataNascimento: '2019-08-05' },
+        { nome: 'Luna', especie: 'Cão', raca: 'Golden Retriever', porte: 'GRANDE', dataNascimento: '2021-11-30' },
+      ],
+    },
+  ];
+
+  for (const c of clientes) {
+    const exists = await prisma.utilizador.findUnique({
+      where: { email: c.email },
+      select: { id: true },
+    });
+
+    if (exists) continue;
+
+    const utilizadorId = randomUUID();
+
+    await prisma.$transaction(async (tx) => {
+      await tx.utilizador.create({
+        data: {
+          id: utilizadorId,
+          nome: c.nome,
+          email: c.email,
+          estadoConta: 'ATIVA',
+          ativo: true,
+        },
+      });
+
+      await tx.cliente.create({
+        data: {
+          id: utilizadorId,
+          telefone: c.telefone,
+          nif: c.nif,
+        },
+      });
+
+      for (const a of c.animais) {
+        await tx.animal.create({
+          data: {
+            clienteId: utilizadorId,
+            nome: a.nome,
+            especie: a.especie,
+            raca: a.raca,
+            porte: a.porte,
+            dataNascimento: new Date(a.dataNascimento),
+          },
+        });
+      }
+    });
+  }
+}
+
 async function main() {
   await seedEvents();
   await seedServicos();
   await seedRegrasPreco();
   await seedSalas();
   await seedFuncionarios();
+  await seedClientes();
 }
 
 main()
