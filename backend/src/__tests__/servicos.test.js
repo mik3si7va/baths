@@ -3,6 +3,7 @@ const {
   createTipoServico,
   getAllRegrasPreco,
   createRegraPreco,
+  deleteTipoServico
 } = require('../repositories/repositorioServicos');
 const { prisma } = require('../db/prismaClient');
 
@@ -114,6 +115,76 @@ describe('Gestão de Serviços - Testes Unitários', () => {
     ).rejects.toThrow();
 
     await prisma.tipoServico.delete({ where: { id: primeiro.id } });
+  });
+
+  test('deleteTipoServico retorna null para id inexistente', async () => {
+    const resultado = await deleteTipoServico('00000000-0000-4000-8000-000000000000');
+    expect(resultado).toBeNull();
+  });
+ 
+  test('deleteTipoServico inativa um servico existente', async () => {
+    const nomeUnico = `Servico Delete ${Date.now()}`;
+    const criado = await createTipoServico({ tipo: nomeUnico });
+ 
+    expect(criado.ativo).toBe(true);
+ 
+    const resultado = await deleteTipoServico(criado.id);
+ 
+    expect(resultado).not.toBeNull();
+    expect(resultado.removed).toBe(true);
+    expect(resultado.id).toBe(criado.id);
+ 
+    // Confirmar que ativo = false na base de dados
+    const naBase = await prisma.tipoServico.findUnique({ where: { id: criado.id } });
+    expect(naBase.ativo).toBe(false);
+ 
+    await prisma.tipoServico.delete({ where: { id: criado.id } });
+  });
+ 
+  test('deleteTipoServico nao elimina o registo — apenas marca ativo = false', async () => {
+    const nomeUnico = `Servico Nao Eliminar ${Date.now()}`;
+    const criado = await createTipoServico({ tipo: nomeUnico });
+ 
+    await deleteTipoServico(criado.id);
+ 
+    // O registo ainda deve existir na base de dados
+    const naBase = await prisma.tipoServico.findUnique({ where: { id: criado.id } });
+    expect(naBase).not.toBeNull();
+    expect(naBase.tipo).toBe(nomeUnico);
+    expect(naBase.ativo).toBe(false);
+ 
+    await prisma.tipoServico.delete({ where: { id: criado.id } });
+  });
+ 
+  test('deleteTipoServico pode ser chamado duas vezes no mesmo servico (idempotente)', async () => {
+    const nomeUnico = `Servico Idempotente ${Date.now()}`;
+    const criado = await createTipoServico({ tipo: nomeUnico });
+ 
+    const primeira = await deleteTipoServico(criado.id);
+    expect(primeira.removed).toBe(true);
+ 
+    // Segunda chamada — o registo existe mas já está inativo; deve continuar a funcionar
+    const segunda = await deleteTipoServico(criado.id);
+    expect(segunda.removed).toBe(true);
+    expect(segunda.id).toBe(criado.id);
+ 
+    await prisma.tipoServico.delete({ where: { id: criado.id } });
+  });
+ 
+  test('getAllTiposServico continua a devolver servicos inativados', async () => {
+    const nomeUnico = `Servico Inativo Lista ${Date.now()}`;
+    const criado = await createTipoServico({ tipo: nomeUnico });
+ 
+    await deleteTipoServico(criado.id);
+ 
+    const todos = await getAllTiposServico();
+    const encontrado = todos.find((s) => s.id === criado.id);
+ 
+    // O serviço ainda aparece na listagem geral, mas com ativo = false
+    expect(encontrado).toBeDefined();
+    expect(encontrado.ativo).toBe(false);
+ 
+    await prisma.tipoServico.delete({ where: { id: criado.id } });
   });
 
 });

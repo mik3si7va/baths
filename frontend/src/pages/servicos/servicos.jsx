@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import {
   Alert,
   Box,
@@ -6,12 +6,16 @@ import {
   Chip,
   CircularProgress,
   FormControlLabel,
+  IconButton,
   Paper,
   Switch,
   TextField,
   Typography,
 } from '@mui/material';
+import { ConfirmDialog } from '../../components';
 import { useThemeContext } from '../../contexts/ThemeContext';
+import DeleteIcon from '@mui/icons-material/Delete';
+import ContentCutIcon from '@mui/icons-material/ContentCut';
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
 
@@ -41,14 +45,31 @@ const initialForm = {
 export default function ServicosPage() {
   const { colors } = useThemeContext();
 
-  const [form, setForm]                   = useState(initialForm);
-  const [servicos, setServicos]           = useState([]);
-  const [regras, setRegras]               = useState([]);
+  const [form, setForm]                     = useState(initialForm);
+  const [servicos, setServicos]             = useState([]);
+  const [regras, setRegras]                 = useState([]);
   const [loadingInitial, setLoadingInitial] = useState(true);
-  const [loadingSubmit, setLoadingSubmit] = useState(false);
-  const [erro, setErro]                   = useState('');
-  const [sucesso, setSucesso]             = useState('');
-  const [errors, setErrors]               = useState({});
+  const [loadingSubmit, setLoadingSubmit]   = useState(false);
+  const [erro, setErro]                     = useState('');
+  const [sucesso, setSucesso]               = useState('');
+  const [errors, setErrors]                 = useState({});
+
+  // Estado para o diálogo de confirmação de inativação
+  const [deleteDialogOpen, setDeleteDialogOpen]   = useState(false);
+  const [servicoToDelete, setServicoToDelete]     = useState(null);
+
+  const successTimeoutRef = useRef(null);
+
+  // Auto-limpar mensagem de sucesso ao fim de 3 s
+  useEffect(() => {
+    if (sucesso) {
+      successTimeoutRef.current = setTimeout(() => setSucesso(''), 3000);
+    }
+    return () => clearTimeout(successTimeoutRef.current);
+  }, [sucesso]);
+
+  // Limpar timeout ao desmontar
+  useEffect(() => () => clearTimeout(successTimeoutRef.current), []);
 
   const loadData = async () => {
     setLoadingInitial(true);
@@ -168,10 +189,51 @@ export default function ServicosPage() {
     }
   };
 
+  // Abrir diálogo de confirmação
+  const handleDeleteClick = (servico) => {
+    setServicoToDelete(servico);
+    setDeleteDialogOpen(true);
+  };
+
+  // Confirmar inativação
+  const handleConfirmDelete = async () => {
+    if (!servicoToDelete) return;
+
+    try {
+      const res = await fetch(`${API_BASE_URL}/servicos/${servicoToDelete.id}`, {
+        method: 'DELETE',
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || 'Erro ao inativar serviço.');
+      }
+
+      setSucesso(`Serviço "${servicoToDelete.tipo}" inativado com sucesso!`);
+      await loadData();
+    } catch (err) {
+      setErro(err.message);
+    } finally {
+      setDeleteDialogOpen(false);
+      setServicoToDelete(null);
+    }
+  };
+
+  const handleCloseDialog = () => {
+    setDeleteDialogOpen(false);
+    setServicoToDelete(null);
+  };
+
   const regrasCountByServico = regras.reduce((acc, r) => {
     acc[r.tipoServicoId] = (acc[r.tipoServicoId] || 0) + 1;
     return acc;
   }, {});
+
+  // Serviços ordenados: ativos primeiro, inativados no final
+  const servicosOrdenados = [...servicos].sort((a, b) => {
+    if (a.ativo === b.ativo) return a.tipo.localeCompare(b.tipo);
+    return a.ativo ? -1 : 1;
+  });
 
   return (
     <Box>
@@ -185,6 +247,10 @@ export default function ServicosPage() {
       {/* ── Formulário de criação ── */}
       <Paper elevation={2} sx={{ borderRadius: 3, p: 3, mb: 4 }}>
         <Box component="form" onSubmit={handleSubmit} sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+          <Typography variant="h2" sx={{ color: colors.text }}>
+            Criar Novo Serviço
+          </Typography>
+
           {sucesso && <Alert severity="success">{sucesso}</Alert>}
           {erro    && <Alert severity="error">{erro}</Alert>}
 
@@ -192,6 +258,7 @@ export default function ServicosPage() {
           <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr auto' }, gap: 2, alignItems: 'flex-start' }}>
             <TextField
               label="Nome do serviço"
+              name="nomeServico"
               placeholder="Ex: Banho completo, Tosquia, Corte de unhas..."
               value={form.nomeServico}
               onChange={(e) => {
@@ -228,6 +295,7 @@ export default function ServicosPage() {
             <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(2, 1fr)' }, gap: 2 }}>
               <TextField
                 label="Preço base (€)"
+                name="precoUnico"
                 type="number"
                 inputProps={{ min: 0, step: 0.01 }}
                 placeholder="ex: 15.00"
@@ -242,6 +310,7 @@ export default function ServicosPage() {
               />
               <TextField
                 label="Duração estimada (min)"
+                name="duracaoUnica"
                 type="number"
                 inputProps={{ min: 1, step: 1 }}
                 placeholder="ex: 30"
@@ -325,7 +394,7 @@ export default function ServicosPage() {
               '&:hover': { backgroundColor: `${colors.primary}dd` },
             }}
           >
-            {loadingSubmit ? 'A criar...' : 'Criar Serviço'}
+            {loadingSubmit ? <CircularProgress size={24} sx={{ color: colors.white }} /> : 'Criar Serviço'}
           </Button>
         </Box>
       </Paper>
@@ -334,7 +403,7 @@ export default function ServicosPage() {
       <Paper elevation={2} sx={{ borderRadius: 3, p: 3 }}>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
           <Typography variant="h2" sx={{ color: colors.text }}>
-            Serviços registados
+            Serviços Registados
           </Typography>
           {loadingInitial && <CircularProgress size={20} />}
         </Box>
@@ -346,40 +415,72 @@ export default function ServicosPage() {
         )}
 
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-          {servicos.map((s) => {
+          {servicosOrdenados.map((s) => {
             const nRegras = regrasCountByServico[s.id] || 0;
             return (
-              <Paper key={s.id} variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
-                <Typography variant="subtitle1" sx={{ fontWeight: 700, color: colors.text }}>
-                  {s.tipo}
-                </Typography>
-                <Typography variant="body2" sx={{ color: colors.textSecondary }}>
-                  {nRegras > 0 ? `${nRegras} regra${nRegras !== 1 ? 's' : ''} de preço` : 'Sem regras de preço'}
-                </Typography>
-                <Box sx={{ mt: 1, display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-                  <Chip
-                    label={s.ativo ? 'Ativo' : 'Inativo'}
-                    size="small"
-                    sx={{
-                      fontWeight: 700,
-                      fontSize: '0.75rem',
-                      backgroundColor: s.ativo ? 'rgba(34,197,94,0.1)' : '#fef2f2',
-                      color: s.ativo ? '#16a34a' : '#dc2626',
-                      border: `1px solid ${s.ativo ? 'rgba(34,197,94,0.3)' : '#fecaca'}`,
-                    }}
-                  />
-                  {nRegras > 0 && (
-                    <Chip
-                      label={nRegras === 5 ? 'Preço por porte' : 'Preço único'}
+              <Paper
+                key={s.id}
+                variant="outlined"
+                sx={{
+                  p: 2,
+                  borderRadius: 2,
+                  opacity: s.ativo ? 1 : 0.55,
+                  borderStyle: s.ativo ? 'solid' : 'dashed',
+                  transition: 'all 0.2s',
+                  '&:hover': {
+                    boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                    borderColor: colors.primary,
+                  },
+                }}
+              >
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                  <Box sx={{ flex: 1 }}>
+                    {/* Nome + chips de estado */}
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5, flexWrap: 'wrap' }}>
+                      <ContentCutIcon sx={{ fontSize: 18, color: s.ativo ? colors.primary : colors.textSecondary }} />
+                      <Typography variant="subtitle1" sx={{ fontWeight: 700, color: colors.text }}>
+                        {s.tipo}
+                      </Typography>
+                      <Chip
+                        size="small"
+                        label={s.ativo ? 'Ativo' : 'Inativo'}
+                        color={s.ativo ? 'success' : 'default'}
+                        sx={{ fontSize: '11px', height: 24 }}
+                      />
+                    </Box>
+
+                    <Typography variant="body2" sx={{ color: colors.textSecondary, mb: 1 }}>
+                      {nRegras > 0 ? `${nRegras} regra${nRegras !== 1 ? 's' : ''} de preço` : 'Sem regras de preço'}
+                    </Typography>
+
+                    {/* Chips de tipo de preço */}
+                    <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                      {nRegras > 0 && (
+                        <Chip
+                          label={nRegras === 5 ? 'Preço por porte' : 'Preço único'}
+                          size="small"
+                          sx={{
+                            fontWeight: 700,
+                            fontSize: '0.75rem',
+                            backgroundColor: 'rgba(71,92,81,0.08)',
+                            color: colors.primary,
+                            border: `1px solid ${colors.primary}44`,
+                          }}
+                        />
+                      )}
+                    </Box>
+                  </Box>
+
+                  {/* Botão inativar — só aparece em serviços ativos */}
+                  {s.ativo && (
+                    <IconButton
                       size="small"
-                      sx={{
-                        fontWeight: 700,
-                        fontSize: '0.75rem',
-                        backgroundColor: 'rgba(71,92,81,0.08)',
-                        color: colors.primary,
-                        border: `1px solid ${colors.primary}44`,
-                      }}
-                    />
+                      onClick={() => handleDeleteClick(s)}
+                      sx={{ color: colors.textSecondary }}
+                      title="Inativar serviço"
+                    >
+                      <DeleteIcon fontSize="small" />
+                    </IconButton>
                   )}
                 </Box>
               </Paper>
@@ -387,6 +488,26 @@ export default function ServicosPage() {
           })}
         </Box>
       </Paper>
+
+      {/* Diálogo de confirmação de inativação */}
+      <ConfirmDialog
+        open={deleteDialogOpen}
+        title="Inativar Serviço"
+        message={
+          <>
+            <Typography>
+              Tem a certeza que pretende inativar o serviço <strong>"{servicoToDelete?.tipo}"</strong>?
+            </Typography>
+            <Typography sx={{ mt: 1 }}>
+              O serviço ficará indisponível para novos agendamentos. Pode reativá-lo a qualquer momento através da API.
+            </Typography>
+          </>
+        }
+        confirmLabel="Inativar"
+        confirmColor="warning"
+        onConfirm={handleConfirmDelete}
+        onClose={handleCloseDialog}
+      />
     </Box>
   );
 }
