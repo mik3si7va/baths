@@ -157,12 +157,12 @@ export default function ServicosPage() {
             precoBase: Number(form.regrasPorPorte[value].precoBase),
             duracaoMinutos: Number(form.regrasPorPorte[value].duracaoMinutos),
           }))
-        : [{
+        : PORTES.map(({ value }) => ({
             tipoServicoId,
-            porteAnimal: 'MEDIO',
+            porteAnimal: value,
             precoBase: Number(form.precoUnico),
             duracaoMinutos: Number(form.duracaoUnica),
-          }];
+          }));
 
       const resRegras = await Promise.all(
         regrasPayload.map((regra) =>
@@ -224,10 +224,20 @@ export default function ServicosPage() {
     setServicoToDelete(null);
   };
 
-  const regrasCountByServico = regras.reduce((acc, r) => {
-    acc[r.tipoServicoId] = (acc[r.tipoServicoId] || 0) + 1;
+  // Para cada servico: contagem de regras e se todos os precos sao iguais (preco unico)
+  const regrasByServico = regras.reduce((acc, r) => {
+    if (!acc[r.tipoServicoId]) acc[r.tipoServicoId] = { count: 0, precos: [] };
+    acc[r.tipoServicoId].count += 1;
+    acc[r.tipoServicoId].precos.push(Number(r.precoBase));
     return acc;
   }, {});
+
+  const getRegraInfo = (id) => {
+    const info = regrasByServico[id];
+    if (!info) return { count: 0, precoUnico: false };
+    const precoUnico = new Set(info.precos).size === 1;
+    return { count: info.count, precoUnico };
+  };
 
   // Serviços ordenados: ativos primeiro, inativados no final
   const servicosOrdenados = [...servicos].sort((a, b) => {
@@ -416,7 +426,7 @@ export default function ServicosPage() {
 
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
           {servicosOrdenados.map((s) => {
-            const nRegras = regrasCountByServico[s.id] || 0;
+            const { count: nRegras, precoUnico } = getRegraInfo(s.id);
             return (
               <Paper
                 key={s.id}
@@ -457,7 +467,7 @@ export default function ServicosPage() {
                     <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
                       {nRegras > 0 && (
                         <Chip
-                          label={nRegras === 5 ? 'Preço por porte' : 'Preço único'}
+                          label={precoUnico ? 'Preço único' : 'Preço por porte'}
                           size="small"
                           sx={{
                             fontWeight: 700,
