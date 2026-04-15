@@ -2,9 +2,6 @@ const { randomUUID } = require('node:crypto');
 const { prisma } = require('../db/prismaClient');
 const PorteEnum = require('../domain/enums/PorteEnum');
 
-//TODO: igualar odos os portes quando é sem portes
-//TODO: Colocar informações realmente importantes!!!!!!!!!!!!!!!!!
-//TODO: Eliminar serviços
 const PORTES_VALIDOS = new Set(Object.values(PorteEnum).map(e => e.value));
 
 /**
