@@ -242,7 +242,8 @@ async function processarTasks(processInstanceId) {
                         servicosConfirmados: true,
                         servicosActualizados: dadosCache.servicos,
                         qtdServicos: dadosCache.servicos.length,
-                        adicionarServico: false
+                        adicionarServico: false,
+                        removerServico: false
                     };
                     console.log('   → Funcionário confirma serviços sem adicionar novos');
                     break;
