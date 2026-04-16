@@ -4,7 +4,7 @@ const swaggerUi = require('swagger-ui-express');
 const swaggerSpec = require('./swagger');
 const { prisma, closePrisma } = require('./db/prismaClient');
 const { getAllEvents, createEvent } = require('./repositories/eventsRepository');
-const { getAllTiposServico, createTipoServico, getAllRegrasPreco, createRegraPreco } = require('./repositories/repositorioServicos');
+const { getAllTiposServico, createTipoServico, deleteTipoServico, getAllRegrasPreco, createRegraPreco } = require('./repositories/repositorioServicos');
 const { getAllSalas, getAllSalasWithStatus, getSalaById, createSala, updateSala, deleteSala, addServicoToSala, getServicosBySala, removeServicoFromSala } = require('./repositories/repositorioSalas');
 const { getAllFuncionarios, getFuncionarioById, createFuncionario, updateFuncionario, deleteFuncionario } = require('./repositories/repositorioFuncionarios');
 
@@ -36,6 +36,69 @@ app.post('/servicos', async (req, res) => {
   } catch (error) {
     console.error('Failed to create servico:', error);
     return res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * @swagger
+ * /servicos/{id}:
+ *   delete:
+ *     summary: Inativa (soft delete) um tipo de serviço
+ *     tags: [Servicos]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: ID do tipo de serviço
+ *     responses:
+ *       200:
+ *         description: Serviço inativado com sucesso
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 removed:
+ *                   type: boolean
+ *                   example: true
+ *                 id:
+ *                   type: string
+ *                   format: uuid
+ *       404:
+ *         description: Serviço não encontrado
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *             examples:
+ *               naoEncontrado:
+ *                 summary: Sem resultado para o id
+ *                 value:
+ *                   error: Servico nao encontrado
+ *       500:
+ *         description: Erro interno
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ */
+app.delete('/servicos/:id', async (req, res) => {
+  const { id } = req.params;
+ 
+  try {
+    const result = await deleteTipoServico(id);
+ 
+    if (!result) {
+      return res.status(404).json({ error: 'Servico nao encontrado' });
+    }
+ 
+    return res.json(result);
+  } catch (error) {
+    console.error('Failed to delete servico:', error);
+    return res.status(500).json({ error: 'Failed to delete servico' });
   }
 });
 

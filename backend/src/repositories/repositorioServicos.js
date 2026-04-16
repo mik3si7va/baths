@@ -2,7 +2,6 @@ const { randomUUID } = require('node:crypto');
 const { prisma } = require('../db/prismaClient');
 const PorteEnum = require('../domain/enums/PorteEnum');
 
-
 const PORTES_VALIDOS = new Set(Object.values(PorteEnum).map(e => e.value));
 
 /**
@@ -113,6 +112,34 @@ async function createTipoServico({ tipo }) {
 }
 
 /**
+ * Inativa (soft delete) um tipo de serviço existente.
+ *
+ * Não elimina o registo — apenas marca `ativo = false`.
+ * Retorna `null` se o serviço não existir.
+ *
+ * @async
+ * @param {string} id - UUID do tipo de serviço a inativar.
+ * @returns {Promise<{ removed: boolean, id: string } | null>}
+ */
+async function deleteTipoServico(id) {
+    const existing = await prisma.tipoServico.findUnique({
+        where: { id },
+        select: { id: true, ativo: true },
+    });
+ 
+    if (!existing) {
+        return null;
+    }
+ 
+    await prisma.tipoServico.update({
+        where: { id },
+        data: { ativo: false },
+    });
+ 
+    return { removed: true, id };
+}
+
+/**
  * Obtém todas as regras de preço configuradas no sistema.
  *
  * @async
@@ -171,6 +198,7 @@ async function createRegraPreco({ tipoServicoId, porteAnimal, precoBase, duracao
 module.exports = {
     getAllTiposServico,
     createTipoServico,
+    deleteTipoServico,
     getAllRegrasPreco,
     createRegraPreco,
 };
