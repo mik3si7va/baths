@@ -44,7 +44,7 @@ async function gerarSolucoes({
     funcionarioPreferido = null,
     processInstanceId,
     diasParaProcurar = 7,
-    maxOpcoes = 8,
+    maxOpcoes = 4,
 }) {
     if (servicosOrdenados.length === 0) {
         throw new Error('Pelo menos um serviço é necessário para gerar soluções');
@@ -296,7 +296,7 @@ module.exports = (client) => {
                 funcionarioPreferido,
                 processInstanceId,
                 diasParaProcurar: 7,
-                maxOpcoes: 8,
+                maxOpcoes: 4,
             });
 
             console.log(
@@ -340,13 +340,13 @@ module.exports = (client) => {
                 'success'
             );
         } catch (err) {
-            log('gerar-solucoes', `Erro persistência: ${err.message}`, 'error');
-            throw err;
-            //log('gerar-solucoes', `Erro: ${err.message}`, 'error');
-            //vars.set('operacaoBemSucedida', false);
-            //vars.set('solucoes', '[]');
-            //vars.set('mensagemErro', err.message);
-            //await taskService.complete(task, vars);
+            //log('gerar-solucoes', `Erro persistência: ${err.message}`, 'error');
+            //throw err;
+            log('gerar-solucoes', `Erro: ${err.message}`, 'error');
+            vars.set('operacaoBemSucedida', false);
+            vars.set('solucoes', '[]');
+            vars.set('mensagemErro', err.message);
+            await taskService.complete(task, vars);
         }
     });
 

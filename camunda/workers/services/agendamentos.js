@@ -3,14 +3,12 @@ const { log } = require('../utils/logger');
 
 const TOPIC = 'agendamentos';
 
-/* ====================== FUNÇÕES PARA WORKERS ====================== */
-
-async function obterPrecoEDuracao(tipoServicoId, porteAnimal = 'PEQUENO') {
+async function obterPrecoEDuracao(tipoServicoId, porteAnimal) {
     if (!tipoServicoId) throw new Error('tipoServicoId é obrigatório');
+    if (!porteAnimal) throw new Error('porteAnimal é obrigatório');
 
     log(TOPIC, `Procurar preço para tipoServicoId=${tipoServicoId} | porte=${porteAnimal}`, 'info');
 
-    // O preço e duração estão em RegraPreco, não em TipoServico
     const regra = await prisma.regraPreco.findFirst({
         where: { tipoServicoId, porteAnimal },
         include: { tipoServico: { select: { tipo: true } } },
@@ -25,32 +23,58 @@ async function obterPrecoEDuracao(tipoServicoId, porteAnimal = 'PEQUENO') {
     const nome = regra.tipoServico.tipo;
 
     log(TOPIC, `✓ ${nome} → ${preco}€ | ${duracao}min`, 'success');
-
     return { preco, duracao, nome };
 }
 
-async function adicionarServicoLista(servicoTemp) {
-    if (!servicoTemp?.tipoServicoId) throw new Error('servicoTemp com tipoServicoId é obrigatório');
+async function adicionarServicoLista(servicoTemp, listaAtual = []) {
+    if (!servicoTemp?.tipoServicoId) {
+        throw new Error('servicoTemp com tipoServicoId é obrigatório');
+    }
+    if (servicoTemp.precoBase === undefined) {
+        throw new Error('precoBase não fornecido (worker obter-preco-duracao falhou?)');
+    }
+    if (servicoTemp.duracaoMinutos === undefined) {
+        throw new Error('duracaoMinutos não fornecido');
+    }
+    if (!servicoTemp.nome) {
+        throw new Error('nome do serviço não fornecido');
+    }
 
     log(TOPIC, `Adicionando serviço ${servicoTemp.tipoServicoId} à lista`, 'info');
 
     const servicoAdicionado = {
         tipoServicoId: servicoTemp.tipoServicoId,
-        precoBase: Number(servicoTemp.precoBase || 0),
-        duracaoMinutos: Number(servicoTemp.duracaoMinutos || 30),
-        nome: servicoTemp.nome || 'Serviço',
-        ordem: servicoTemp.ordem || null,
+        precoBase: Number(servicoTemp.precoBase),
+        duracaoMinutos: Number(servicoTemp.duracaoMinutos),
+        nome: servicoTemp.nome,
+        ordem: servicoTemp.ordem ?? null,
     };
 
-    return { servicosActualizados: [servicoAdicionado], servicoAdicionado };
+    const novaLista = [...listaAtual, servicoAdicionado];
+    return { servicosActualizados: novaLista, servicoAdicionado };
+}
+
+async function removerServicoLista(listaAtual = [], indiceServico) {
+    if (!Array.isArray(listaAtual)) {
+        throw new Error('Lista de serviços inválida');
+    }
+    if (indiceServico === undefined || indiceServico < 0 || indiceServico >= listaAtual.length) {
+        throw new Error(`Índice de serviço inválido: ${indiceServico}`);
+    }
+
+    log(TOPIC, `Removendo serviço no índice ${indiceServico} da lista`, 'info');
+
+    const novaLista = [...listaAtual];
+    novaLista.splice(indiceServico, 1);
+    return { servicosActualizados: novaLista };
 }
 
 async function montarResumo({ servicosActualizados = [], opcaoSelecionada = {}, animalId, clienteNome }) {
     const servicosFormatados = servicosActualizados.map((s, i) => ({
-        ordem: s.ordem || i + 1,
-        nome: s.nome || `Serviço ${s.tipoServicoId}`,
-        preco: Number(s.precoBase || 0),
-        duracao: Number(s.duracaoMinutos || 0),
+        ordem: s.ordem ?? i + 1,
+        nome: s.nome ?? `Serviço ${s.tipoServicoId}`,
+        preco: Number(s.precoBase ?? 0),
+        duracao: Number(s.duracaoMinutos ?? 0),
     }));
 
     const duracaoTotal = servicosFormatados.reduce((sum, s) => sum + s.duracao, 0);
@@ -107,8 +131,8 @@ async function criarAgendamentoCompleto(payload) {
                 data: servicos.map((s, i) => ({
                     agendamentoId: novo.id,
                     tipoServicoId: s.tipoServicoId,
-                    precoNoMomento: Number(s.precoBase || s.preco || 0),
-                    duracaoNoMomento: Number(s.duracaoMinutos || s.duracao || 0),
+                    precoNoMomento: Number(s.precoBase ?? s.preco ?? 0),
+                    duracaoNoMomento: Number(s.duracaoMinutos ?? s.duracao ?? 0),
                     ordem: s.ordem ?? i + 1,
                 })),
             });
@@ -157,8 +181,8 @@ async function atualizarAgendamentoCompleto(payload) {
                 data: servicos.map((s, i) => ({
                     agendamentoId,
                     tipoServicoId: s.tipoServicoId,
-                    precoNoMomento: Number(s.precoBase || s.preco || 0),
-                    duracaoNoMomento: Number(s.duracaoMinutos || s.duracao || 0),
+                    precoNoMomento: Number(s.precoBase ?? s.preco ?? 0),
+                    duracaoNoMomento: Number(s.duracaoMinutos ?? s.duracao ?? 0),
                     ordem: s.ordem ?? i + 1,
                 })),
             });
@@ -224,7 +248,6 @@ async function carregarDadosAgendamento(agendamentoId) {
 
     if (!agendamento) throw new Error(`Agendamento ${agendamentoId} não encontrado`);
 
-    // Reconstrói servicosIniciais no formato que o Sub-processo 1 espera
     const servicosIniciais = agendamento.servicos.map(s => ({
         tipoServicoId: s.tipoServicoId,
         nomeServico: s.tipoServico?.tipo || 'Serviço',
@@ -233,11 +256,16 @@ async function carregarDadosAgendamento(agendamentoId) {
         ordem: s.ordem,
     }));
 
+    let porteAnimal = agendamento.animal?.porte;
+    if (!porteAnimal) {
+        throw new Error(`Animal ${agendamento.animalId} não tem porte definido. Corrija a ficha do animal.`);
+    }
+
     const resultado = {
-        clienteId: agendamento.animal?.clienteId || null,
+        clienteId: agendamento.animal?.clienteId ?? null,
         animalId: agendamento.animalId,
-        porteAnimal: agendamento.animal?.porte || 'MEDIO',
-        clienteEmail: agendamento.animal?.cliente?.utilizador?.email || null,
+        porteAnimal,
+        clienteEmail: agendamento.animal?.cliente?.utilizador?.email ?? null,
         servicosIniciais,
     };
 
@@ -252,12 +280,12 @@ async function libertarRecursosAgendamento(agendamentoId) {
 
     const agendamento = await prisma.agendamento.findUnique({
         where: { id: agendamentoId },
-        select: { processInstanceId: true }
+        select: { processInstanceId: true },
     });
 
     if (agendamento?.processInstanceId) {
         await prisma.reservaTemporaria.deleteMany({
-            where: { processInstanceId: agendamento.processInstanceId }
+            where: { processInstanceId: agendamento.processInstanceId },
         });
         log(TOPIC, `✓ Reservas temporárias limpas para processo [${agendamento.processInstanceId}]`, 'success');
     } else {
@@ -268,6 +296,7 @@ async function libertarRecursosAgendamento(agendamentoId) {
 module.exports = {
     obterPrecoEDuracao,
     adicionarServicoLista,
+    removerServicoLista,
     montarResumo,
     criarAgendamentoCompleto,
     atualizarAgendamentoCompleto,
