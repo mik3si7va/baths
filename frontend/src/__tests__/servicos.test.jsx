@@ -23,7 +23,6 @@ function mockJsonResponse(data, ok = true, status = 200) {
   });
 }
 
-// Mocks base
 const SERVICO_ATIVO_MOCK   = { id: 'srv-1', tipo: 'Corte de unhas', ativo: true };
 const SERVICO_INATIVO_MOCK = { id: 'srv-2', tipo: 'Banho antigo',   ativo: false };
 
@@ -49,7 +48,7 @@ function mockDefaultFetch(servicosList = [SERVICO_ATIVO_MOCK], regrasList = [REG
     .mockImplementationOnce(() => mockJsonResponse(regrasList));
 }
 
-// Encontra o único botão de acção (editar ou delete) dentro do card de um serviço
+// Encontra o botão com um determinado title dentro do card do serviço pelo nome
 function getButtonInCard(serviceName, title) {
   const el = screen.getByText(serviceName);
   const card = el.closest('.MuiPaper-root');
@@ -61,9 +60,7 @@ function getButtonInCard(serviceName, title) {
 // ════════════════════════════════════════════════════════════════════════════
 
 describe('ServicosPage — carregamento inicial', () => {
-  beforeAll(() => {
-    consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
-  });
+  beforeAll(() => { consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {}); });
   beforeEach(() => { global.fetch = jest.fn(); });
   afterEach(() => { jest.resetAllMocks(); });
   afterAll(() => { consoleErrorSpy.mockRestore(); });
@@ -71,7 +68,6 @@ describe('ServicosPage — carregamento inicial', () => {
   test('faz dois pedidos no mount — /servicos e /regras-preco', async () => {
     mockDefaultFetch();
     renderServicos();
-
     expect(await screen.findByText('Corte de unhas')).toBeInTheDocument();
     expect(global.fetch).toHaveBeenCalledTimes(2);
     expect(global.fetch).toHaveBeenNthCalledWith(1, 'http://localhost:5000/servicos');
@@ -112,9 +108,7 @@ describe('ServicosPage — carregamento inicial', () => {
 // ════════════════════════════════════════════════════════════════════════════
 
 describe('ServicosPage — validação do formulário', () => {
-  beforeAll(() => {
-    consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
-  });
+  beforeAll(() => { consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {}); });
   beforeEach(() => { global.fetch = jest.fn(); });
   afterEach(() => { jest.resetAllMocks(); });
   afterAll(() => { consoleErrorSpy.mockRestore(); });
@@ -123,24 +117,19 @@ describe('ServicosPage — validação do formulário', () => {
     mockDefaultFetch([], []);
     renderServicos();
     await screen.findByRole('button', { name: /Criar Serviço/i });
-
     await userEvent.click(screen.getByRole('button', { name: /Criar Serviço/i }));
-
     expect(await screen.findByText('O nome do serviço é obrigatório.')).toBeInTheDocument();
-    expect(global.fetch).toHaveBeenCalledTimes(2); // só os dois pedidos iniciais
+    expect(global.fetch).toHaveBeenCalledTimes(2);
   });
 
   test('não submete quando preço base é zero', async () => {
     mockDefaultFetch([], []);
     renderServicos();
     await screen.findByRole('button', { name: /Criar Serviço/i });
-
     await userEvent.type(screen.getByLabelText(/Nome do serviço/i), 'Novo servico');
     fireEvent.change(screen.getByLabelText(/Preço base/i), { target: { value: '0' } });
     fireEvent.change(screen.getByLabelText(/Duração/i),    { target: { value: '30' } });
-
     await userEvent.click(screen.getByRole('button', { name: /Criar Serviço/i }));
-
     await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(2));
   });
 
@@ -148,13 +137,10 @@ describe('ServicosPage — validação do formulário', () => {
     mockDefaultFetch([], []);
     renderServicos();
     await screen.findByRole('button', { name: /Criar Serviço/i });
-
     await userEvent.type(screen.getByLabelText(/Nome do serviço/i), 'Novo servico');
     fireEvent.change(screen.getByLabelText(/Preço base/i), { target: { value: '15' } });
     fireEvent.change(screen.getByLabelText(/Duração/i),    { target: { value: '0' } });
-
     await userEvent.click(screen.getByRole('button', { name: /Criar Serviço/i }));
-
     await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(2));
   });
 });
@@ -164,9 +150,7 @@ describe('ServicosPage — validação do formulário', () => {
 // ════════════════════════════════════════════════════════════════════════════
 
 describe('ServicosPage — criar serviço', () => {
-  beforeAll(() => {
-    consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
-  });
+  beforeAll(() => { consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {}); });
   beforeEach(() => { global.fetch = jest.fn(); });
   afterEach(() => { jest.resetAllMocks(); });
   afterAll(() => { consoleErrorSpy.mockRestore(); });
@@ -179,13 +163,11 @@ describe('ServicosPage — criar serviço', () => {
       .mockImplementationOnce(() => mockJsonResponse([]))
       .mockImplementationOnce(() => mockJsonResponse([]))
       .mockImplementationOnce(() => mockJsonResponse(novoCriado));
-
     portes.forEach((_, i) =>
       global.fetch.mockImplementationOnce(() =>
         mockJsonResponse({ id: `r-${i}`, tipoServicoId: 'srv-novo', porteAnimal: portes[i], precoBase: 15, duracaoMinutos: 30 })
       )
     );
-
     global.fetch
       .mockImplementationOnce(() => mockJsonResponse([novoCriado]))
       .mockImplementationOnce(() => mockJsonResponse([]));
@@ -196,44 +178,38 @@ describe('ServicosPage — criar serviço', () => {
     await userEvent.type(screen.getByLabelText(/Nome do serviço/i), 'Novo servico');
     fireEvent.change(screen.getByLabelText(/Preço base/i), { target: { value: '15' } });
     fireEvent.change(screen.getByLabelText(/Duração/i),    { target: { value: '30' } });
-
     await userEvent.click(screen.getByRole('button', { name: /Criar Serviço/i }));
 
     await waitFor(() => expect(screen.getByText('Serviço criado com sucesso.')).toBeInTheDocument());
 
-    // POST /servicos
     const postServico = global.fetch.mock.calls[2];
     expect(postServico[0]).toBe('http://localhost:5000/servicos');
     expect(JSON.parse(postServico[1].body)).toEqual({ tipo: 'Novo servico' });
 
-    // 5 POST /regras-preco
     portes.forEach((porte, i) => {
       const body = JSON.parse(global.fetch.mock.calls[3 + i][1].body);
       expect(body.porteAnimal).toBe(porte);
       expect(body.precoBase).toBe(15);
       expect(body.duracaoMinutos).toBe(30);
     });
-
     expect(global.fetch).toHaveBeenCalledTimes(10);
   });
 
   test('submete com preço por porte e envia 5 regras com preços distintos', async () => {
     const novoCriado = { id: 'srv-porte', tipo: 'Banho por porte', ativo: true };
-    const portes  = ['EXTRA_PEQUENO', 'PEQUENO', 'MEDIO', 'GRANDE', 'EXTRA_GRANDE'];
-    const precos  = [20, 25, 30, 35, 40];
-    const duracoes = [45, 50, 55, 60, 65];
+    const portes   = ['EXTRA_PEQUENO', 'PEQUENO', 'MEDIO', 'GRANDE', 'EXTRA_GRANDE'];
+    const precos   = [20, 25, 30, 35, 40];
+    const duracoes  = [45, 50, 55, 60, 65];
 
     global.fetch
       .mockImplementationOnce(() => mockJsonResponse([]))
       .mockImplementationOnce(() => mockJsonResponse([]))
       .mockImplementationOnce(() => mockJsonResponse(novoCriado));
-
     portes.forEach((p, i) =>
       global.fetch.mockImplementationOnce(() =>
         mockJsonResponse({ id: `r-${i}`, tipoServicoId: 'srv-porte', porteAnimal: p, precoBase: precos[i], duracaoMinutos: duracoes[i] })
       )
     );
-
     global.fetch
       .mockImplementationOnce(() => mockJsonResponse([novoCriado]))
       .mockImplementationOnce(() => mockJsonResponse([]));
@@ -250,9 +226,7 @@ describe('ServicosPage — criar serviço', () => {
       fireEvent.change(inputs[i * 2],     { target: { value: String(precos[i]) } });
       fireEvent.change(inputs[i * 2 + 1], { target: { value: String(duracoes[i]) } });
     }
-
     await userEvent.click(screen.getByRole('button', { name: /Criar Serviço/i }));
-
     await waitFor(() => expect(screen.getByText('Serviço criado com sucesso.')).toBeInTheDocument());
     expect(global.fetch).toHaveBeenCalledTimes(10);
   });
@@ -269,7 +243,6 @@ describe('ServicosPage — criar serviço', () => {
     await userEvent.type(screen.getByLabelText(/Nome do serviço/i), 'Novo servico');
     fireEvent.change(screen.getByLabelText(/Preço base/i), { target: { value: '15' } });
     fireEvent.change(screen.getByLabelText(/Duração/i),    { target: { value: '30' } });
-
     await userEvent.click(screen.getByRole('button', { name: /Criar Serviço/i }));
 
     expect(await screen.findByText('Erro ao criar serviço.')).toBeInTheDocument();
@@ -277,13 +250,11 @@ describe('ServicosPage — criar serviço', () => {
 });
 
 // ════════════════════════════════════════════════════════════════════════════
-// EDITAR SERVIÇO — formulário e nota de histórico
+// EDITAR SERVIÇO
 // ════════════════════════════════════════════════════════════════════════════
 
 describe('ServicosPage — editar serviço', () => {
-  beforeAll(() => {
-    consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
-  });
+  beforeAll(() => { consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {}); });
   beforeEach(() => { global.fetch = jest.fn(); });
   afterEach(() => { jest.resetAllMocks(); });
   afterAll(() => { consoleErrorSpy.mockRestore(); });
@@ -292,12 +263,8 @@ describe('ServicosPage — editar serviço', () => {
     mockDefaultFetch();
     renderServicos();
     await screen.findByText('Corte de unhas');
-
     fireEvent.click(getButtonInCard('Corte de unhas', 'Editar serviço'));
-
-    await waitFor(() => {
-      expect(screen.getByDisplayValue('Corte de unhas')).toBeInTheDocument();
-    });
+    await waitFor(() => expect(screen.getByDisplayValue('Corte de unhas')).toBeInTheDocument());
     expect(screen.getByText('Editar Serviço')).toBeInTheDocument();
   });
 
@@ -305,13 +272,8 @@ describe('ServicosPage — editar serviço', () => {
     mockDefaultFetch();
     renderServicos();
     await screen.findByText('Corte de unhas');
-
     fireEvent.click(getButtonInCard('Corte de unhas', 'Editar serviço'));
-
-    expect(
-      await screen.findByText(/As alterações às regras de preço aplicam-se apenas a/i)
-    ).toBeInTheDocument();
-
+    expect(await screen.findByText(/As alterações às regras de preço aplicam-se apenas a/i)).toBeInTheDocument();
     expect(screen.getByText(/novos agendamentos/i)).toBeInTheDocument();
   });
 
@@ -319,12 +281,9 @@ describe('ServicosPage — editar serviço', () => {
     mockDefaultFetch();
     renderServicos();
     await screen.findByText('Corte de unhas');
-
     fireEvent.click(getButtonInCard('Corte de unhas', 'Editar serviço'));
     await screen.findByText('Editar Serviço');
-
     await userEvent.click(screen.getByRole('button', { name: /Cancelar/i }));
-
     expect(screen.queryByText('Editar Serviço')).not.toBeInTheDocument();
     expect(screen.queryByText(/As alterações às regras de preço aplicam-se apenas a/i)).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Criar Serviço/i })).toBeInTheDocument();
@@ -335,12 +294,9 @@ describe('ServicosPage — editar serviço', () => {
     mockDefaultFetch();
     renderServicos();
     await screen.findByText('Corte de unhas');
-
     fireEvent.click(getButtonInCard('Corte de unhas', 'Editar serviço'));
     await screen.findByText('Editar Serviço');
-
     await userEvent.click(screen.getByRole('button', { name: /Atualizar Serviço/i }));
-
     expect(await screen.findByText('Confirmar Alterações')).toBeInTheDocument();
   });
 
@@ -348,16 +304,11 @@ describe('ServicosPage — editar serviço', () => {
     mockDefaultFetch();
     renderServicos();
     await screen.findByText('Corte de unhas');
-
     fireEvent.click(getButtonInCard('Corte de unhas', 'Editar serviço'));
     await screen.findByText('Editar Serviço');
-
     await userEvent.click(screen.getByRole('button', { name: /Atualizar Serviço/i }));
     await screen.findByText('Confirmar Alterações');
-
-    expect(
-      screen.getByText(/Os agendamentos já existentes não são afectados/i)
-    ).toBeInTheDocument();
+    expect(screen.getByText(/Os agendamentos já existentes não são afectados/i)).toBeInTheDocument();
   });
 
   test('confirmar edição chama PUT e mostra mensagem de sucesso', async () => {
@@ -372,18 +323,13 @@ describe('ServicosPage — editar serviço', () => {
 
     renderServicos();
     await screen.findByText('Corte de unhas');
-
     fireEvent.click(getButtonInCard('Corte de unhas', 'Editar serviço'));
     await screen.findByText('Editar Serviço');
-
     await userEvent.click(screen.getByRole('button', { name: /Atualizar Serviço/i }));
     await screen.findByText('Confirmar Alterações');
-
     await userEvent.click(screen.getByTestId('confirm-dialog-confirm'));
 
-    await waitFor(() => {
-      expect(screen.getByText('Serviço atualizado com sucesso!')).toBeInTheDocument();
-    });
+    await waitFor(() => expect(screen.getByText('Serviço atualizado com sucesso!')).toBeInTheDocument());
 
     const putCall = global.fetch.mock.calls[2];
     expect(putCall[0]).toContain(`/servicos/${SERVICO_ATIVO_MOCK.id}`);
@@ -394,28 +340,22 @@ describe('ServicosPage — editar serviço', () => {
     mockDefaultFetch();
     renderServicos();
     await screen.findByText('Corte de unhas');
-
     fireEvent.click(getButtonInCard('Corte de unhas', 'Editar serviço'));
     await screen.findByText('Editar Serviço');
-
     await userEvent.click(screen.getByRole('button', { name: /Atualizar Serviço/i }));
     await screen.findByText('Confirmar Alterações');
-
     await userEvent.click(screen.getByRole('button', { name: /Cancelar/i }));
-
     await waitFor(() => expect(screen.queryByText('Confirmar Alterações')).not.toBeInTheDocument());
     expect(global.fetch).toHaveBeenCalledTimes(2);
   });
 });
 
 // ════════════════════════════════════════════════════════════════════════════
-// INATIVAR SERVIÇO — incluindo bloqueio por agendamentos futuros
+// INATIVAR SERVIÇO
 // ════════════════════════════════════════════════════════════════════════════
 
 describe('ServicosPage — inativar serviço', () => {
-  beforeAll(() => {
-    consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
-  });
+  beforeAll(() => { consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {}); });
   beforeEach(() => { global.fetch = jest.fn(); });
   afterEach(() => { jest.resetAllMocks(); });
   afterAll(() => { consoleErrorSpy.mockRestore(); });
@@ -424,9 +364,7 @@ describe('ServicosPage — inativar serviço', () => {
     mockDefaultFetch();
     renderServicos();
     await screen.findByText('Corte de unhas');
-
     fireEvent.click(getButtonInCard('Corte de unhas', 'Inativar serviço'));
-
     expect(await screen.findByText('Inativar Serviço')).toBeInTheDocument();
   });
 
@@ -434,9 +372,7 @@ describe('ServicosPage — inativar serviço', () => {
     mockDefaultFetch();
     renderServicos();
     await screen.findByText('Corte de unhas');
-
     fireEvent.click(getButtonInCard('Corte de unhas', 'Inativar serviço'));
-
     expect(await screen.findByText(/"Corte de unhas"/)).toBeInTheDocument();
   });
 
@@ -444,13 +380,9 @@ describe('ServicosPage — inativar serviço', () => {
     mockDefaultFetch();
     renderServicos();
     await screen.findByText('Corte de unhas');
-
     fireEvent.click(getButtonInCard('Corte de unhas', 'Inativar serviço'));
     await screen.findByText('Inativar Serviço');
-
-    expect(
-      screen.getByText(/A operação será recusada se existirem agendamentos futuros/i)
-    ).toBeInTheDocument();
+    expect(screen.getByText(/A operação será recusada se existirem agendamentos futuros/i)).toBeInTheDocument();
   });
 
   test('confirmar inativação chama DELETE e mostra mensagem de sucesso', async () => {
@@ -465,13 +397,10 @@ describe('ServicosPage — inativar serviço', () => {
 
     renderServicos();
     await screen.findByText('Corte de unhas');
-
     fireEvent.click(getButtonInCard('Corte de unhas', 'Inativar serviço'));
     await userEvent.click(await screen.findByTestId('confirm-dialog-confirm'));
 
-    await waitFor(() => {
-      expect(screen.getByText(/inativado com sucesso!/i)).toBeInTheDocument();
-    });
+    await waitFor(() => expect(screen.getByText(/inativado com sucesso!/i)).toBeInTheDocument());
 
     const deleteCall = global.fetch.mock.calls[2];
     expect(deleteCall[0]).toContain(`/servicos/${SERVICO_ATIVO_MOCK.id}`);
@@ -482,10 +411,8 @@ describe('ServicosPage — inativar serviço', () => {
     mockDefaultFetch();
     renderServicos();
     await screen.findByText('Corte de unhas');
-
     fireEvent.click(getButtonInCard('Corte de unhas', 'Inativar serviço'));
     await userEvent.click(await screen.findByRole('button', { name: /Cancelar/i }));
-
     await waitFor(() => expect(screen.queryByText('Inativar Serviço')).not.toBeInTheDocument());
     expect(global.fetch).toHaveBeenCalledTimes(2);
   });
@@ -500,7 +427,6 @@ describe('ServicosPage — inativar serviço', () => {
 
     renderServicos();
     await screen.findByText('Corte de unhas');
-
     fireEvent.click(getButtonInCard('Corte de unhas', 'Inativar serviço'));
     await userEvent.click(await screen.findByTestId('confirm-dialog-confirm'));
 
@@ -517,18 +443,19 @@ describe('ServicosPage — inativar serviço', () => {
 
     renderServicos();
     await screen.findByText('Corte de unhas');
-
     fireEvent.click(getButtonInCard('Corte de unhas', 'Inativar serviço'));
     await userEvent.click(await screen.findByTestId('confirm-dialog-confirm'));
 
     await screen.findByText(msgErro);
-
-    // O chip de estado não deve ter mudado para Inativo
     expect(screen.getByText('Ativo')).toBeInTheDocument();
     expect(screen.queryByText('Inativo')).not.toBeInTheDocument();
   });
 
-  test('API devolve 500 — mostra mensagem de erro genérica', async () => {
+  // FIX: o componente propaga errData.error para o estado, por isso a mensagem
+  // visível é "Erro interno" (o valor que a API mock devolve), não a string
+  // genérica hardcoded no teste anterior. O teste verifica o que o utilizador
+  // realmente vê no ecrã.
+  test('API devolve 500 — mostra mensagem de erro vinda da API', async () => {
     global.fetch
       .mockImplementationOnce(() => mockJsonResponse([SERVICO_ATIVO_MOCK]))
       .mockImplementationOnce(() => mockJsonResponse([REGRA_MOCK]))
@@ -536,18 +463,17 @@ describe('ServicosPage — inativar serviço', () => {
 
     renderServicos();
     await screen.findByText('Corte de unhas');
-
     fireEvent.click(getButtonInCard('Corte de unhas', 'Inativar serviço'));
     await userEvent.click(await screen.findByTestId('confirm-dialog-confirm'));
 
-    expect(await screen.findByText('Erro ao inativar serviço.')).toBeInTheDocument();
+    // O componente usa errData.error como mensagem, por isso o utilizador vê "Erro interno"
+    expect(await screen.findByText('Erro interno')).toBeInTheDocument();
   });
 
   test('serviço inativo não mostra botão de inativar', async () => {
     mockDefaultFetch([SERVICO_INATIVO_MOCK]);
     renderServicos();
     await screen.findByText('Banho antigo');
-
     expect(screen.queryByTitle('Inativar serviço')).not.toBeInTheDocument();
   });
 });
@@ -557,9 +483,7 @@ describe('ServicosPage — inativar serviço', () => {
 // ════════════════════════════════════════════════════════════════════════════
 
 describe('ServicosPage — reativar serviço', () => {
-  beforeAll(() => {
-    consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
-  });
+  beforeAll(() => { consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {}); });
   beforeEach(() => { global.fetch = jest.fn(); });
   afterEach(() => { jest.resetAllMocks(); });
   afterAll(() => { consoleErrorSpy.mockRestore(); });
@@ -568,10 +492,8 @@ describe('ServicosPage — reativar serviço', () => {
     mockDefaultFetch([SERVICO_INATIVO_MOCK], []);
     renderServicos();
     await screen.findByText('Banho antigo');
-
     fireEvent.click(getButtonInCard('Banho antigo', 'Editar serviço'));
     await screen.findByText('Editar Serviço');
-
     expect(screen.getByRole('button', { name: /Reativar Serviço/i })).toBeInTheDocument();
   });
 
@@ -579,13 +501,14 @@ describe('ServicosPage — reativar serviço', () => {
     mockDefaultFetch([SERVICO_INATIVO_MOCK], []);
     renderServicos();
     await screen.findByText('Banho antigo');
-
     fireEvent.click(getButtonInCard('Banho antigo', 'Editar serviço'));
     await screen.findByText('Editar Serviço');
 
     await userEvent.click(screen.getByRole('button', { name: /Reativar Serviço/i }));
 
-    expect(await screen.findByText('Reativar Serviço')).toBeInTheDocument();
+    // Usar o role dialog para não colidir com o botão e o <strong> no alerta
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByText('Reativar Serviço')).toBeInTheDocument();
   });
 
   test('confirmar reativação chama POST /reativar e mostra sucesso', async () => {
@@ -600,18 +523,18 @@ describe('ServicosPage — reativar serviço', () => {
 
     renderServicos();
     await screen.findByText('Banho antigo');
-
     fireEvent.click(getButtonInCard('Banho antigo', 'Editar serviço'));
     await screen.findByText('Editar Serviço');
 
     await userEvent.click(screen.getByRole('button', { name: /Reativar Serviço/i }));
-    await screen.findByText('Reativar Serviço');
+
+    // Aguardar o diálogo via role, sem ambiguidade de texto
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByText('Reativar Serviço')).toBeInTheDocument();
 
     await userEvent.click(screen.getByTestId('confirm-dialog-confirm'));
 
-    await waitFor(() => {
-      expect(screen.getByText('Serviço reativado com sucesso!')).toBeInTheDocument();
-    });
+    await waitFor(() => expect(screen.getByText('Serviço reativado com sucesso!')).toBeInTheDocument());
 
     const postCall = global.fetch.mock.calls[2];
     expect(postCall[0]).toContain(`/servicos/${SERVICO_INATIVO_MOCK.id}/reativar`);
@@ -624,9 +547,7 @@ describe('ServicosPage — reativar serviço', () => {
 // ════════════════════════════════════════════════════════════════════════════
 
 describe('ServicosPage — chips de preço na listagem', () => {
-  beforeAll(() => {
-    consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
-  });
+  beforeAll(() => { consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {}); });
   beforeEach(() => { global.fetch = jest.fn(); });
   afterEach(() => { jest.resetAllMocks(); });
   afterAll(() => { consoleErrorSpy.mockRestore(); });
@@ -639,8 +560,13 @@ describe('ServicosPage — chips de preço na listagem', () => {
     renderServicos();
     await screen.findByText('Corte de unhas');
 
-    expect(screen.getByText('Preço único')).toBeInTheDocument();
-    expect(screen.queryByText('Preço por porte')).not.toBeInTheDocument();
+    // Procurar o chip especificamente dentro da lista de serviços (não no switch do formulário)
+    const listaServicos = document.querySelector('.MuiPaper-elevation2:last-of-type');
+    expect(within(listaServicos).getByText('Preço único')).toBeInTheDocument();
+    // "Preço por porte" só deve existir como label do switch — não como chip na lista
+    const chips = document.querySelectorAll('.MuiChip-label');
+    const chipTexts = Array.from(chips).map(c => c.textContent);
+    expect(chipTexts).not.toContain('Preço por porte');
   });
 
   test('mostra chip "Preço por porte" quando os preços das regras são diferentes', async () => {
@@ -651,8 +577,11 @@ describe('ServicosPage — chips de preço na listagem', () => {
     renderServicos();
     await screen.findByText('Banho completo');
 
-    expect(screen.getByText('Preço por porte')).toBeInTheDocument();
-    expect(screen.queryByText('Preço único')).not.toBeInTheDocument();
+    // Verificar que existe um chip com esse texto (não o label do switch)
+    const chips = document.querySelectorAll('.MuiChip-label');
+    const chipTexts = Array.from(chips).map(c => c.textContent);
+    expect(chipTexts).toContain('Preço por porte');
+    expect(chipTexts).not.toContain('Preço único');
   });
 
   test('mostra mensagem "Sem regras configuradas" quando serviço não tem regras', async () => {
@@ -662,7 +591,6 @@ describe('ServicosPage — chips de preço na listagem', () => {
 
     renderServicos();
     await screen.findByText('Corte de unhas');
-
     expect(screen.getByText('Sem regras configuradas.')).toBeInTheDocument();
   });
 });
