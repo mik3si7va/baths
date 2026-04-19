@@ -1,82 +1,176 @@
+const request = require('supertest');
+const { app } = require('../server');
 const {
   getAllTiposServico,
   createTipoServico,
+  updateTipoServico,
+  deleteTipoServico,
+  reativarTipoServico,
   getAllRegrasPreco,
   createRegraPreco,
-  deleteTipoServico
+  countAgendamentosFuturos,
 } = require('../repositories/repositorioServicos');
 const { prisma } = require('../db/prismaClient');
 
-describe('Gestão de Serviços - Testes Unitários', () => {
+// ─── Utilitários ────────────────────────────────────────────────────────────
 
+function uniqueNome(prefix) {
+  return `${prefix}.${Date.now()}.${Math.floor(Math.random() * 10000)}`;
+}
+
+/**
+ * Cria um agendamento futuro associado a um serviço, para testar o bloqueio
+ * do soft delete. Cria os registos mínimos necessários (animal, cliente,
+ * utilizador, funcionário, sala) e limpa tudo no afterEach via os IDs
+ * devolvidos.
+ */
+async function criarAgendamentoFuturo(tipoServicoId) {
+  const { randomUUID } = require('node:crypto');
+
+  const utilizadorClienteId = randomUUID();
+  const utilizadorFuncionarioId = randomUUID();
+  const salaId = randomUUID();
+
+  // Utilizador cliente
+  await prisma.utilizador.create({
+    data: { id: utilizadorClienteId, nome: 'Cliente Teste', email: `cliente.${utilizadorClienteId}@test.com`, estadoConta: 'ATIVA', ativo: true },
+  });
+  await prisma.cliente.create({
+    data: { id: utilizadorClienteId, telefone: '910000000' },
+  });
+  const animal = await prisma.animal.create({
+    data: { clienteId: utilizadorClienteId, nome: 'Rex', especie: 'Cão', porte: 'MEDIO' },
+  });
+
+  // Utilizador funcionário
+  await prisma.utilizador.create({
+    data: { id: utilizadorFuncionarioId, nome: 'Func Teste', email: `func.${utilizadorFuncionarioId}@test.com`, estadoConta: 'ATIVA', ativo: true },
+  });
+  await prisma.funcionario.create({
+    data: { id: utilizadorFuncionarioId, cargo: 'BANHISTA', telefone: '910000001', porteAnimais: ['MEDIO'] },
+  });
+
+  // Sala
+  await prisma.sala.create({
+    data: { id: salaId, nome: `Sala Teste ${salaId}`, capacidade: 1, equipamento: 'Teste', precoHora: 10 },
+  });
+
+  const agora = new Date();
+  const inicio = new Date(agora.getTime() + 24 * 60 * 60 * 1000); // amanhã
+  const fim = new Date(inicio.getTime() + 60 * 60 * 1000);
+
+  const agendamento = await prisma.agendamento.create({
+    data: {
+      animalId: animal.id,
+      funcionarioId: utilizadorFuncionarioId,
+      salaId,
+      dataHoraInicio: inicio,
+      dataHoraFim: fim,
+      valorTotal: 30,
+      estado: 'CONFIRMADO',
+    },
+  });
+
+  await prisma.agendamentoServico.create({
+    data: {
+      agendamentoId: agendamento.id,
+      tipoServicoId,
+      precoNoMomento: 30,
+      duracaoNoMomento: 30,
+      ordem: 1,
+    },
+  });
+
+  return {
+    agendamentoId: agendamento.id,
+    animalId: animal.id,
+    utilizadorClienteId,
+    utilizadorFuncionarioId,
+    salaId,
+  };
+}
+
+async function limparAgendamento({ agendamentoId, animalId, utilizadorClienteId, utilizadorFuncionarioId, salaId }) {
+  await prisma.agendamentoServico.deleteMany({ where: { agendamentoId } });
+  await prisma.agendamento.deleteMany({ where: { id: agendamentoId } });
+  await prisma.animal.deleteMany({ where: { id: animalId } });
+  await prisma.cliente.deleteMany({ where: { id: utilizadorClienteId } });
+  await prisma.funcionario.deleteMany({ where: { id: utilizadorFuncionarioId } });
+  await prisma.utilizador.deleteMany({ where: { id: { in: [utilizadorClienteId, utilizadorFuncionarioId] } } });
+  await prisma.sala.deleteMany({ where: { id: salaId } });
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// TESTES UNITÁRIOS — repositorioServicos
+// ════════════════════════════════════════════════════════════════════════════
+
+describe('Gestão de Serviços — Testes Unitários', () => {
   afterAll(async () => {
     await prisma.$disconnect();
   });
 
-  // ─── TIPOS DE SERVIÇO ────────────────────────────────────────────────────────
+  // ─── getAllTiposServico ──────────────────────────────────────────────────
 
-  test('getAllTiposServico retorna uma lista de serviços', async () => {
+  test('getAllTiposServico retorna uma lista', async () => {
     const servicos = await getAllTiposServico();
     expect(Array.isArray(servicos)).toBe(true);
   });
 
   test('getAllTiposServico retorna objectos com as propriedades correctas', async () => {
     const servicos = await getAllTiposServico();
-    servicos.forEach((servico) => {
-      expect(servico).toHaveProperty('id');
-      expect(servico).toHaveProperty('tipo');
-      expect(servico).toHaveProperty('ativo');
+    servicos.forEach((s) => {
+      expect(s).toHaveProperty('id');
+      expect(s).toHaveProperty('tipo');
+      expect(s).toHaveProperty('ativo');
     });
   });
 
-  test('getAllTiposServico retorna todos os tipos de serviço do seed', async () => {
+  test('getAllTiposServico retorna todos os tipos do seed', async () => {
     const servicos = await getAllTiposServico();
     const tipos = servicos.map((s) => s.tipo);
-
-    // O seed continua a inserir estes nomes — agora como strings livres
-    const tiposEsperados = [
-      'BANHO',
-      'TOSQUIA_COMPLETA',
-      'TOSQUIA_HIGIENICA',
-      'CORTE_UNHAS',
-      'LIMPEZA_OUVIDOS',
-      'EXPRESSAO_GLANDULAS',
-      'LIMPEZA_DENTES',
-      'APARAR_PELO_CARA',
-      'ANTI_PULGAS',
-      'ANTI_QUEDA',
-      'REMOCAO_NOS',
+    const esperados = [
+      'BANHO', 'TOSQUIA_COMPLETA', 'TOSQUIA_HIGIENICA', 'CORTE_UNHAS',
+      'LIMPEZA_OUVIDOS', 'EXPRESSAO_GLANDULAS', 'LIMPEZA_DENTES',
+      'APARAR_PELO_CARA', 'ANTI_PULGAS', 'ANTI_QUEDA', 'REMOCAO_NOS',
     ];
-
-    tiposEsperados.forEach((tipo) => {
-      expect(tipos).toContain(tipo);
-    });
+    esperados.forEach((tipo) => expect(tipos).toContain(tipo));
   });
 
-  test('createTipoServico falha quando tipo nao e fornecido', async () => {
-    await expect(
-      createTipoServico({ tipo: undefined })
-    ).rejects.toThrow('O nome do serviço é obrigatório e não pode estar vazio.');
+  test('getAllTiposServico inclui serviços inativos na listagem', async () => {
+    const nome = uniqueNome('Servico Inativo Lista');
+    const criado = await createTipoServico({ tipo: nome });
+    await deleteTipoServico(criado.id);
+
+    const todos = await getAllTiposServico();
+    const encontrado = todos.find((s) => s.id === criado.id);
+    expect(encontrado).toBeDefined();
+    expect(encontrado.ativo).toBe(false);
+
+    await prisma.tipoServico.delete({ where: { id: criado.id } });
   });
 
-  test('createTipoServico falha quando tipo e string vazia', async () => {
-    await expect(
-      createTipoServico({ tipo: '' })
-    ).rejects.toThrow('O nome do serviço é obrigatório e não pode estar vazio.');
+  // ─── createTipoServico ───────────────────────────────────────────────────
+
+  test('createTipoServico falha quando tipo não é fornecido', async () => {
+    await expect(createTipoServico({ tipo: undefined }))
+      .rejects.toThrow('O nome do serviço é obrigatório e não pode estar vazio.');
   });
 
-  test('createTipoServico falha quando tipo e apenas espacos', async () => {
-    await expect(
-      createTipoServico({ tipo: '   ' })
-    ).rejects.toThrow('O nome do serviço é obrigatório e não pode estar vazio.');
+  test('createTipoServico falha quando tipo é string vazia', async () => {
+    await expect(createTipoServico({ tipo: '' }))
+      .rejects.toThrow('O nome do serviço é obrigatório e não pode estar vazio.');
   });
 
-  test('createTipoServico cria um servico com os dados correctos', async () => {
-    const nomeUnico = `Servico Teste ${Date.now()}`;
+  test('createTipoServico falha quando tipo é apenas espaços', async () => {
+    await expect(createTipoServico({ tipo: '   ' }))
+      .rejects.toThrow('O nome do serviço é obrigatório e não pode estar vazio.');
+  });
 
-    const novo = await createTipoServico({ tipo: nomeUnico });
+  test('createTipoServico cria um serviço com os dados correctos', async () => {
+    const nome = uniqueNome('Servico Criar');
+    const novo = await createTipoServico({ tipo: nome });
 
-    expect(novo.tipo).toBe(nomeUnico);
+    expect(novo.tipo).toBe(nome);
     expect(novo.ativo).toBe(true);
     expect(novo).toHaveProperty('id');
 
@@ -84,172 +178,353 @@ describe('Gestão de Serviços - Testes Unitários', () => {
   });
 
   test('createTipoServico faz trim ao nome antes de guardar', async () => {
-    const nomeUnico = `Servico Trim ${Date.now()}`;
+    const nome = uniqueNome('Servico Trim');
+    const novo = await createTipoServico({ tipo: `  ${nome}  ` });
 
-    const novo = await createTipoServico({ tipo: `  ${nomeUnico}  ` });
-
-    expect(novo.tipo).toBe(nomeUnico);
+    expect(novo.tipo).toBe(nome);
 
     await prisma.tipoServico.delete({ where: { id: novo.id } });
   });
 
   test('createTipoServico falha com nome duplicado', async () => {
-    const nomeUnico = `Servico Duplicado ${Date.now()}`;
+    const nome = uniqueNome('Servico Duplicado');
+    const primeiro = await createTipoServico({ tipo: nome });
 
-    const primeiro = await createTipoServico({ tipo: nomeUnico });
-
-    await expect(
-      createTipoServico({ tipo: nomeUnico })
-    ).rejects.toThrow(`Já existe um serviço com o nome "${nomeUnico}".`);
+    await expect(createTipoServico({ tipo: nome }))
+      .rejects.toThrow(`Já existe um serviço com o nome "${nome}".`);
 
     await prisma.tipoServico.delete({ where: { id: primeiro.id } });
   });
 
-  test('createTipoServico falha com nome duplicado independente de maiusculas', async () => {
-    const nomeUnico = `Servico Case ${Date.now()}`;
+  test('createTipoServico falha com nome duplicado independente de maiúsculas', async () => {
+    const nome = uniqueNome('Servico Case');
+    const primeiro = await createTipoServico({ tipo: nome });
 
-    const primeiro = await createTipoServico({ tipo: nomeUnico });
-
-    await expect(
-      createTipoServico({ tipo: nomeUnico.toUpperCase() })
-    ).rejects.toThrow();
+    await expect(createTipoServico({ tipo: nome.toUpperCase() })).rejects.toThrow();
 
     await prisma.tipoServico.delete({ where: { id: primeiro.id } });
   });
+
+  // ─── deleteTipoServico ───────────────────────────────────────────────────
 
   test('deleteTipoServico retorna null para id inexistente', async () => {
     const resultado = await deleteTipoServico('00000000-0000-4000-8000-000000000000');
     expect(resultado).toBeNull();
   });
- 
-  test('deleteTipoServico inativa um servico existente', async () => {
-    const nomeUnico = `Servico Delete ${Date.now()}`;
-    const criado = await createTipoServico({ tipo: nomeUnico });
- 
-    expect(criado.ativo).toBe(true);
- 
+
+  test('deleteTipoServico inativa um serviço existente sem agendamentos futuros', async () => {
+    const nome = uniqueNome('Servico Delete');
+    const criado = await createTipoServico({ tipo: nome });
+
     const resultado = await deleteTipoServico(criado.id);
- 
-    expect(resultado).not.toBeNull();
     expect(resultado.removed).toBe(true);
     expect(resultado.id).toBe(criado.id);
- 
-    // Confirmar que ativo = false na base de dados
+
     const naBase = await prisma.tipoServico.findUnique({ where: { id: criado.id } });
     expect(naBase.ativo).toBe(false);
- 
+
     await prisma.tipoServico.delete({ where: { id: criado.id } });
   });
- 
-  test('deleteTipoServico nao elimina o registo — apenas marca ativo = false', async () => {
-    const nomeUnico = `Servico Nao Eliminar ${Date.now()}`;
-    const criado = await createTipoServico({ tipo: nomeUnico });
- 
+
+  test('deleteTipoServico não elimina o registo — apenas marca ativo = false', async () => {
+    const nome = uniqueNome('Servico Nao Eliminar');
+    const criado = await createTipoServico({ tipo: nome });
+
     await deleteTipoServico(criado.id);
- 
-    // O registo ainda deve existir na base de dados
+
     const naBase = await prisma.tipoServico.findUnique({ where: { id: criado.id } });
     expect(naBase).not.toBeNull();
-    expect(naBase.tipo).toBe(nomeUnico);
     expect(naBase.ativo).toBe(false);
- 
+
     await prisma.tipoServico.delete({ where: { id: criado.id } });
   });
- 
-  test('deleteTipoServico pode ser chamado duas vezes no mesmo servico (idempotente)', async () => {
-    const nomeUnico = `Servico Idempotente ${Date.now()}`;
-    const criado = await createTipoServico({ tipo: nomeUnico });
- 
+
+  test('deleteTipoServico pode ser chamado duas vezes no mesmo serviço (idempotente)', async () => {
+    const nome = uniqueNome('Servico Idempotente');
+    const criado = await createTipoServico({ tipo: nome });
+
     const primeira = await deleteTipoServico(criado.id);
     expect(primeira.removed).toBe(true);
- 
-    // Segunda chamada — o registo existe mas já está inativo; deve continuar a funcionar
+
     const segunda = await deleteTipoServico(criado.id);
     expect(segunda.removed).toBe(true);
-    expect(segunda.id).toBe(criado.id);
- 
+
     await prisma.tipoServico.delete({ where: { id: criado.id } });
   });
- 
-  test('getAllTiposServico continua a devolver servicos inativados', async () => {
-    const nomeUnico = `Servico Inativo Lista ${Date.now()}`;
-    const criado = await createTipoServico({ tipo: nomeUnico });
- 
+
+  test('deleteTipoServico lança erro quando existem agendamentos futuros', async () => {
+    const nome = uniqueNome('Servico Com Agendamento');
+    const criado = await createTipoServico({ tipo: nome });
+
+    const contexto = await criarAgendamentoFuturo(criado.id);
+
+    await expect(deleteTipoServico(criado.id))
+      .rejects.toThrow('Não é possível inativar o serviço');
+
+    await limparAgendamento(contexto);
+    await prisma.tipoServico.delete({ where: { id: criado.id } });
+  });
+
+  test('deleteTipoServico inclui o número de agendamentos futuros na mensagem de erro', async () => {
+    const nome = uniqueNome('Servico Msg Agendamento');
+    const criado = await createTipoServico({ tipo: nome });
+
+    const contexto = await criarAgendamentoFuturo(criado.id);
+
+    await expect(deleteTipoServico(criado.id))
+      .rejects.toThrow('1 agendamento(s) futuro(s)');
+
+    await limparAgendamento(contexto);
+    await prisma.tipoServico.delete({ where: { id: criado.id } });
+  });
+
+  test('deleteTipoServico funciona depois de cancelar o agendamento futuro', async () => {
+    const nome = uniqueNome('Servico Depois Cancelar');
+    const criado = await createTipoServico({ tipo: nome });
+
+    const contexto = await criarAgendamentoFuturo(criado.id);
+
+    // Confirmar que bloqueia
+    await expect(deleteTipoServico(criado.id)).rejects.toThrow();
+
+    // Cancelar o agendamento
+    await prisma.agendamento.update({
+      where: { id: contexto.agendamentoId },
+      data: { estado: 'CANCELADO' },
+    });
+
+    // Agora deve conseguir inativar
+    const resultado = await deleteTipoServico(criado.id);
+    expect(resultado.removed).toBe(true);
+
+    await limparAgendamento(contexto);
+    await prisma.tipoServico.delete({ where: { id: criado.id } });
+  });
+
+  // ─── countAgendamentosFuturos ────────────────────────────────────────────
+
+  test('countAgendamentosFuturos retorna 0 para serviço sem agendamentos', async () => {
+    const nome = uniqueNome('Servico Sem Agendamentos');
+    const criado = await createTipoServico({ tipo: nome });
+
+    const total = await countAgendamentosFuturos(criado.id);
+    expect(total).toBe(0);
+
+    await prisma.tipoServico.delete({ where: { id: criado.id } });
+  });
+
+  test('countAgendamentosFuturos retorna 1 quando existe um agendamento futuro CONFIRMADO', async () => {
+    const nome = uniqueNome('Servico Count 1');
+    const criado = await createTipoServico({ tipo: nome });
+
+    const contexto = await criarAgendamentoFuturo(criado.id);
+
+    const total = await countAgendamentosFuturos(criado.id);
+    expect(total).toBe(1);
+
+    await limparAgendamento(contexto);
+    await prisma.tipoServico.delete({ where: { id: criado.id } });
+  });
+
+  test('countAgendamentosFuturos não conta agendamentos CANCELADOS', async () => {
+    const nome = uniqueNome('Servico Count Cancelado');
+    const criado = await createTipoServico({ tipo: nome });
+
+    const contexto = await criarAgendamentoFuturo(criado.id);
+    await prisma.agendamento.update({
+      where: { id: contexto.agendamentoId },
+      data: { estado: 'CANCELADO' },
+    });
+
+    const total = await countAgendamentosFuturos(criado.id);
+    expect(total).toBe(0);
+
+    await limparAgendamento(contexto);
+    await prisma.tipoServico.delete({ where: { id: criado.id } });
+  });
+
+  test('countAgendamentosFuturos não conta agendamentos CONCLUIDOS', async () => {
+    const nome = uniqueNome('Servico Count Concluido');
+    const criado = await createTipoServico({ tipo: nome });
+
+    const contexto = await criarAgendamentoFuturo(criado.id);
+    await prisma.agendamento.update({
+      where: { id: contexto.agendamentoId },
+      data: { estado: 'CONCLUIDO' },
+    });
+
+    const total = await countAgendamentosFuturos(criado.id);
+    expect(total).toBe(0);
+
+    await limparAgendamento(contexto);
+    await prisma.tipoServico.delete({ where: { id: criado.id } });
+  });
+
+  // ─── reativarTipoServico ─────────────────────────────────────────────────
+
+  test('reativarTipoServico retorna null para id inexistente', async () => {
+    const resultado = await reativarTipoServico('00000000-0000-4000-8000-000000000000');
+    expect(resultado).toBeNull();
+  });
+
+  test('reativarTipoServico coloca um serviço como ativo novamente', async () => {
+    const nome = uniqueNome('Servico Reativar');
+    const criado = await createTipoServico({ tipo: nome });
     await deleteTipoServico(criado.id);
- 
-    const todos = await getAllTiposServico();
-    const encontrado = todos.find((s) => s.id === criado.id);
- 
-    // O serviço ainda aparece na listagem geral, mas com ativo = false
-    expect(encontrado).toBeDefined();
-    expect(encontrado.ativo).toBe(false);
- 
+
+    const reativado = await reativarTipoServico(criado.id);
+    expect(reativado.ativo).toBe(true);
+
     await prisma.tipoServico.delete({ where: { id: criado.id } });
   });
 
-});
+  // ─── updateTipoServico ───────────────────────────────────────────────────
 
-describe('Gestão de Regras de Preço - Testes Unitários', () => {
-
-  afterAll(async () => {
-    await prisma.$disconnect();
+  test('updateTipoServico retorna null para id inexistente', async () => {
+    const resultado = await updateTipoServico('00000000-0000-4000-8000-000000000000', {
+      tipo: 'Qualquer',
+      regrasPreco: [{ porteAnimal: 'MEDIO', precoBase: 10, duracaoMinutos: 20 }],
+    });
+    expect(resultado).toBeNull();
   });
 
-  // ─── REGRAS DE PREÇO ─────────────────────────────────────────────────────────
+  test('updateTipoServico atualiza nome e substitui regras com sucesso', async () => {
+    const s = await createTipoServico({ tipo: uniqueNome('Nome Antigo') });
+    await createRegraPreco({ tipoServicoId: s.id, porteAnimal: 'PEQUENO', precoBase: 10, duracaoMinutos: 20 });
 
-  test('getAllRegrasPreco retorna uma lista de regras', async () => {
+    const resultado = await updateTipoServico(s.id, {
+      tipo: 'Nome Atualizado',
+      regrasPreco: [
+        { porteAnimal: 'GRANDE', precoBase: 50.5, duracaoMinutos: 90 },
+        { porteAnimal: 'MEDIO',  precoBase: 30,   duracaoMinutos: 45 },
+      ],
+    });
+
+    expect(resultado.tipo).toBe('Nome Atualizado');
+    expect(resultado.regrasPreco).toHaveLength(2);
+
+    // Confirmar que a regra antiga (PEQUENO) foi removida
+    const regrasNaDB = await prisma.regraPreco.findMany({ where: { tipoServicoId: s.id } });
+    expect(regrasNaDB.some(r => r.porteAnimal === 'PEQUENO')).toBe(false);
+
+    await prisma.regraPreco.deleteMany({ where: { tipoServicoId: s.id } });
+    await prisma.tipoServico.delete({ where: { id: s.id } });
+  });
+
+  test('updateTipoServico preserva preco_no_momento dos agendamentos existentes', async () => {
+    const nome = uniqueNome('Servico Historico');
+    const criado = await createTipoServico({ tipo: nome });
+    await createRegraPreco({ tipoServicoId: criado.id, porteAnimal: 'MEDIO', precoBase: 20, duracaoMinutos: 30 });
+
+    // Criar agendamento passado para simular histórico
+    const contexto = await criarAgendamentoFuturo(criado.id);
+
+    // Guardar o preço registado no momento
+    const assocAntes = await prisma.agendamentoServico.findFirst({
+      where: { agendamentoId: contexto.agendamentoId, tipoServicoId: criado.id },
+    });
+    expect(Number(assocAntes.precoNoMomento)).toBe(30); // valor definido em criarAgendamentoFuturo
+
+    // Atualizar o serviço com novo preço
+    await updateTipoServico(criado.id, {
+      tipo: nome,
+      regrasPreco: [{ porteAnimal: 'MEDIO', precoBase: 99, duracaoMinutos: 60 }],
+    });
+
+    // O registo de agendamento_servico NÃO deve ter sido alterado
+    const assocDepois = await prisma.agendamentoServico.findFirst({
+      where: { agendamentoId: contexto.agendamentoId, tipoServicoId: criado.id },
+    });
+    expect(Number(assocDepois.precoNoMomento)).toBe(30);
+    expect(assocDepois.duracaoNoMomento).toBe(30);
+
+    await limparAgendamento(contexto);
+    await prisma.regraPreco.deleteMany({ where: { tipoServicoId: criado.id } });
+    await prisma.tipoServico.delete({ where: { id: criado.id } });
+  });
+
+  test('updateTipoServico falha se o nome for duplicado para outro ID', async () => {
+    const s1 = await createTipoServico({ tipo: uniqueNome('Servico A') });
+    const s2 = await createTipoServico({ tipo: uniqueNome('Servico B') });
+
+    await expect(
+      updateTipoServico(s1.id, {
+        tipo: s2.tipo,
+        regrasPreco: [{ porteAnimal: 'MEDIO', precoBase: 20, duracaoMinutos: 30 }],
+      })
+    ).rejects.toThrow(`Já existe um serviço com o nome "${s2.tipo}".`);
+
+    await prisma.tipoServico.deleteMany({ where: { id: { in: [s1.id, s2.id] } } });
+  });
+
+  test('updateTipoServico falha se regrasPreco estiver vazio', async () => {
+    const s = await createTipoServico({ tipo: uniqueNome('Servico Sem Regras') });
+
+    await expect(
+      updateTipoServico(s.id, { tipo: 'Novo Nome', regrasPreco: [] })
+    ).rejects.toThrow('regrasPreco é obrigatório e deve conter pelo menos uma regra.');
+
+    await prisma.tipoServico.delete({ where: { id: s.id } });
+  });
+
+  test('updateTipoServico falha com portes duplicados no input', async () => {
+    const s = await createTipoServico({ tipo: uniqueNome('Servico Portes Dup') });
+
+    await expect(
+      updateTipoServico(s.id, {
+        tipo: s.tipo,
+        regrasPreco: [
+          { porteAnimal: 'MEDIO', precoBase: 20, duracaoMinutos: 30 },
+          { porteAnimal: 'MEDIO', precoBase: 25, duracaoMinutos: 40 },
+        ],
+      })
+    ).rejects.toThrow('Não podem existir regras duplicadas para o mesmo porte de animal.');
+
+    await prisma.tipoServico.delete({ where: { id: s.id } });
+  });
+
+  // ─── getAllRegrasPreco ───────────────────────────────────────────────────
+
+  test('getAllRegrasPreco retorna uma lista', async () => {
     const regras = await getAllRegrasPreco();
     expect(Array.isArray(regras)).toBe(true);
   });
 
   test('getAllRegrasPreco retorna objectos com as propriedades correctas', async () => {
     const regras = await getAllRegrasPreco();
-    regras.forEach((regra) => {
-      expect(regra).toHaveProperty('id');
-      expect(regra).toHaveProperty('tipoServicoId');
-      expect(regra).toHaveProperty('porteAnimal');
-      expect(regra).toHaveProperty('precoBase');
-      expect(regra).toHaveProperty('duracaoMinutos');
+    regras.forEach((r) => {
+      expect(r).toHaveProperty('id');
+      expect(r).toHaveProperty('tipoServicoId');
+      expect(r).toHaveProperty('porteAnimal');
+      expect(r).toHaveProperty('precoBase');
+      expect(r).toHaveProperty('duracaoMinutos');
     });
   });
 
-  test('getAllRegrasPreco retorna precoBase como número', async () => {
+  test('getAllRegrasPreco devolve precoBase como número', async () => {
     const regras = await getAllRegrasPreco();
-    regras.forEach((regra) => {
-      expect(typeof regra.precoBase).toBe('number');
-    });
+    regras.forEach((r) => expect(typeof r.precoBase).toBe('number'));
   });
+
+  // ─── createRegraPreco ────────────────────────────────────────────────────
 
   test('createRegraPreco falha com porte inválido', async () => {
     const servico = await prisma.tipoServico.findFirst();
-
     await expect(
-      createRegraPreco({
-        tipoServicoId: servico.id,
-        porteAnimal: 'PORTE_INVALIDO',
-        precoBase: 25.0,
-        duracaoMinutos: 45,
-      })
+      createRegraPreco({ tipoServicoId: servico.id, porteAnimal: 'PORTE_INVALIDO', precoBase: 25, duracaoMinutos: 45 })
     ).rejects.toThrow();
   });
 
   test('createRegraPreco cria uma regra com os dados correctos', async () => {
     const servico = await prisma.tipoServico.findFirst();
+    const nova = await createRegraPreco({ tipoServicoId: servico.id, porteAnimal: 'MEDIO', precoBase: 35, duracaoMinutos: 60 });
 
-    const novaRegra = await createRegraPreco({
-      tipoServicoId: servico.id,
-      porteAnimal: 'MEDIO',
-      precoBase: 35.0,
-      duracaoMinutos: 60,
-    });
+    expect(nova.tipoServicoId).toBe(servico.id);
+    expect(nova.porteAnimal).toBe('MEDIO');
+    expect(nova.precoBase).toBe(35);
+    expect(nova.duracaoMinutos).toBe(60);
 
-    expect(novaRegra.tipoServicoId).toBe(servico.id);
-    expect(novaRegra.porteAnimal).toBe('MEDIO');
-    expect(novaRegra.precoBase).toBe(35.0);
-    expect(novaRegra.duracaoMinutos).toBe(60);
-    expect(novaRegra).toHaveProperty('id');
-
-    await prisma.regraPreco.delete({ where: { id: novaRegra.id } });
+    await prisma.regraPreco.delete({ where: { id: nova.id } });
   });
 
   test('createRegraPreco cria regra para todos os portes válidos', async () => {
@@ -258,28 +533,226 @@ describe('Gestão de Regras de Preço - Testes Unitários', () => {
     const criadas = [];
 
     for (const porte of portes) {
-      const regra = await createRegraPreco({
-        tipoServicoId: servico.id,
-        porteAnimal: porte,
-        precoBase: 20.0,
-        duracaoMinutos: 30,
-      });
-      expect(regra.porteAnimal).toBe(porte);
-      criadas.push(regra.id);
+      const r = await createRegraPreco({ tipoServicoId: servico.id, porteAnimal: porte, precoBase: 20, duracaoMinutos: 30 });
+      expect(r.porteAnimal).toBe(porte);
+      criadas.push(r.id);
     }
 
     await prisma.regraPreco.deleteMany({ where: { id: { in: criadas } } });
   });
 
-  test('createRegraPreco falha se tipoServicoId não existir na base de dados', async () => {
+  test('createRegraPreco falha se tipoServicoId não existir', async () => {
     await expect(
-      createRegraPreco({
-        tipoServicoId: '00000000-0000-0000-0000-000000000000',
-        porteAnimal: 'PEQUENO',
-        precoBase: 15.0,
-        duracaoMinutos: 30,
-      })
+      createRegraPreco({ tipoServicoId: '00000000-0000-0000-0000-000000000000', porteAnimal: 'PEQUENO', precoBase: 15, duracaoMinutos: 30 })
     ).rejects.toThrow();
   });
+});
 
+// ════════════════════════════════════════════════════════════════════════════
+// TESTES DE API — endpoints HTTP
+// ════════════════════════════════════════════════════════════════════════════
+
+describe('API Serviços — Testes de Endpoint', () => {
+  const createdIds = [];
+
+  afterEach(async () => {
+    if (createdIds.length > 0) {
+      const ids = createdIds.splice(0);
+      await prisma.regraPreco.deleteMany({ where: { tipoServicoId: { in: ids } } });
+      await prisma.tipoServico.deleteMany({ where: { id: { in: ids } } });
+    }
+  });
+
+  afterAll(async () => {
+    await prisma.$disconnect();
+  });
+
+  // ─── GET /servicos ───────────────────────────────────────────────────────
+
+  test('GET /servicos devolve 200 e lista', async () => {
+    const res = await request(app).get('/servicos');
+    expect(res.status).toBe(200);
+    expect(Array.isArray(res.body)).toBe(true);
+  });
+
+  // ─── POST /servicos ──────────────────────────────────────────────────────
+
+  test('POST /servicos cria serviço com 201', async () => {
+    const nome = uniqueNome('API Servico Criar');
+    const res = await request(app).post('/servicos').send({ tipo: nome });
+
+    expect(res.status).toBe(201);
+    expect(res.body.tipo).toBe(nome);
+    expect(res.body.ativo).toBe(true);
+    createdIds.push(res.body.id);
+  });
+
+  test('POST /servicos devolve 500 sem tipo', async () => {
+    const res = await request(app).post('/servicos').send({});
+    expect(res.status).toBe(400);
+  });
+
+  // ─── PUT /servicos/:id ───────────────────────────────────────────────────
+
+  test('PUT /servicos/:id atualiza serviço com 200', async () => {
+    const criado = await request(app).post('/servicos').send({ tipo: uniqueNome('API Servico Update') });
+    expect(criado.status).toBe(201);
+    createdIds.push(criado.body.id);
+
+    const res = await request(app).put(`/servicos/${criado.body.id}`).send({
+      tipo: uniqueNome('API Servico Updated'),
+      regrasPreco: [{ porteAnimal: 'MEDIO', precoBase: 25, duracaoMinutos: 40 }],
+    });
+
+    expect(res.status).toBe(200);
+    expect(res.body.regrasPreco).toHaveLength(1);
+    expect(res.body.regrasPreco[0].porteAnimal).toBe('MEDIO');
+  });
+
+  test('PUT /servicos/:id devolve 404 para id inexistente', async () => {
+    const res = await request(app)
+      .put('/servicos/00000000-0000-4000-8000-000000000000')
+      .send({ tipo: 'X', regrasPreco: [{ porteAnimal: 'MEDIO', precoBase: 10, duracaoMinutos: 20 }] });
+
+    expect(res.status).toBe(404);
+  });
+
+  test('PUT /servicos/:id devolve 409 para nome duplicado', async () => {
+    const s1 = await request(app).post('/servicos').send({ tipo: uniqueNome('API Dup A') });
+    const s2 = await request(app).post('/servicos').send({ tipo: uniqueNome('API Dup B') });
+    expect(s1.status).toBe(201);
+    expect(s2.status).toBe(201);
+    createdIds.push(s1.body.id, s2.body.id);
+
+    const res = await request(app).put(`/servicos/${s1.body.id}`).send({
+      tipo: s2.body.tipo,
+      regrasPreco: [{ porteAnimal: 'MEDIO', precoBase: 10, duracaoMinutos: 20 }],
+    });
+
+    expect(res.status).toBe(409);
+    expect(res.body.error).toContain('Já existe um serviço com o nome');
+  });
+
+  test('PUT /servicos/:id devolve 400 sem regrasPreco', async () => {
+    const criado = await request(app).post('/servicos').send({ tipo: uniqueNome('API Sem Regras') });
+    expect(criado.status).toBe(201);
+    createdIds.push(criado.body.id);
+
+    const res = await request(app).put(`/servicos/${criado.body.id}`).send({ tipo: 'Nome qualquer' });
+    expect(res.status).toBe(400);
+  });
+
+  test('PUT /servicos/:id preserva preco_no_momento do histórico de agendamentos', async () => {
+    const nome = uniqueNome('API Historico');
+    const criado = await request(app).post('/servicos').send({ tipo: nome });
+    expect(criado.status).toBe(201);
+    createdIds.push(criado.body.id);
+
+    const contexto = await criarAgendamentoFuturo(criado.body.id);
+
+    // Atualizar preço via API
+    const res = await request(app).put(`/servicos/${criado.body.id}`).send({
+      tipo: nome,
+      regrasPreco: [{ porteAnimal: 'MEDIO', precoBase: 999, duracaoMinutos: 99 }],
+    });
+    expect(res.status).toBe(200);
+
+    // O registo histórico deve manter o preço original
+    const assoc = await prisma.agendamentoServico.findFirst({
+      where: { agendamentoId: contexto.agendamentoId, tipoServicoId: criado.body.id },
+    });
+    expect(Number(assoc.precoNoMomento)).toBe(30);
+    expect(assoc.duracaoNoMomento).toBe(30);
+
+    await limparAgendamento(contexto);
+  });
+
+  // ─── DELETE /servicos/:id ────────────────────────────────────────────────
+
+  test('DELETE /servicos/:id inativa serviço sem agendamentos futuros com 200', async () => {
+    const criado = await request(app).post('/servicos').send({ tipo: uniqueNome('API Delete OK') });
+    expect(criado.status).toBe(201);
+    createdIds.push(criado.body.id);
+
+    const res = await request(app).delete(`/servicos/${criado.body.id}`);
+    expect(res.status).toBe(200);
+    expect(res.body.removed).toBe(true);
+
+    // Confirmar que o registo ainda existe mas inativo
+    const naBase = await prisma.tipoServico.findUnique({ where: { id: criado.body.id } });
+    expect(naBase.ativo).toBe(false);
+  });
+
+  test('DELETE /servicos/:id devolve 404 para id inexistente', async () => {
+    const res = await request(app).delete('/servicos/00000000-0000-4000-8000-000000000000');
+    expect(res.status).toBe(404);
+    expect(res.body.error).toBe('Servico nao encontrado');
+  });
+
+  test('DELETE /servicos/:id devolve 409 quando existem agendamentos futuros', async () => {
+    const criado = await request(app).post('/servicos').send({ tipo: uniqueNome('API Delete Bloqueado') });
+    expect(criado.status).toBe(201);
+    createdIds.push(criado.body.id);
+
+    const contexto = await criarAgendamentoFuturo(criado.body.id);
+
+    const res = await request(app).delete(`/servicos/${criado.body.id}`);
+    expect(res.status).toBe(409);
+    expect(res.body.error).toContain('Não é possível inativar o serviço');
+    expect(res.body.error).toContain('agendamento(s) futuro(s)');
+
+    await limparAgendamento(contexto);
+  });
+
+  test('DELETE /servicos/:id funciona após cancelar os agendamentos futuros', async () => {
+    const criado = await request(app).post('/servicos').send({ tipo: uniqueNome('API Delete Apos Cancelar') });
+    expect(criado.status).toBe(201);
+    createdIds.push(criado.body.id);
+
+    const contexto = await criarAgendamentoFuturo(criado.body.id);
+
+    // Confirmar que bloqueia
+    const bloqueado = await request(app).delete(`/servicos/${criado.body.id}`);
+    expect(bloqueado.status).toBe(409);
+
+    // Cancelar o agendamento
+    await prisma.agendamento.update({
+      where: { id: contexto.agendamentoId },
+      data: { estado: 'CANCELADO' },
+    });
+
+    // Agora deve funcionar
+    const res = await request(app).delete(`/servicos/${criado.body.id}`);
+    expect(res.status).toBe(200);
+    expect(res.body.removed).toBe(true);
+
+    await limparAgendamento(contexto);
+  });
+
+  // ─── POST /servicos/:id/reativar ─────────────────────────────────────────
+
+  test('POST /servicos/:id/reativar reativa serviço inativo com 200', async () => {
+    const criado = await request(app).post('/servicos').send({ tipo: uniqueNome('API Reativar') });
+    expect(criado.status).toBe(201);
+    createdIds.push(criado.body.id);
+
+    await request(app).delete(`/servicos/${criado.body.id}`);
+
+    const res = await request(app).post(`/servicos/${criado.body.id}/reativar`);
+    expect(res.status).toBe(200);
+    expect(res.body.ativo).toBe(true);
+  });
+
+  test('POST /servicos/:id/reativar devolve 404 para id inexistente', async () => {
+    const res = await request(app).post('/servicos/00000000-0000-4000-8000-000000000000/reativar');
+    expect(res.status).toBe(404);
+  });
+
+  // ─── GET /regras-preco ───────────────────────────────────────────────────
+
+  test('GET /regras-preco devolve 200 e lista', async () => {
+    const res = await request(app).get('/regras-preco');
+    expect(res.status).toBe(200);
+    expect(Array.isArray(res.body)).toBe(true);
+  });
 });

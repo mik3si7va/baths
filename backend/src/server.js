@@ -4,7 +4,7 @@ const swaggerUi = require('swagger-ui-express');
 const swaggerSpec = require('./swagger');
 const { prisma, closePrisma } = require('./db/prismaClient');
 const { getAllEvents, createEvent } = require('./repositories/eventsRepository');
-const { getAllTiposServico, createTipoServico, deleteTipoServico, getAllRegrasPreco, createRegraPreco } = require('./repositories/repositorioServicos');
+const { getAllTiposServico, createTipoServico, updateTipoServico, deleteTipoServico, reativarTipoServico, getAllRegrasPreco, createRegraPreco } = require('./repositories/repositorioServicos');
 const { getAllSalas, getAllSalasWithStatus, getSalaById, createSala, updateSala, deleteSala, addServicoToSala, getServicosBySala, removeServicoFromSala } = require('./repositories/repositorioSalas');
 const { getAllFuncionarios, getFuncionarioById, createFuncionario, updateFuncionario, deleteFuncionario } = require('./repositories/repositorioFuncionarios');
 
@@ -37,6 +37,87 @@ app.post('/servicos', async (req, res) => {
     console.error('Failed to create servico:', error);
     return res.status(500).json({ error: error.message });
   }
+});
+
+/**
+ * @swagger
+ * /servicos/{id}:
+ *   put:
+ *     summary: Atualiza um tipo de serviço e substitui as suas regras de preço
+ *     tags: [Servicos]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: ID do tipo de serviço
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [tipo, regrasPreco]
+ *             properties:
+ *               tipo:
+ *                 type: string
+ *                 example: 'BANHO'
+ *               regrasPreco:
+ *                 type: array
+ *                 items:
+ *                   type: object
+ *                   required: [porteAnimal, precoBase, duracaoMinutos]
+ *                   properties:
+ *                     porteAnimal:
+ *                       $ref: '#/components/schemas/PorteEnum'
+ *                     precoBase:
+ *                       type: number
+ *                       example: 25.00
+ *                     duracaoMinutos:
+ *                       type: integer
+ *                       example: 45
+ *     responses:
+ *       200:
+ *         description: Serviço atualizado com sucesso
+ *       400:
+ *         description: Dados inválidos
+ *       404:
+ *         description: Serviço não encontrado
+ *       409:
+ *         description: Nome já existe
+ *       500:
+ *         description: Erro interno
+ */
+app.put('/servicos/:id', async (req, res) => {
+    const { id } = req.params;
+    const { tipo, regrasPreco } = req.body || {};
+
+    if (!tipo) {
+        return res.status(400).json({ error: 'tipo é obrigatório' });
+    }
+    if (!Array.isArray(regrasPreco) || regrasPreco.length === 0) {
+        return res.status(400).json({ error: 'regrasPreco é obrigatório e deve conter pelo menos uma regra' });
+    }
+
+    try {
+        const resultado = await updateTipoServico(id, { tipo, regrasPreco });
+
+        if (!resultado) {
+            return res.status(404).json({ error: 'Servico nao encontrado' });
+        }
+
+        return res.json(resultado);
+    } catch (error) {
+        console.error('Failed to update servico:', error);
+
+        if (error.message?.startsWith('Já existe um serviço com o nome')) {
+            return res.status(409).json({ error: error.message });
+        }
+
+        return res.status(400).json({ error: error.message });
+    }
 });
 
 /**
@@ -87,18 +168,63 @@ app.post('/servicos', async (req, res) => {
  */
 app.delete('/servicos/:id', async (req, res) => {
   const { id } = req.params;
- 
+
   try {
     const result = await deleteTipoServico(id);
- 
+
     if (!result) {
       return res.status(404).json({ error: 'Servico nao encontrado' });
     }
- 
+
     return res.json(result);
   } catch (error) {
     console.error('Failed to delete servico:', error);
+
+    // Agendamentos futuros impedem a inativação — conflito de negócio
+    if (error.message?.startsWith('Não é possível inativar o serviço')) {
+      return res.status(409).json({ error: error.message });
+    }
+
     return res.status(500).json({ error: 'Failed to delete servico' });
+  }
+});
+
+/**
+ * @swagger
+ * /servicos/{id}/reativar:
+ *   post:
+ *     summary: Reativa um tipo de serviço inativo
+ *     tags: [Servicos]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: ID do tipo de serviço
+ *     responses:
+ *       200:
+ *         description: Serviço reativado com sucesso
+ *       404:
+ *         description: Serviço não encontrado
+ *       500:
+ *         description: Erro interno
+ */
+app.post('/servicos/:id/reativar', async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const result = await reativarTipoServico(id);
+
+    if (!result) {
+      return res.status(404).json({ error: 'Servico nao encontrado' });
+    }
+
+    return res.json(result);
+  } catch (error) {
+    console.error('Failed to reativar servico:', error);
+    return res.status(500).json({ error: 'Failed to reativar servico' });
   }
 });
 
