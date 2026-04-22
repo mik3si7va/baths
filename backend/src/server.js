@@ -7,6 +7,7 @@ const { getAllEvents, createEvent } = require('./repositories/eventsRepository')
 const { getAllTiposServico, createTipoServico, deleteTipoServico, getAllRegrasPreco, createRegraPreco } = require('./repositories/repositorioServicos');
 const { getAllSalas, getAllSalasWithStatus, getSalaById, createSala, updateSala, deleteSala, addServicoToSala, getServicosBySala, removeServicoFromSala } = require('./repositories/repositorioSalas');
 const { getAllFuncionarios, getFuncionarioById, createFuncionario, updateFuncionario, deleteFuncionario } = require('./repositories/repositorioFuncionarios');
+const { getAllClientes, getClienteById, createCliente } = require('./repositories/repositorioClientes');
 
 const app = express();
 const PORT = Number(process.env.PORT || 5000);
@@ -992,6 +993,152 @@ app.delete('/funcionarios/:id', async (req, res) => {
     return res.status(500).json({ error: 'Failed to delete funcionario' });
   }
 });
+
+// ─── CLIENTES ────────────────────────────────────────────────────────────────
+ 
+/**
+ * @swagger
+ * /clientes:
+ *   get:
+ *     summary: Lista todos os clientes
+ *     tags: [Clientes]
+ *     responses:
+ *       200:
+ *         description: Lista de clientes
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/Cliente'
+ *       500:
+ *         description: Erro interno
+ */
+app.get('/clientes', async (_req, res) => {
+  try {
+    const clientes = await getAllClientes();
+    return res.json(clientes);
+  } catch (error) {
+    console.error('Failed to fetch clientes:', error);
+    return res.status(500).json({ error: 'Failed to fetch clientes' });
+  }
+});
+ 
+/**
+ * @swagger
+ * /clientes/{id}:
+ *   get:
+ *     summary: Obtem um cliente por id
+ *     tags: [Clientes]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     responses:
+ *       200:
+ *         description: Cliente encontrado
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Cliente'
+ *       404:
+ *         description: Cliente nao encontrado
+ *       500:
+ *         description: Erro interno
+ */
+app.get('/clientes/:id', async (req, res) => {
+  const { id } = req.params;
+  try {
+    const cliente = await getClienteById(id);
+    if (!cliente) {
+      return res.status(404).json({ error: 'Cliente nao encontrado' });
+    }
+    return res.json(cliente);
+  } catch (error) {
+    console.error('Failed to fetch cliente:', error);
+    return res.status(500).json({ error: 'Failed to fetch cliente' });
+  }
+});
+ 
+/**
+ * @swagger
+ * /clientes:
+ *   post:
+ *     summary: Regista um novo cliente
+ *     tags: [Clientes]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/CreateClienteRequest'
+ *     responses:
+ *       201:
+ *         description: Cliente registado
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Cliente'
+ *       400:
+ *         description: Dados invalidos
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *             examples:
+ *               camposObrigatorios:
+ *                 summary: Campos obrigatorios em falta
+ *                 value:
+ *                   error: 'nome, email e telefone sao obrigatorios'
+ *               nifInvalido:
+ *                 summary: NIF invalido
+ *                 value:
+ *                   error: 'O NIF deve ter 9 dígitos numéricos.'
+ *       409:
+ *         description: Email ou NIF ja existe
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *             examples:
+ *               emailDuplicado:
+ *                 summary: Email ja existente
+ *                 value:
+ *                   error: 'Já existe uma conta com o email "cliente@email.com".'
+ *               nifDuplicado:
+ *                 summary: NIF ja existente
+ *                 value:
+ *                   error: 'Já existe um cliente com o NIF "123456789".'
+ *       500:
+ *         description: Erro interno
+ */
+app.post('/clientes', async (req, res) => {
+  const { nome, email, telefone, nif, morada } = req.body || {};
+ 
+  if (!nome || !email || !telefone) {
+    return res.status(400).json({ error: 'nome, email e telefone sao obrigatorios' });
+  }
+ 
+  try {
+    const novoCliente = await createCliente({ nome, email, telefone, nif, morada });
+    return res.status(201).json(novoCliente);
+  } catch (error) {
+    console.error('Failed to create cliente:', error);
+ 
+    if (
+      error.message?.startsWith('Já existe uma conta com o email') ||
+      error.message?.startsWith('Já existe um cliente com o NIF')
+    ) {
+      return res.status(409).json({ error: error.message });
+    }
+ 
+    return res.status(400).json({ error: error.message });
+  }
+});
+ 
 
 app.get('/events', async (_req, res) => {
   try {
