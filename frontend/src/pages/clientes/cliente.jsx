@@ -531,7 +531,7 @@ function ClienteCard({ cliente, onAddAnimal }) {
               <Chip
                 size="small"
                 icon={<PetsIcon sx={{ fontSize: "14px !important" }} />}
-                label={`${cliente.animais.length} animal${cliente.animais.length !== 1 ? "is" : ""}`}
+                label={`${cliente.animais.length} ${cliente.animais.length === 1 ? "animal" : "animais"}`}
                 variant="outlined"
                 color="primary"
                 sx={{ fontSize: "11px", height: 22 }}
