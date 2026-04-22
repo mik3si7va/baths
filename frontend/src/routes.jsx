@@ -2,7 +2,7 @@ import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { MainLayout, CompactLayout } from './layouts';
 import ServicosPage from './pages/servicos/servicos';
-import { Home, Calendar, Login, Salas, SalaDetalhes, Users} from './pages'
+import { Home, Calendar, Login, Salas, SalaDetalhes, Users, Clientes } from './pages'
 import App from './App';
 
 
@@ -22,17 +22,29 @@ export default function AppRoutes() {
         <BrowserRouter>
             <Routes>
                 <Route path="/" element={<App />} />
-                <Route 
-                    path="/home" 
+                <Route
+                    path="/home"
                     element={
-                        <PrivateRoute 
+                        <PrivateRoute
                             element={
                                 <MainLayout>
                                     <Home />
                                 </MainLayout>
-                            } 
+                            }
                         />
-                    } 
+                    }
+                />
+                <Route
+                    path="/clientes"
+                    element={
+                        <PrivateRoute
+                            element={
+                                <CompactLayout showBack>
+                                    <Clientes />
+                                </CompactLayout>
+                            }
+                        />
+                    }
                 />
                 <Route
                     path="/servicos"
@@ -46,29 +58,29 @@ export default function AppRoutes() {
                         />
                     }
                 />
-                <Route 
-                    path="/calendar" 
+                <Route
+                    path="/calendar"
                     element={
-                        <PrivateRoute 
+                        <PrivateRoute
                             element={
                                 <CompactLayout showBack>
                                     <Calendar />
                                 </CompactLayout>
-                            } 
+                            }
                         />
-                    } 
+                    }
                 />
-                <Route 
-                    path="/salas" 
+                <Route
+                    path="/salas"
                     element={
-                        <PrivateRoute 
+                        <PrivateRoute
                             element={
                                 <CompactLayout showBack>
                                     <Salas />
                                 </CompactLayout>
-                            } 
+                            }
                         />
-                    } 
+                    }
                 />
                 <Route
                     path="/salas/:id/:nome"

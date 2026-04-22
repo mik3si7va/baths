@@ -13,6 +13,7 @@ import SearchIcon from '@mui/icons-material/Search';
 import PaymentIcon from '@mui/icons-material/Payment';
 import ContentCutIcon from '@mui/icons-material/ContentCut';
 import ShoppingCartIcon from '@mui/icons-material/ShoppingCart';
+import PersonAddIcon from '@mui/icons-material/PersonAdd';
 
 export default function Home() {
     const { colors } = useThemeContext();
@@ -57,7 +58,17 @@ export default function Home() {
             height: 180,
             width: 328
         },
-                {
+        {
+            title: 'Clientes',
+            description: 'Criar e gerir clientes.',
+            icon: PeopleIcon,
+            buttonText: 'Gerir',
+            buttonIcon: PersonAddIcon,
+            href: '/clientes',
+            height: 180,
+            width: 328
+        },
+        {
             title: 'Serviços',
             description: 'Criar e gerir serviços, portes e regras de preço.',
             icon: ContentCutIcon,
