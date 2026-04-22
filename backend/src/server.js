@@ -1,12 +1,37 @@
-const express = require('express');
-const cors = require('cors');
-const swaggerUi = require('swagger-ui-express');
-const swaggerSpec = require('./swagger');
-const { prisma, closePrisma } = require('./db/prismaClient');
-const { getAllEvents, createEvent } = require('./repositories/eventsRepository');
-const { getAllTiposServico, createTipoServico, deleteTipoServico, getAllRegrasPreco, createRegraPreco } = require('./repositories/repositorioServicos');
-const { getAllSalas, getAllSalasWithStatus, getSalaById, createSala, updateSala, deleteSala, addServicoToSala, getServicosBySala, removeServicoFromSala } = require('./repositories/repositorioSalas');
-const { getAllFuncionarios, getFuncionarioById, createFuncionario, updateFuncionario, deleteFuncionario } = require('./repositories/repositorioFuncionarios');
+const express = require("express");
+const cors = require("cors");
+const swaggerUi = require("swagger-ui-express");
+const swaggerSpec = require("./swagger");
+const { prisma, closePrisma } = require("./db/prismaClient");
+const {
+  getAllEvents,
+  createEvent,
+} = require("./repositories/eventsRepository");
+const {
+  getAllTiposServico,
+  createTipoServico,
+  deleteTipoServico,
+  getAllRegrasPreco,
+  createRegraPreco,
+} = require("./repositories/repositorioServicos");
+const {
+  getAllSalas,
+  getAllSalasWithStatus,
+  getSalaById,
+  createSala,
+  updateSala,
+  deleteSala,
+  addServicoToSala,
+  getServicosBySala,
+  removeServicoFromSala,
+} = require("./repositories/repositorioSalas");
+const {
+  getAllFuncionarios,
+  getFuncionarioById,
+  createFuncionario,
+  updateFuncionario,
+  deleteFuncionario,
+} = require("./repositories/repositorioFuncionarios");
 const {
   getAllClientes,
   getClienteById,
@@ -15,36 +40,35 @@ const {
   confirmarClienteComAnimal,
   createAnimal,
   getAnimaisByCliente,
-  limparClientesTemporarios,
-} = require('./repositories/repositorioClientes');
+} = require("./repositories/repositorioClientes");
 
 const app = express();
 const PORT = Number(process.env.PORT || 5000);
 
-app.use(cors({ origin: 'http://localhost:3000' }));
+app.use(cors({ origin: "http://localhost:3000" }));
 app.use(express.json());
-app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
-app.get('/servicos', async (_req, res) => {
+app.get("/servicos", async (_req, res) => {
   try {
     const servicos = await getAllTiposServico();
     return res.json(servicos);
   } catch (error) {
-    console.error('Failed to fetch servicos:', error);
-    return res.status(500).json({ error: 'Failed to fetch servicos' });
+    console.error("Failed to fetch servicos:", error);
+    return res.status(500).json({ error: "Failed to fetch servicos" });
   }
 });
 
-app.post('/servicos', async (req, res) => {
+app.post("/servicos", async (req, res) => {
   const { tipo } = req.body || {};
   if (!tipo) {
-    return res.status(400).json({ error: 'tipo é obrigatório' });
+    return res.status(400).json({ error: "tipo é obrigatório" });
   }
   try {
     const novo = await createTipoServico({ tipo });
     return res.status(201).json(novo);
   } catch (error) {
-    console.error('Failed to create servico:', error);
+    console.error("Failed to create servico:", error);
     return res.status(500).json({ error: error.message });
   }
 });
@@ -95,43 +119,54 @@ app.post('/servicos', async (req, res) => {
  *             schema:
  *               $ref: '#/components/schemas/Error'
  */
-app.delete('/servicos/:id', async (req, res) => {
+app.delete("/servicos/:id", async (req, res) => {
   const { id } = req.params;
- 
+
   try {
     const result = await deleteTipoServico(id);
- 
+
     if (!result) {
-      return res.status(404).json({ error: 'Servico nao encontrado' });
+      return res.status(404).json({ error: "Servico nao encontrado" });
     }
- 
+
     return res.json(result);
   } catch (error) {
-    console.error('Failed to delete servico:', error);
-    return res.status(500).json({ error: 'Failed to delete servico' });
+    console.error("Failed to delete servico:", error);
+    return res.status(500).json({ error: "Failed to delete servico" });
   }
 });
 
-app.get('/regras-preco', async (_req, res) => {
+app.get("/regras-preco", async (_req, res) => {
   try {
     const regras = await getAllRegrasPreco();
     return res.json(regras);
   } catch (error) {
-    console.error('Failed to fetch regras:', error);
-    return res.status(500).json({ error: 'Failed to fetch regras' });
+    console.error("Failed to fetch regras:", error);
+    return res.status(500).json({ error: "Failed to fetch regras" });
   }
 });
 
-app.post('/regras-preco', async (req, res) => {
-  const { tipoServicoId, porteAnimal, precoBase, duracaoMinutos } = req.body || {};
+app.post("/regras-preco", async (req, res) => {
+  const { tipoServicoId, porteAnimal, precoBase, duracaoMinutos } =
+    req.body || {};
   if (!tipoServicoId || !porteAnimal || !precoBase || !duracaoMinutos) {
-    return res.status(400).json({ error: 'tipoServicoId, porteAnimal, precoBase e duracaoMinutos são obrigatórios' });
+    return res
+      .status(400)
+      .json({
+        error:
+          "tipoServicoId, porteAnimal, precoBase e duracaoMinutos são obrigatórios",
+      });
   }
   try {
-    const nova = await createRegraPreco({ tipoServicoId, porteAnimal, precoBase, duracaoMinutos });
+    const nova = await createRegraPreco({
+      tipoServicoId,
+      porteAnimal,
+      precoBase,
+      duracaoMinutos,
+    });
     return res.status(201).json(nova);
   } catch (error) {
-    console.error('Failed to create regra:', error);
+    console.error("Failed to create regra:", error);
     return res.status(500).json({ error: error.message });
   }
 });
@@ -158,13 +193,13 @@ app.post('/regras-preco', async (req, res) => {
  *             schema:
  *               $ref: '#/components/schemas/Error'
  */
-app.get('/salas', async (_req, res) => {
+app.get("/salas", async (_req, res) => {
   try {
     const salas = await getAllSalas();
     return res.json(salas);
   } catch (error) {
-    console.error('Failed to fetch salas:', error);
-    return res.status(500).json({ error: 'Failed to fetch salas' });
+    console.error("Failed to fetch salas:", error);
+    return res.status(500).json({ error: "Failed to fetch salas" });
   }
 });
 
@@ -186,13 +221,13 @@ app.get('/salas', async (_req, res) => {
  *       500:
  *         description: Erro interno
  */
-app.get('/salas/todas', async (_req, res) => {
+app.get("/salas/todas", async (_req, res) => {
   try {
     const salas = await getAllSalasWithStatus();
     return res.json(salas);
   } catch (error) {
-    console.error('Failed to fetch all salas:', error);
-    return res.status(500).json({ error: 'Failed to fetch all salas' });
+    console.error("Failed to fetch all salas:", error);
+    return res.status(500).json({ error: "Failed to fetch all salas" });
   }
 });
 
@@ -235,19 +270,19 @@ app.get('/salas/todas', async (_req, res) => {
  *             schema:
  *               $ref: '#/components/schemas/Error'
  */
-app.get('/salas/:id', async (req, res) => {
+app.get("/salas/:id", async (req, res) => {
   const { id } = req.params;
 
   try {
     const sala = await getSalaById(id);
     if (!sala) {
-      return res.status(404).json({ error: 'Sala nao encontrada' });
+      return res.status(404).json({ error: "Sala nao encontrada" });
     }
 
     return res.json(sala);
   } catch (error) {
-    console.error('Failed to fetch sala:', error);
-    return res.status(500).json({ error: 'Failed to fetch sala' });
+    console.error("Failed to fetch sala:", error);
+    return res.status(500).json({ error: "Failed to fetch sala" });
   }
 });
 
@@ -299,15 +334,22 @@ app.get('/salas/:id', async (req, res) => {
  *             schema:
  *               $ref: '#/components/schemas/Error'
  */
-app.post('/salas', async (req, res) => {
-  const { nome, capacidade, equipamento, precoHora, tipoServicoIds } = req.body || {};
+app.post("/salas", async (req, res) => {
+  const { nome, capacidade, equipamento, precoHora, tipoServicoIds } =
+    req.body || {};
   try {
-    const nova = await createSala({ nome, capacidade, equipamento, precoHora, tipoServicoIds });
+    const nova = await createSala({
+      nome,
+      capacidade,
+      equipamento,
+      precoHora,
+      tipoServicoIds,
+    });
     return res.status(201).json(nova);
   } catch (error) {
-    console.error('Failed to create sala:', error);
+    console.error("Failed to create sala:", error);
 
-    if (error.message?.startsWith('Ja existe uma sala com o nome')) {
+    if (error.message?.startsWith("Ja existe uma sala com o nome")) {
       return res.status(409).json({ error: error.message });
     }
 
@@ -382,22 +424,30 @@ app.post('/salas', async (req, res) => {
  *             schema:
  *               $ref: '#/components/schemas/Error'
  */
-app.put('/salas/:id', async (req, res) => {
+app.put("/salas/:id", async (req, res) => {
   const { id } = req.params;
-  const { nome, capacidade, equipamento, precoHora, tipoServicoIds, ativo } = req.body || {};
+  const { nome, capacidade, equipamento, precoHora, tipoServicoIds, ativo } =
+    req.body || {};
 
   try {
-    const salaAtualizada = await updateSala(id, { nome, capacidade, equipamento, precoHora, tipoServicoIds, ativo });
+    const salaAtualizada = await updateSala(id, {
+      nome,
+      capacidade,
+      equipamento,
+      precoHora,
+      tipoServicoIds,
+      ativo,
+    });
 
     if (!salaAtualizada) {
-      return res.status(404).json({ error: 'Sala nao encontrada' });
+      return res.status(404).json({ error: "Sala nao encontrada" });
     }
 
     return res.json(salaAtualizada);
   } catch (error) {
-    console.error('Failed to update sala:', error);
+    console.error("Failed to update sala:", error);
 
-    if (error.message?.startsWith('Ja existe uma sala com o nome')) {
+    if (error.message?.startsWith("Ja existe uma sala com o nome")) {
       return res.status(409).json({ error: error.message });
     }
 
@@ -451,19 +501,19 @@ app.put('/salas/:id', async (req, res) => {
  *             schema:
  *               $ref: '#/components/schemas/Error'
  */
-app.delete('/salas/:id', async (req, res) => {
+app.delete("/salas/:id", async (req, res) => {
   const { id } = req.params;
 
   try {
     const result = await deleteSala(id);
     if (!result) {
-      return res.status(404).json({ error: 'Sala nao encontrada' });
+      return res.status(404).json({ error: "Sala nao encontrada" });
     }
 
     return res.json(result);
   } catch (error) {
-    console.error('Failed to delete sala:', error);
-    return res.status(500).json({ error: 'Failed to delete sala' });
+    console.error("Failed to delete sala:", error);
+    return res.status(500).json({ error: "Failed to delete sala" });
   }
 });
 
@@ -537,19 +587,19 @@ app.delete('/salas/:id', async (req, res) => {
  *             schema:
  *               $ref: '#/components/schemas/Error'
  */
-app.post('/salas/:id/servicos', async (req, res) => {
+app.post("/salas/:id/servicos", async (req, res) => {
   const { id } = req.params;
   const { tipoServicoId } = req.body || {};
   if (!tipoServicoId) {
-    return res.status(400).json({ error: 'tipoServicoId e obrigatorio' });
+    return res.status(400).json({ error: "tipoServicoId e obrigatorio" });
   }
   try {
     const associacao = await addServicoToSala({ salaId: id, tipoServicoId });
     return res.status(201).json(associacao);
   } catch (error) {
-    console.error('Failed to add servico to sala:', error);
+    console.error("Failed to add servico to sala:", error);
 
-    if (error.message?.startsWith('Este servico ja esta associado')) {
+    if (error.message?.startsWith("Este servico ja esta associado")) {
       return res.status(409).json({ error: error.message });
     }
 
@@ -587,14 +637,14 @@ app.post('/salas/:id/servicos', async (req, res) => {
  *             schema:
  *               $ref: '#/components/schemas/Error'
  */
-app.get('/salas/:id/servicos', async (req, res) => {
+app.get("/salas/:id/servicos", async (req, res) => {
   const { id } = req.params;
   try {
     const servicos = await getServicosBySala(id);
     return res.json(servicos);
   } catch (error) {
-    console.error('Failed to fetch servicos da sala:', error);
-    return res.status(500).json({ error: 'Failed to fetch servicos da sala' });
+    console.error("Failed to fetch servicos da sala:", error);
+    return res.status(500).json({ error: "Failed to fetch servicos da sala" });
   }
 });
 
@@ -648,14 +698,17 @@ app.get('/salas/:id/servicos', async (req, res) => {
  *             schema:
  *               $ref: '#/components/schemas/Error'
  */
-app.delete('/salas/:id/servicos/:servicoId', async (req, res) => {
+app.delete("/salas/:id/servicos/:servicoId", async (req, res) => {
   const { id, servicoId } = req.params;
   try {
-    const result = await removeServicoFromSala({ salaId: id, tipoServicoId: servicoId });
+    const result = await removeServicoFromSala({
+      salaId: id,
+      tipoServicoId: servicoId,
+    });
     return res.json(result);
   } catch (error) {
-    console.error('Failed to remove servico from sala:', error);
-    if (error.message?.startsWith('Associacao nao encontrada')) {
+    console.error("Failed to remove servico from sala:", error);
+    if (error.message?.startsWith("Associacao nao encontrada")) {
       return res.status(404).json({ error: error.message });
     }
     return res.status(500).json({ error: error.message });
@@ -684,13 +737,13 @@ app.delete('/salas/:id/servicos/:servicoId', async (req, res) => {
  *             schema:
  *               $ref: '#/components/schemas/Error'
  */
-app.get('/funcionarios', async (_req, res) => {
+app.get("/funcionarios", async (_req, res) => {
   try {
     const funcionarios = await getAllFuncionarios();
     return res.json(funcionarios);
   } catch (error) {
-    console.error('Failed to fetch funcionarios:', error);
-    return res.status(500).json({ error: 'Failed to fetch funcionarios' });
+    console.error("Failed to fetch funcionarios:", error);
+    return res.status(500).json({ error: "Failed to fetch funcionarios" });
   }
 });
 
@@ -733,19 +786,19 @@ app.get('/funcionarios', async (_req, res) => {
  *             schema:
  *               $ref: '#/components/schemas/Error'
  */
-app.get('/funcionarios/:id', async (req, res) => {
+app.get("/funcionarios/:id", async (req, res) => {
   const { id } = req.params;
 
   try {
     const funcionario = await getFuncionarioById(id);
     if (!funcionario) {
-      return res.status(404).json({ error: 'Funcionario nao encontrado' });
+      return res.status(404).json({ error: "Funcionario nao encontrado" });
     }
 
     return res.json(funcionario);
   } catch (error) {
-    console.error('Failed to fetch funcionario:', error);
-    return res.status(500).json({ error: 'Failed to fetch funcionario' });
+    console.error("Failed to fetch funcionario:", error);
+    return res.status(500).json({ error: "Failed to fetch funcionario" });
   }
 });
 
@@ -811,11 +864,24 @@ app.get('/funcionarios/:id', async (req, res) => {
  *                 value:
  *                   error: 'Ja existe um funcionario com o email "sofia.r@bet.com".'
  */
-app.post('/funcionarios', async (req, res) => {
-  const { nomeCompleto, cargo, telefone, email, porteAnimais, tipoServicoIds, horario } = req.body || {};
+app.post("/funcionarios", async (req, res) => {
+  const {
+    nomeCompleto,
+    cargo,
+    telefone,
+    email,
+    porteAnimais,
+    tipoServicoIds,
+    horario,
+  } = req.body || {};
 
   if (!nomeCompleto || !cargo || !telefone || !email || !horario) {
-    return res.status(400).json({ error: 'nomeCompleto, cargo, telefone, email e horario sao obrigatorios' });
+    return res
+      .status(400)
+      .json({
+        error:
+          "nomeCompleto, cargo, telefone, email e horario sao obrigatorios",
+      });
   }
 
   try {
@@ -831,9 +897,9 @@ app.post('/funcionarios', async (req, res) => {
 
     return res.status(201).json(novoFuncionario);
   } catch (error) {
-    console.error('Failed to create funcionario:', error);
+    console.error("Failed to create funcionario:", error);
 
-    if (error.message?.startsWith('Ja existe um funcionario com o email')) {
+    if (error.message?.startsWith("Ja existe um funcionario com o email")) {
       return res.status(409).json({ error: error.message });
     }
 
@@ -906,12 +972,25 @@ app.post('/funcionarios', async (req, res) => {
  *                 value:
  *                   error: 'Ja existe um funcionario com o email "sofia.r@bet.com".'
  */
-app.put('/funcionarios/:id', async (req, res) => {
+app.put("/funcionarios/:id", async (req, res) => {
   const { id } = req.params;
-  const { nomeCompleto, cargo, telefone, email, porteAnimais, tipoServicoIds, horario } = req.body || {};
+  const {
+    nomeCompleto,
+    cargo,
+    telefone,
+    email,
+    porteAnimais,
+    tipoServicoIds,
+    horario,
+  } = req.body || {};
 
   if (!nomeCompleto || !cargo || !telefone || !email || !horario) {
-    return res.status(400).json({ error: 'nomeCompleto, cargo, telefone, email e horario sao obrigatorios' });
+    return res
+      .status(400)
+      .json({
+        error:
+          "nomeCompleto, cargo, telefone, email e horario sao obrigatorios",
+      });
   }
 
   try {
@@ -926,14 +1005,14 @@ app.put('/funcionarios/:id', async (req, res) => {
     });
 
     if (!funcionarioAtualizado) {
-      return res.status(404).json({ error: 'Funcionario nao encontrado' });
+      return res.status(404).json({ error: "Funcionario nao encontrado" });
     }
 
     return res.json(funcionarioAtualizado);
   } catch (error) {
-    console.error('Failed to update funcionario:', error);
+    console.error("Failed to update funcionario:", error);
 
-    if (error.message?.startsWith('Ja existe um funcionario com o email')) {
+    if (error.message?.startsWith("Ja existe um funcionario com o email")) {
       return res.status(409).json({ error: error.message });
     }
 
@@ -987,24 +1066,24 @@ app.put('/funcionarios/:id', async (req, res) => {
  *             schema:
  *               $ref: '#/components/schemas/Error'
  */
-app.delete('/funcionarios/:id', async (req, res) => {
+app.delete("/funcionarios/:id", async (req, res) => {
   const { id } = req.params;
 
   try {
     const result = await deleteFuncionario(id);
     if (!result) {
-      return res.status(404).json({ error: 'Funcionario nao encontrado' });
+      return res.status(404).json({ error: "Funcionario nao encontrado" });
     }
 
     return res.json(result);
   } catch (error) {
-    console.error('Failed to delete funcionario:', error);
-    return res.status(500).json({ error: 'Failed to delete funcionario' });
+    console.error("Failed to delete funcionario:", error);
+    return res.status(500).json({ error: "Failed to delete funcionario" });
   }
 });
 
 // ─── CLIENTES ─────────────────────────────────────────────────────────────────
- 
+
 /**
  * @swagger
  * /clientes:
@@ -1017,14 +1096,15 @@ app.delete('/funcionarios/:id', async (req, res) => {
  *       500:
  *         description: Erro interno
  */
-app.get('/clientes', async (_req, res) => {
-  try { return res.json(await getAllClientes()); }
-  catch (error) {
-    console.error('Failed to fetch clientes:', error);
-    return res.status(500).json({ error: 'Failed to fetch clientes' });
+app.get("/clientes", async (_req, res) => {
+  try {
+    return res.json(await getAllClientes());
+  } catch (error) {
+    console.error("Failed to fetch clientes:", error);
+    return res.status(500).json({ error: "Failed to fetch clientes" });
   }
 });
- 
+
 /**
  * @swagger
  * /clientes/{id}:
@@ -1032,17 +1112,18 @@ app.get('/clientes', async (_req, res) => {
  *     summary: Obtem um cliente por id (inclui animais)
  *     tags: [Clientes]
  */
-app.get('/clientes/:id', async (req, res) => {
+app.get("/clientes/:id", async (req, res) => {
   try {
     const cliente = await getClienteById(req.params.id);
-    if (!cliente) return res.status(404).json({ error: 'Cliente nao encontrado' });
+    if (!cliente)
+      return res.status(404).json({ error: "Cliente nao encontrado" });
     return res.json(cliente);
   } catch (error) {
-    console.error('Failed to fetch cliente:', error);
-    return res.status(500).json({ error: 'Failed to fetch cliente' });
+    console.error("Failed to fetch cliente:", error);
+    return res.status(500).json({ error: "Failed to fetch cliente" });
   }
 });
- 
+
 /**
  * @swagger
  * /clientes:
@@ -1073,28 +1154,37 @@ app.get('/clientes/:id', async (req, res) => {
  *       409:
  *         description: Email ou NIF duplicado
  */
-app.post('/clientes', async (req, res) => {
+app.post("/clientes", async (req, res) => {
   const { nome, email, telefone, password, nif, morada } = req.body || {};
- 
+
   if (!nome || !email || !telefone || !password) {
-    return res.status(400).json({ error: 'nome, email, telefone e password sao obrigatorios' });
+    return res
+      .status(400)
+      .json({ error: "nome, email, telefone e password sao obrigatorios" });
   }
- 
+
   try {
-    const novoCliente = await createClienteTemporario({ nome, email, telefone, password, nif, morada });
+    const novoCliente = await createClienteTemporario({
+      nome,
+      email,
+      telefone,
+      password,
+      nif,
+      morada,
+    });
     return res.status(201).json(novoCliente);
   } catch (error) {
-    console.error('Failed to create cliente:', error);
+    console.error("Failed to create cliente:", error);
     if (
-      error.message?.startsWith('Já existe uma conta com o email') ||
-      error.message?.startsWith('Já existe um cliente com o NIF')
+      error.message?.startsWith("Já existe uma conta com o email") ||
+      error.message?.startsWith("Já existe um cliente com o NIF")
     ) {
       return res.status(409).json({ error: error.message });
     }
     return res.status(400).json({ error: error.message });
   }
 });
- 
+
 /**
  * @swagger
  * /clientes/{id}:
@@ -1102,22 +1192,28 @@ app.post('/clientes', async (req, res) => {
  *     summary: Cancela e elimina um cliente temporário (PENDENTE_VERIFICACAO sem animais)
  *     tags: [Clientes]
  */
-app.delete('/clientes/:id', async (req, res) => {
+app.delete("/clientes/:id", async (req, res) => {
   try {
     const result = await cancelarClienteTemporario(req.params.id);
-    if (!result) return res.status(404).json({ error: 'Cliente nao encontrado' });
+    if (!result)
+      return res.status(404).json({ error: "Cliente nao encontrado" });
     if (!result.cancelled) {
-      return res.status(409).json({ error: 'Nao e possivel cancelar um cliente ja confirmado ou com animais registados.' });
+      return res
+        .status(409)
+        .json({
+          error:
+            "Nao e possivel cancelar um cliente ja confirmado ou com animais registados.",
+        });
     }
     return res.json(result);
   } catch (error) {
-    console.error('Failed to cancel cliente:', error);
-    return res.status(500).json({ error: 'Failed to cancel cliente' });
+    console.error("Failed to cancel cliente:", error);
+    return res.status(500).json({ error: "Failed to cancel cliente" });
   }
 });
- 
+
 // ─── ANIMAIS ──────────────────────────────────────────────────────────────────
- 
+
 /**
  * @swagger
  * /clientes/{id}/animais/confirmar:
@@ -1154,28 +1250,37 @@ app.delete('/clientes/:id', async (req, res) => {
  *       404:
  *         description: Cliente não encontrado
  */
-app.post('/clientes/:id/animais/confirmar', async (req, res) => {
+app.post("/clientes/:id/animais/confirmar", async (req, res) => {
   const { id } = req.params;
-  const { nome, especie, raca, porte, dataNascimento, alergias, observacoes } = req.body || {};
- 
+  const { nome, especie, raca, porte, dataNascimento, alergias, observacoes } =
+    req.body || {};
+
   if (!nome || !especie || !porte) {
-    return res.status(400).json({ error: 'nome, especie e porte sao obrigatorios' });
+    return res
+      .status(400)
+      .json({ error: "nome, especie e porte sao obrigatorios" });
   }
- 
+
   try {
     const result = await confirmarClienteComAnimal(id, {
-      nome, especie, raca, porte, dataNascimento, alergias, observacoes,
+      nome,
+      especie,
+      raca,
+      porte,
+      dataNascimento,
+      alergias,
+      observacoes,
     });
     return res.status(201).json(result);
   } catch (error) {
-    console.error('Failed to confirm cliente com animal:', error);
-    if (error.message === 'Cliente não encontrado.') {
+    console.error("Failed to confirm cliente com animal:", error);
+    if (error.message === "Cliente não encontrado.") {
       return res.status(404).json({ error: error.message });
     }
     return res.status(400).json({ error: error.message });
   }
 });
- 
+
 /**
  * @swagger
  * /clientes/{id}/animais:
@@ -1183,14 +1288,15 @@ app.post('/clientes/:id/animais/confirmar', async (req, res) => {
  *     summary: Lista os animais de um cliente
  *     tags: [Clientes]
  */
-app.get('/clientes/:id/animais', async (req, res) => {
-  try { return res.json(await getAnimaisByCliente(req.params.id)); }
-  catch (error) {
-    console.error('Failed to fetch animais:', error);
-    return res.status(500).json({ error: 'Failed to fetch animais' });
+app.get("/clientes/:id/animais", async (req, res) => {
+  try {
+    return res.json(await getAnimaisByCliente(req.params.id));
+  } catch (error) {
+    console.error("Failed to fetch animais:", error);
+    return res.status(500).json({ error: "Failed to fetch animais" });
   }
 });
- 
+
 /**
  * @swagger
  * /clientes/{id}/animais:
@@ -1225,58 +1331,71 @@ app.get('/clientes/:id/animais', async (req, res) => {
  *       404:
  *         description: Cliente não encontrado
  */
-app.post('/clientes/:id/animais', async (req, res) => {
+app.post("/clientes/:id/animais", async (req, res) => {
   const { id } = req.params;
-  const { nome, especie, raca, porte, dataNascimento, alergias, observacoes } = req.body || {};
- 
+  const { nome, especie, raca, porte, dataNascimento, alergias, observacoes } =
+    req.body || {};
+
   if (!nome || !especie || !porte) {
-    return res.status(400).json({ error: 'nome, especie e porte sao obrigatorios' });
+    return res
+      .status(400)
+      .json({ error: "nome, especie e porte sao obrigatorios" });
   }
- 
+
   try {
-    const novoAnimal = await createAnimal(id, { nome, especie, raca, porte, dataNascimento, alergias, observacoes });
+    const novoAnimal = await createAnimal(id, {
+      nome,
+      especie,
+      raca,
+      porte,
+      dataNascimento,
+      alergias,
+      observacoes,
+    });
     return res.status(201).json(novoAnimal);
   } catch (error) {
-    console.error('Failed to create animal:', error);
-    if (error.message === 'Cliente não encontrado.') {
+    console.error("Failed to create animal:", error);
+    if (error.message === "Cliente não encontrado.") {
       return res.status(404).json({ error: error.message });
     }
     return res.status(400).json({ error: error.message });
   }
 });
 
-app.get('/events', async (_req, res) => {
+app.get("/events", async (_req, res) => {
   try {
     const events = await getAllEvents();
     return res.json(events);
   } catch (error) {
-    console.error('Failed to fetch events:', error);
-    return res.status(500).json({ error: 'Failed to fetch events' });
+    console.error("Failed to fetch events:", error);
+    return res.status(500).json({ error: "Failed to fetch events" });
   }
 });
 
-app.post('/events', async (req, res) => {
+app.post("/events", async (req, res) => {
   const { title, start, end } = req.body || {};
 
   if (!title || !start || !end) {
-    return res.status(400).json({ error: 'title, start, and end are required' });
+    return res
+      .status(400)
+      .json({ error: "title, start, and end are required" });
   }
 
   try {
     const newEvent = await createEvent({ title, start, end });
     return res.status(201).json(newEvent);
   } catch (error) {
-    console.error('Failed to create event:', error);
-    return res.status(500).json({ error: 'Failed to create event' });
+    console.error("Failed to create event:", error);
+    return res.status(500).json({ error: "Failed to create event" });
   }
 });
 
 async function startServer() {
   try {
     await prisma.$connect();
-    console.log('Database connection ready.');
+    console.log("Database connection ready.");
   } catch (error) {
-    console.error('Database connection failed:', error);
+    console.error("Database connection failed:", error);
     process.exit(1);
   }
 
@@ -1291,35 +1410,40 @@ async function startServer() {
     });
   };
 
-  process.on('SIGINT', shutdown);
-  process.on('SIGTERM', shutdown);
+  process.on("SIGINT", shutdown);
+  process.on("SIGTERM", shutdown);
 }
 
 // ROTAS DE TESTE
 // Estas rotas só estão disponíveis em ambiente de teste (NODE_ENV=test).
-// São usadas pelos testes de aceitação (Cypress) para limpar dados criados durante os testes, 
+// São usadas pelos testes de aceitação (Cypress) para limpar dados criados durante os testes,
 // garantindo que a base de dados não acumula lixo.
 // NUNCA devem ser usadas em produção.
 
-app.delete('/test/salas-cypress', async (_req, res) => {
+app.delete("/test/salas-cypress", async (_req, res) => {
   // Só funciona em ambiente de teste
-  if (process.env.NODE_ENV !== 'test') {
-    return res.status(403).json({ error: 'Apenas disponivel em ambiente de teste.' });
+  if (process.env.NODE_ENV !== "test") {
+    return res
+      .status(403)
+      .json({ error: "Apenas disponivel em ambiente de teste." });
   }
 
   try {
     // Apaga salas criadas pelos testes Cypress — identificadas pelo prefixo do nome
     await prisma.salaServico.deleteMany({
-      where: { sala: { nome: { startsWith: 'Sala Cypress' } } },
-    })
+      where: { sala: { nome: { startsWith: "Sala Cypress" } } },
+    });
     await prisma.sala.deleteMany({
-      where: { nome: { startsWith: 'Sala Cypress' } },
-    })
+      where: { nome: { startsWith: "Sala Cypress" } },
+    });
 
-    return res.json({ ok: true, message: 'Salas de teste removidas com sucesso.' });
+    return res.json({
+      ok: true,
+      message: "Salas de teste removidas com sucesso.",
+    });
   } catch (error) {
-    console.error('Failed to cleanup test salas:', error);
-    return res.status(500).json({ error: 'Erro ao limpar salas de teste.' });
+    console.error("Failed to cleanup test salas:", error);
+    return res.status(500).json({ error: "Erro ao limpar salas de teste." });
   }
 });
 
