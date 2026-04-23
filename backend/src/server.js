@@ -34,6 +34,15 @@ const {
   updateFuncionario,
   deleteFuncionario,
 } = require("./repositories/repositorioFuncionarios");
+const {
+  getAllClientes,
+  getClienteById,
+  createClienteTemporario,
+  cancelarClienteTemporario,
+  confirmarClienteComAnimal,
+  createAnimal,
+  getAnimaisByCliente,
+} = require('./repositories/repositorioClientes');
 
 const app = express();
 const PORT = Number(process.env.PORT || 5000);
@@ -41,6 +50,251 @@ const PORT = Number(process.env.PORT || 5000);
 app.use(cors({ origin: "http://localhost:3000" }));
 app.use(express.json());
 app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+
+
+// ─── CLIENTES ─────────────────────────────────────────────────────────────────
+ 
+/**
+ * @swagger
+ * /clientes:
+ *   get:
+ *     summary: Lista todos os clientes confirmados (ATIVA) com os seus animais
+ *     tags: [Clientes]
+ *     responses:
+ *       200:
+ *         description: Lista de clientes
+ *       500:
+ *         description: Erro interno
+ */
+app.get('/clientes', async (_req, res) => {
+  try { return res.json(await getAllClientes()); }
+  catch (error) {
+    console.error('Failed to fetch clientes:', error);
+    return res.status(500).json({ error: 'Failed to fetch clientes' });
+  }
+});
+ 
+/**
+ * @swagger
+ * /clientes/{id}:
+ *   get:
+ *     summary: Obtem um cliente por id (inclui animais)
+ *     tags: [Clientes]
+ */
+app.get('/clientes/:id', async (req, res) => {
+  try {
+    const cliente = await getClienteById(req.params.id);
+    if (!cliente) return res.status(404).json({ error: 'Cliente nao encontrado' });
+    return res.json(cliente);
+  } catch (error) {
+    console.error('Failed to fetch cliente:', error);
+    return res.status(500).json({ error: 'Failed to fetch cliente' });
+  }
+});
+ 
+/**
+ * @swagger
+ * /clientes:
+ *   post:
+ *     summary: >
+ *       Cria um cliente temporário (PENDENTE_VERIFICACAO).
+ *       O registo só fica oficial após POST /clientes/:id/animais/confirmar.
+ *     tags: [Clientes]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [nome, email, telefone, password]
+ *             properties:
+ *               nome:     { type: string }
+ *               email:    { type: string, format: email }
+ *               telefone: { type: string }
+ *               password: { type: string, minLength: 8 }
+ *               nif:      { type: string }
+ *               morada:   { type: string }
+ *     responses:
+ *       201:
+ *         description: Cliente temporário criado — aguarda confirmação via animal
+ *       400:
+ *         description: Dados inválidos
+ *       409:
+ *         description: Email ou NIF duplicado
+ */
+app.post('/clientes', async (req, res) => {
+  const { nome, email, telefone, password, nif, morada } = req.body || {};
+ 
+  if (!nome || !email || !telefone || !password) {
+    return res.status(400).json({ error: 'nome, email, telefone e password sao obrigatorios' });
+  }
+ 
+  try {
+    const novoCliente = await createClienteTemporario({ nome, email, telefone, password, nif, morada });
+    return res.status(201).json(novoCliente);
+  } catch (error) {
+    console.error('Failed to create cliente:', error);
+    if (
+      error.message?.startsWith('Já existe uma conta com o email') ||
+      error.message?.startsWith('Já existe um cliente com o NIF')
+    ) {
+      return res.status(409).json({ error: error.message });
+    }
+    return res.status(400).json({ error: error.message });
+  }
+});
+ 
+/**
+ * @swagger
+ * /clientes/{id}:
+ *   delete:
+ *     summary: Cancela e elimina um cliente temporário (PENDENTE_VERIFICACAO sem animais)
+ *     tags: [Clientes]
+ */
+app.delete('/clientes/:id', async (req, res) => {
+  try {
+    const result = await cancelarClienteTemporario(req.params.id);
+    if (!result) return res.status(404).json({ error: 'Cliente nao encontrado' });
+    if (!result.cancelled) {
+      return res.status(409).json({ error: 'Nao e possivel cancelar um cliente ja confirmado ou com animais registados.' });
+    }
+    return res.json(result);
+  } catch (error) {
+    console.error('Failed to cancel cliente:', error);
+    return res.status(500).json({ error: 'Failed to cancel cliente' });
+  }
+});
+ 
+// ─── ANIMAIS ──────────────────────────────────────────────────────────────────
+ 
+/**
+ * @swagger
+ * /clientes/{id}/animais/confirmar:
+ *   post:
+ *     summary: >
+ *       Regista o primeiro animal e confirma o cliente numa transação atómica.
+ *       estadoConta passa de PENDENTE_VERIFICACAO → ATIVA.
+ *     tags: [Clientes]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string, format: uuid }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [nome, especie, porte]
+ *             properties:
+ *               nome:           { type: string }
+ *               especie:        { type: string }
+ *               raca:           { type: string }
+ *               porte:          { type: string }
+ *               dataNascimento: { type: string, format: date }
+ *               alergias:       { type: string }
+ *               observacoes:    { type: string }
+ *     responses:
+ *       201:
+ *         description: Cliente confirmado e animal registado
+ *       400:
+ *         description: Dados inválidos ou cliente já confirmado
+ *       404:
+ *         description: Cliente não encontrado
+ */
+app.post('/clientes/:id/animais/confirmar', async (req, res) => {
+  const { id } = req.params;
+  const { nome, especie, raca, porte, dataNascimento, alergias, observacoes } = req.body || {};
+ 
+  if (!nome || !especie || !porte) {
+    return res.status(400).json({ error: 'nome, especie e porte sao obrigatorios' });
+  }
+ 
+  try {
+    const result = await confirmarClienteComAnimal(id, {
+      nome, especie, raca, porte, dataNascimento, alergias, observacoes,
+    });
+    return res.status(201).json(result);
+  } catch (error) {
+    console.error('Failed to confirm cliente com animal:', error);
+    if (error.message === 'Cliente não encontrado.') {
+      return res.status(404).json({ error: error.message });
+    }
+    return res.status(400).json({ error: error.message });
+  }
+});
+ 
+/**
+ * @swagger
+ * /clientes/{id}/animais:
+ *   get:
+ *     summary: Lista os animais de um cliente
+ *     tags: [Clientes]
+ */
+app.get('/clientes/:id/animais', async (req, res) => {
+  try { return res.json(await getAnimaisByCliente(req.params.id)); }
+  catch (error) {
+    console.error('Failed to fetch animais:', error);
+    return res.status(500).json({ error: 'Failed to fetch animais' });
+  }
+});
+ 
+/**
+ * @swagger
+ * /clientes/{id}/animais:
+ *   post:
+ *     summary: Adiciona um animal adicional a um cliente já confirmado (ATIVA)
+ *     tags: [Clientes]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string, format: uuid }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [nome, especie, porte]
+ *             properties:
+ *               nome:           { type: string }
+ *               especie:        { type: string }
+ *               raca:           { type: string }
+ *               porte:          { type: string }
+ *               dataNascimento: { type: string, format: date }
+ *               alergias:       { type: string }
+ *               observacoes:    { type: string }
+ *     responses:
+ *       201:
+ *         description: Animal registado
+ *       400:
+ *         description: Dados inválidos ou cliente não confirmado
+ *       404:
+ *         description: Cliente não encontrado
+ */
+app.post('/clientes/:id/animais', async (req, res) => {
+  const { id } = req.params;
+  const { nome, especie, raca, porte, dataNascimento, alergias, observacoes } = req.body || {};
+ 
+  if (!nome || !especie || !porte) {
+    return res.status(400).json({ error: 'nome, especie e porte sao obrigatorios' });
+  }
+ 
+  try {
+    const novoAnimal = await createAnimal(id, { nome, especie, raca, porte, dataNascimento, alergias, observacoes });
+    return res.status(201).json(novoAnimal);
+  } catch (error) {
+    console.error('Failed to create animal:', error);
+    if (error.message === 'Cliente não encontrado.') {
+      return res.status(404).json({ error: error.message });
+    }
+    return res.status(400).json({ error: error.message });
+  }
+});
+
+
 
 /**
  * @swagger

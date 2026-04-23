@@ -2,7 +2,8 @@ import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { MainLayout, CompactLayout } from './layouts';
 import ServicosPage from './pages/servicos/servicos';
-import { Home, Calendar, Login, Salas, SalaDetalhes, Users} from './pages'
+import Clientes from './pages/clientes/clientes';
+import { Home, Calendar, Login, Salas, SalaDetalhes, Users } from './pages'
 import App from './App';
 
 
@@ -33,6 +34,18 @@ export default function AppRoutes() {
                             } 
                         />
                     } 
+                />
+                <Route
+                    path="/clientes"
+                    element={
+                        <PrivateRoute
+                            element={
+                                <CompactLayout showBack>
+                                    <Clientes />
+                                </CompactLayout>
+                            }
+                        />
+                    }
                 />
                 <Route
                     path="/servicos"
