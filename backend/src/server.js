@@ -10,7 +10,9 @@ const {
 const {
   getAllTiposServico,
   createTipoServico,
+  updateTipoServico,
   deleteTipoServico,
+  reativarTipoServico,
   getAllRegrasPreco,
   createRegraPreco,
 } = require("./repositories/repositorioServicos");
@@ -42,6 +44,7 @@ const {
   getAnimaisByCliente,
 } = require("./repositories/repositorioClientes");
 
+
 const app = express();
 const PORT = Number(process.env.PORT || 5000);
 
@@ -49,6 +52,24 @@ app.use(cors({ origin: "http://localhost:3000" }));
 app.use(express.json());
 app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
+/**
+ * @swagger
+ * /servicos:
+ *   get:
+ *     summary: Lista todos os tipos de serviço ativos
+ *     tags: [Servicos]
+ *     responses:
+ *       200:
+ *         description: Lista de tipos de serviço obtida com sucesso
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/TipoServico'
+ *       500:
+ *         description: Erro interno ao obter serviços
+ */
 app.get("/servicos", async (_req, res) => {
   try {
     const servicos = await getAllTiposServico();
@@ -59,6 +80,32 @@ app.get("/servicos", async (_req, res) => {
   }
 });
 
+/**
+ * @swagger
+ * /servicos:
+ *   post:
+ *     summary: Cria um novo tipo de serviço
+ *     tags: [Servicos]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [tipo]
+ *             properties:
+ *               tipo:
+ *                 type: string
+ *                 description: Nome do tipo de serviço
+ *                 example: BANHO
+ *     responses:
+ *       201:
+ *         description: Tipo de serviço criado com sucesso
+ *       400:
+ *         description: Dados inválidos
+ *       500:
+ *         description: Erro interno ao criar serviço
+ */
 app.post("/servicos", async (req, res) => {
   const { tipo } = req.body || {};
   if (!tipo) {
@@ -70,6 +117,91 @@ app.post("/servicos", async (req, res) => {
   } catch (error) {
     console.error("Failed to create servico:", error);
     return res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * @swagger
+ * /servicos/{id}:
+ *   put:
+ *     summary: Atualiza um tipo de serviço e substitui as suas regras de preço
+ *     tags: [Servicos]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: ID do tipo de serviço
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [tipo, regrasPreco]
+ *             properties:
+ *               tipo:
+ *                 type: string
+ *                 example: 'BANHO'
+ *               regrasPreco:
+ *                 type: array
+ *                 items:
+ *                   type: object
+ *                   required: [porteAnimal, precoBase, duracaoMinutos]
+ *                   properties:
+ *                     porteAnimal:
+ *                       $ref: '#/components/schemas/PorteEnum'
+ *                     precoBase:
+ *                       type: number
+ *                       example: 25.00
+ *                     duracaoMinutos:
+ *                       type: integer
+ *                       example: 45
+ *     responses:
+ *       200:
+ *         description: Serviço atualizado com sucesso
+ *       400:
+ *         description: Dados inválidos
+ *       404:
+ *         description: Serviço não encontrado
+ *       409:
+ *         description: Nome já existe
+ *       500:
+ *         description: Erro interno
+ */
+app.put("/servicos/:id", async (req, res) => {
+  const { id } = req.params;
+  const { tipo, regrasPreco } = req.body || {};
+
+  if (!tipo) {
+    return res.status(400).json({ error: "tipo é obrigatório" });
+  }
+  if (!Array.isArray(regrasPreco) || regrasPreco.length === 0) {
+    return res
+      .status(400)
+      .json({
+        error: "regrasPreco é obrigatório e deve conter pelo menos uma regra",
+      });
+  }
+
+  try {
+    const resultado = await updateTipoServico(id, { tipo, regrasPreco });
+
+    if (!resultado) {
+      return res.status(404).json({ error: "Servico nao encontrado" });
+    }
+
+    return res.json(resultado);
+  } catch (error) {
+    console.error("Failed to update servico:", error);
+
+    if (error.message?.startsWith("Já existe um serviço com o nome")) {
+      return res.status(409).json({ error: error.message });
+    }
+
+    return res.status(400).json({ error: error.message });
   }
 });
 
@@ -132,10 +264,73 @@ app.delete("/servicos/:id", async (req, res) => {
     return res.json(result);
   } catch (error) {
     console.error("Failed to delete servico:", error);
+
+    // Agendamentos futuros impedem a inativação — conflito de negócio
+    if (error.message?.startsWith("Não é possível inativar o serviço")) {
+      return res.status(409).json({ error: error.message });
+    }
+
     return res.status(500).json({ error: "Failed to delete servico" });
   }
 });
 
+/**
+ * @swagger
+ * /servicos/{id}/reativar:
+ *   post:
+ *     summary: Reativa um tipo de serviço inativo
+ *     tags: [Servicos]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: ID do tipo de serviço
+ *     responses:
+ *       200:
+ *         description: Serviço reativado com sucesso
+ *       404:
+ *         description: Serviço não encontrado
+ *       500:
+ *         description: Erro interno
+ */
+app.post("/servicos/:id/reativar", async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const result = await reativarTipoServico(id);
+
+    if (!result) {
+      return res.status(404).json({ error: "Servico nao encontrado" });
+    }
+
+    return res.json(result);
+  } catch (error) {
+    console.error("Failed to reativar servico:", error);
+    return res.status(500).json({ error: "Failed to reativar servico" });
+  }
+});
+
+/**
+ * @swagger
+ * /regras-preco:
+ *   get:
+ *     summary: Lista todas as regras de preço
+ *     tags: [RegrasPreco]
+ *     responses:
+ *       200:
+ *         description: Lista de regras de preço obtida com sucesso
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/RegraPreco'
+ *       500:
+ *         description: Erro interno ao obter regras de preço
+ */
 app.get("/regras-preco", async (_req, res) => {
   try {
     const regras = await getAllRegrasPreco();
@@ -146,6 +341,46 @@ app.get("/regras-preco", async (_req, res) => {
   }
 });
 
+/**
+ * @swagger
+ * /regras-preco:
+ *   post:
+ *     summary: Cria uma nova regra de preço para um tipo de serviço
+ *     tags: [RegrasPreco]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - tipoServicoId
+ *               - porteAnimal
+ *               - precoBase
+ *               - duracaoMinutos
+ *             properties:
+ *               tipoServicoId:
+ *                 type: string
+ *                 format: uuid
+ *                 description: ID do tipo de serviço associado
+ *               porteAnimal:
+ *                 $ref: '#/components/schemas/PorteEnum'
+ *               precoBase:
+ *                 type: number
+ *                 description: Preço base do serviço
+ *                 example: 25.00
+ *               duracaoMinutos:
+ *                 type: integer
+ *                 description: Duração estimada do serviço em minutos
+ *                 example: 45
+ *     responses:
+ *       201:
+ *         description: Regra de preço criada com sucesso
+ *       400:
+ *         description: Dados inválidos
+ *       500:
+ *         description: Erro interno ao criar regra de preço
+ */
 app.post("/regras-preco", async (req, res) => {
   const { tipoServicoId, porteAnimal, precoBase, duracaoMinutos } =
     req.body || {};
