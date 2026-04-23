@@ -1,16 +1,16 @@
-import React from 'react';
-import { render, screen, waitFor, fireEvent } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
-import CreateClient from '../pages/clientes/cliente';
-import { ThemeProvider } from '../contexts/ThemeContext';
+import React from "react";
+import { render, screen, waitFor, fireEvent } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import Client from "../pages/clientes/clientes";
+import { ThemeProvider } from "../contexts/ThemeContext";
 
 let consoleErrorSpy;
 
 function renderClientes() {
   return render(
     <ThemeProvider>
-      <CreateClient />
-    </ThemeProvider>
+      <Client />
+    </ThemeProvider>,
   );
 }
 
@@ -22,26 +22,114 @@ function mockJsonResponse(data, ok = true, status = 200) {
   });
 }
 
-const CLIENTE_MOCK = {
-  id: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
-  nome: 'João Silva',
-  email: 'joao.silva@email.com',
-  telefone: '910000001',
-  nif: '123456789',
-  ativo: true,
-  estadoConta: 'ATIVA',
+// ── Mocks ──────────────────────────────────────────────────────────────────────
+
+const CLIENTE_TEMPORARIO_MOCK = {
+  id: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+  nome: "João Silva",
+  email: "joao.silva@email.com",
+  telefone: "910000001",
+  nif: "123456789",
+  ativo: false,
+  estadoConta: "PENDENTE_VERIFICACAO",
+  animais: [],
 };
 
-function mockDefaultFetch(clientesList = [CLIENTE_MOCK]) {
-  global.fetch.mockImplementationOnce(() => mockJsonResponse(clientesList));
+const CLIENTE_ATIVO_MOCK = {
+  ...CLIENTE_TEMPORARIO_MOCK,
+  ativo: true,
+  estadoConta: "ATIVA",
+  animais: [
+    {
+      id: "anim-1",
+      clienteId: CLIENTE_TEMPORARIO_MOCK.id,
+      nome: "Rex",
+      especie: "Cão",
+      raca: "Labrador",
+      porte: "GRANDE",
+      dataNascimento: "2020-03-15",
+      alergias: null,
+      observacoes: null,
+    },
+  ],
+};
+
+const ANIMAL_MOCK = {
+  id: "anim-1",
+  clienteId: CLIENTE_TEMPORARIO_MOCK.id,
+  nome: "Rex",
+  especie: "Cão",
+  raca: "Labrador",
+  porte: "GRANDE",
+  dataNascimento: "2020-03-15",
+  alergias: null,
+  observacoes: null,
+};
+
+const CONFIRMAR_RESULT_MOCK = {
+  cliente: CLIENTE_ATIVO_MOCK,
+  animal: ANIMAL_MOCK,
+};
+
+// Mock para o GET /clientes inicial
+function mockGetClientes(lista = [CLIENTE_ATIVO_MOCK]) {
+  global.fetch.mockImplementationOnce(() => mockJsonResponse(lista));
 }
 
-describe('CreateClient page', () => {
+// Preenche o formulário do passo 1 (dados do cliente)
+async function preencherFormularioCliente({
+  nome = "João Silva",
+  email = "joao.silva@email.com",
+  telefone = "910000001",
+  password = "password123",
+  confirmarPassword = "password123",
+  nif = "",
+} = {}) {
+  await userEvent.type(screen.getByLabelText(/Nome completo/i), nome);
+  await userEvent.type(screen.getByLabelText(/Email/i), email);
+  await userEvent.type(screen.getByLabelText(/Telefone/i), telefone);
+
+  // Preencher password (há dois campos: password e confirmar password)
+  const passwordInputs = screen.getAllByLabelText(/password/i);
+  await userEvent.type(passwordInputs[0], password);
+  await userEvent.type(passwordInputs[1], confirmarPassword);
+
+  if (nif) {
+    await userEvent.type(screen.getByLabelText(/NIF/i), nif);
+  }
+}
+
+// Preenche o formulário do passo 2 (dados do animal)
+async function preencherFormularioAnimal({
+  nome = "Rex",
+  especie = "Cão",
+  porte = "GRANDE",
+} = {}) {
+  await userEvent.type(screen.getByLabelText(/Nome do animal/i), nome);
+  await userEvent.type(screen.getByLabelText(/Espécie/i), especie);
+
+  // Selecionar porte
+  fireEvent.mouseDown(screen.getByLabelText(/Porte/i));
+  const porteOption = await screen.findByText(
+    new RegExp(porte === "GRANDE" ? "Grande" : porte, "i"),
+  );
+  fireEvent.click(porteOption);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("Client page", () => {
   beforeAll(() => {
-    consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation((...args) => {
-      const firstArg = args[0];
-      if (typeof firstArg === 'string' && firstArg.includes('not wrapped in act')) return;
-    });
+    consoleErrorSpy = jest
+      .spyOn(console, "error")
+      .mockImplementation((...args) => {
+        const firstArg = args[0];
+        if (
+          typeof firstArg === "string" &&
+          firstArg.includes("not wrapped in act")
+        )
+          return;
+      });
   });
 
   beforeEach(() => {
@@ -56,233 +144,713 @@ describe('CreateClient page', () => {
     consoleErrorSpy.mockRestore();
   });
 
-  // ─── CARREGAMENTO INICIAL ────────────────────────────────────────────────
+  // ── CARREGAMENTO INICIAL ─────────────────────────────────────────────────
 
-  test('carrega clientes no mount', async () => {
-    mockDefaultFetch();
+  test("carrega clientes no mount e chama GET /clientes", async () => {
+    mockGetClientes();
     renderClientes();
 
-    expect(await screen.findByText('João Silva')).toBeInTheDocument();
-    expect(global.fetch).toHaveBeenCalledWith('http://localhost:5000/clientes');
+    expect(global.fetch).toHaveBeenCalledWith("http://localhost:5000/clientes");
+    expect(await screen.findByText("João Silva")).toBeInTheDocument();
   });
 
-  test('mostra mensagem quando nao existem clientes', async () => {
-    mockDefaultFetch([]);
+  test("mostra mensagem quando nao existem clientes", async () => {
+    mockGetClientes([]);
     renderClientes();
 
-    expect(await screen.findByText(/Ainda não existem clientes registados/i)).toBeInTheDocument();
+    expect(
+      await screen.findByText(/Ainda não existem clientes registados/i),
+    ).toBeInTheDocument();
   });
 
-  test('mostra chip Ativo para cliente ativo', async () => {
-    mockDefaultFetch();
+  test("mostra chip Ativo para cliente ativo", async () => {
+    mockGetClientes();
     renderClientes();
 
-    await screen.findByText('João Silva');
-    expect(screen.getByText('Ativo')).toBeInTheDocument();
+    await screen.findByText("João Silva");
+    expect(screen.getByText("Ativo")).toBeInTheDocument();
   });
 
-  // ─── VALIDAÇÃO DO FORMULÁRIO ─────────────────────────────────────────────
-
-  test('mostra erro quando nome esta vazio', async () => {
-    mockDefaultFetch();
+  test("mostra indicador de passos com passo 1 activo no inicio", async () => {
+    mockGetClientes([]);
     renderClientes();
 
-    await screen.findByText('Registo de Clientes');
-    await userEvent.click(screen.getByRole('button', { name: /Registar Cliente/i }));
+    await screen.findByText("Registo de Clientes");
+    expect(screen.getByText("1. Cliente")).toBeInTheDocument();
+    expect(screen.getByText("2. Animal")).toBeInTheDocument();
+    expect(screen.getByText("3. Concluído")).toBeInTheDocument();
+  });
 
-    expect(await screen.findByText('Nome é obrigatório.')).toBeInTheDocument();
+  test("mostra titulo Dados do Cliente no passo 1", async () => {
+    mockGetClientes([]);
+    renderClientes();
+
+    expect(await screen.findByText("Dados do Cliente")).toBeInTheDocument();
+  });
+
+  // ── VALIDAÇÃO PASSO 1 — DADOS DO CLIENTE ────────────────────────────────
+
+  test("mostra erro quando nome esta vazio ao tentar continuar", async () => {
+    mockGetClientes([]);
+    renderClientes();
+
+    await screen.findByText("Dados do Cliente");
+    await userEvent.click(
+      screen.getByRole("button", { name: /Continuar para o Animal/i }),
+    );
+
+    expect(await screen.findByText("Nome é obrigatório.")).toBeInTheDocument();
     expect(global.fetch).toHaveBeenCalledTimes(1); // só o GET inicial
   });
 
-  test('mostra erro quando email esta vazio', async () => {
-    mockDefaultFetch();
+  test("mostra erro quando email esta vazio", async () => {
+    mockGetClientes([]);
     renderClientes();
 
-    await screen.findByText('Registo de Clientes');
-    await userEvent.type(screen.getByLabelText(/Nome completo/i), 'Cliente Teste');
-    await userEvent.click(screen.getByRole('button', { name: /Registar Cliente/i }));
+    await screen.findByText("Dados do Cliente");
+    await userEvent.type(screen.getByLabelText(/Nome completo/i), "Teste");
+    await userEvent.click(
+      screen.getByRole("button", { name: /Continuar para o Animal/i }),
+    );
 
-    expect(await screen.findByText('Email é obrigatório.')).toBeInTheDocument();
+    expect(await screen.findByText("Email é obrigatório.")).toBeInTheDocument();
   });
 
-  test('mostra erro quando telefone esta vazio', async () => {
-    mockDefaultFetch();
+  test("mostra erro quando telefone esta vazio", async () => {
+    mockGetClientes([]);
     renderClientes();
 
-    await screen.findByText('Registo de Clientes');
-    await userEvent.type(screen.getByLabelText(/Nome completo/i), 'Cliente Teste');
-    await userEvent.type(screen.getByLabelText(/Email/i), 'cliente@email.com');
-    await userEvent.click(screen.getByRole('button', { name: /Registar Cliente/i }));
+    await screen.findByText("Dados do Cliente");
+    await userEvent.type(screen.getByLabelText(/Nome completo/i), "Teste");
+    await userEvent.type(screen.getByLabelText(/Email/i), "teste@email.com");
+    await userEvent.click(
+      screen.getByRole("button", { name: /Continuar para o Animal/i }),
+    );
 
-    expect(await screen.findByText('Telefone é obrigatório.')).toBeInTheDocument();
+    expect(
+      await screen.findByText("Telefone é obrigatório."),
+    ).toBeInTheDocument();
   });
 
-  test('mostra erro quando NIF invalido', async () => {
-    mockDefaultFetch();
+  test("mostra erro quando password esta vazia", async () => {
+    mockGetClientes([]);
     renderClientes();
 
-    await screen.findByText('Registo de Clientes');
-    await userEvent.type(screen.getByLabelText(/Nome completo/i), 'Cliente Teste');
-    await userEvent.type(screen.getByLabelText(/Email/i), 'cliente@email.com');
-    await userEvent.type(screen.getByLabelText(/Telefone/i), '910000001');
-    await userEvent.type(screen.getByLabelText(/NIF/i), '12345');
-    await userEvent.click(screen.getByRole('button', { name: /Registar Cliente/i }));
+    await screen.findByText("Dados do Cliente");
+    await userEvent.type(screen.getByLabelText(/Nome completo/i), "Teste");
+    await userEvent.type(screen.getByLabelText(/Email/i), "teste@email.com");
+    await userEvent.type(screen.getByLabelText(/Telefone/i), "910000001");
+    await userEvent.click(
+      screen.getByRole("button", { name: /Continuar para o Animal/i }),
+    );
 
-    expect(await screen.findByText('O NIF deve ter 9 dígitos numéricos.')).toBeInTheDocument();
+    expect(
+      await screen.findByText("Password é obrigatória."),
+    ).toBeInTheDocument();
   });
 
-  // ─── CRIAR CLIENTE ───────────────────────────────────────────────────────
+  test("mostra erro quando password tem menos de 8 caracteres", async () => {
+    mockGetClientes([]);
+    renderClientes();
 
-  test('submete com sucesso e envia payload correto', async () => {
-    const clienteCriado = {
-      ...CLIENTE_MOCK,
-      id: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
-      nome: 'Novo Cliente',
-      email: 'novo@email.com',
-    };
+    await screen.findByText("Dados do Cliente");
+    await userEvent.type(screen.getByLabelText(/Nome completo/i), "Teste");
+    await userEvent.type(screen.getByLabelText(/Email/i), "teste@email.com");
+    await userEvent.type(screen.getByLabelText(/Telefone/i), "910000001");
 
+    const passwordInputs = screen.getAllByLabelText(/password/i);
+    await userEvent.type(passwordInputs[0], "1234567"); // 7 chars
+    await userEvent.click(
+      screen.getByRole("button", { name: /Continuar para o Animal/i }),
+    );
+
+    expect(
+      await screen.findByText("A password deve ter pelo menos 8 caracteres."),
+    ).toBeInTheDocument();
+  });
+
+  test("mostra erro quando as passwords nao coincidem", async () => {
+    mockGetClientes([]);
+    renderClientes();
+
+    await screen.findByText("Dados do Cliente");
+    await userEvent.type(screen.getByLabelText(/Nome completo/i), "Teste");
+    await userEvent.type(screen.getByLabelText(/Email/i), "teste@email.com");
+    await userEvent.type(screen.getByLabelText(/Telefone/i), "910000001");
+
+    const passwordInputs = screen.getAllByLabelText(/password/i);
+    await userEvent.type(passwordInputs[0], "password123");
+    await userEvent.type(passwordInputs[1], "outrapassword");
+    await userEvent.click(
+      screen.getByRole("button", { name: /Continuar para o Animal/i }),
+    );
+
+    expect(
+      await screen.findByText("As passwords não coincidem."),
+    ).toBeInTheDocument();
+  });
+
+  test("mostra erro quando NIF invalido (menos de 9 digitos)", async () => {
+    mockGetClientes([]);
+    renderClientes();
+
+    await screen.findByText("Dados do Cliente");
+    await userEvent.type(screen.getByLabelText(/Nome completo/i), "Teste");
+    await userEvent.type(screen.getByLabelText(/Email/i), "teste@email.com");
+    await userEvent.type(screen.getByLabelText(/Telefone/i), "910000001");
+
+    const passwordInputs = screen.getAllByLabelText(/password/i);
+    await userEvent.type(passwordInputs[0], "password123");
+    await userEvent.type(passwordInputs[1], "password123");
+
+    await userEvent.type(screen.getByLabelText(/NIF/i), "12345");
+    await userEvent.click(
+      screen.getByRole("button", { name: /Continuar para o Animal/i }),
+    );
+
+    expect(
+      await screen.findByText("O NIF deve ter 9 dígitos numéricos."),
+    ).toBeInTheDocument();
+  });
+
+  // ── PASSO 1 → PASSO 2 ────────────────────────────────────────────────────
+
+  test("avanca para passo 2 apos POST /clientes com sucesso", async () => {
     global.fetch
-      .mockImplementationOnce(() => mockJsonResponse([]))         // GET /clientes
-      .mockImplementationOnce(() => mockJsonResponse(clienteCriado)) // POST /clientes
-      .mockImplementationOnce(() => mockJsonResponse([clienteCriado])); // GET /clientes reload
+      .mockImplementationOnce(() => mockJsonResponse([])) // GET /clientes
+      .mockImplementationOnce(() => mockJsonResponse(CLIENTE_TEMPORARIO_MOCK)); // POST /clientes
 
     renderClientes();
-    await screen.findByText('Registo de Clientes');
+    await screen.findByText("Dados do Cliente");
 
-    await userEvent.type(screen.getByLabelText(/Nome completo/i), 'Novo Cliente');
-    await userEvent.type(screen.getByLabelText(/Email/i), 'Novo@Email.com');
-    await userEvent.type(screen.getByLabelText(/Telefone/i), '910111111');
-    await userEvent.type(screen.getByLabelText(/NIF/i), '987654321');
+    await preencherFormularioCliente();
+    await userEvent.click(
+      screen.getByRole("button", { name: /Continuar para o Animal/i }),
+    );
 
-    await userEvent.click(screen.getByRole('button', { name: /Registar Cliente/i }));
-
-    await waitFor(() => {
-      expect(screen.getByText(/Novo Cliente.*registado com sucesso/i)).toBeInTheDocument();
-    });
-
-    const postCall = global.fetch.mock.calls[1];
-    expect(postCall[0]).toBe('http://localhost:5000/clientes');
-    expect(postCall[1].method).toBe('POST');
-
-    const payload = JSON.parse(postCall[1].body);
-    expect(payload.nome).toBe('Novo Cliente');
-    expect(payload.email).toBe('novo@email.com'); // normalizado para lowercase
-    expect(payload.telefone).toBe('910111111');
-    expect(payload.nif).toBe('987654321');
+    expect(await screen.findByText("Primeiro Animal")).toBeInTheDocument();
   });
 
-  test('submete sem NIF e nao envia campo nif', async () => {
-    const clienteCriado = {
-      ...CLIENTE_MOCK,
-      id: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',
-      nome: 'Sem NIF',
-      email: 'semnif@email.com',
-      nif: null,
-    };
-
+  test("envia payload correcto no POST /clientes", async () => {
     global.fetch
       .mockImplementationOnce(() => mockJsonResponse([]))
-      .mockImplementationOnce(() => mockJsonResponse(clienteCriado))
-      .mockImplementationOnce(() => mockJsonResponse([clienteCriado]));
+      .mockImplementationOnce(() => mockJsonResponse(CLIENTE_TEMPORARIO_MOCK));
 
     renderClientes();
-    await screen.findByText('Registo de Clientes');
+    await screen.findByText("Dados do Cliente");
 
-    await userEvent.type(screen.getByLabelText(/Nome completo/i), 'Sem NIF');
-    await userEvent.type(screen.getByLabelText(/Email/i), 'semnif@email.com');
-    await userEvent.type(screen.getByLabelText(/Telefone/i), '910222222');
-
-    await userEvent.click(screen.getByRole('button', { name: /Registar Cliente/i }));
-
-    await waitFor(() => {
-      expect(screen.getByText(/registado com sucesso/i)).toBeInTheDocument();
+    await preencherFormularioCliente({
+      nome: "Maria Santos",
+      email: "Maria@Email.com",
+      telefone: "910111111",
+      password: "minhapassword",
+      confirmarPassword: "minhapassword",
+      nif: "987654321",
     });
+    await userEvent.click(
+      screen.getByRole("button", { name: /Continuar para o Animal/i }),
+    );
+
+    await screen.findByText("Primeiro Animal");
 
     const postCall = global.fetch.mock.calls[1];
+    expect(postCall[0]).toBe("http://localhost:5000/clientes");
+    expect(postCall[1].method).toBe("POST");
+
     const payload = JSON.parse(postCall[1].body);
+    expect(payload.nome).toBe("Maria Santos");
+    expect(payload.email).toBe("maria@email.com"); // normalizado para lowercase
+    expect(payload.telefone).toBe("910111111");
+    expect(payload.nif).toBe("987654321");
+    expect(payload.password).toBe("minhapassword");
+    expect(payload.confirmarPassword).toBeUndefined(); // não enviado
+  });
+
+  test("nao envia NIF quando esta vazio", async () => {
+    global.fetch
+      .mockImplementationOnce(() => mockJsonResponse([]))
+      .mockImplementationOnce(() => mockJsonResponse(CLIENTE_TEMPORARIO_MOCK));
+
+    renderClientes();
+    await screen.findByText("Dados do Cliente");
+    await preencherFormularioCliente({ nif: "" });
+    await userEvent.click(
+      screen.getByRole("button", { name: /Continuar para o Animal/i }),
+    );
+
+    await screen.findByText("Primeiro Animal");
+
+    const payload = JSON.parse(global.fetch.mock.calls[1][1].body);
     expect(payload.nif).toBeUndefined();
   });
 
-  test('mostra erro 409 da API para email duplicado', async () => {
+  test("mostra erro 409 da API para email duplicado", async () => {
     global.fetch
       .mockImplementationOnce(() => mockJsonResponse([]))
       .mockImplementationOnce(() =>
-        mockJsonResponse({ error: 'Já existe uma conta com o email "joao@email.com".' }, false, 409)
+        mockJsonResponse(
+          { error: 'Já existe uma conta com o email "joao@email.com".' },
+          false,
+          409,
+        ),
       );
 
     renderClientes();
-    await screen.findByText('Registo de Clientes');
-
-    await userEvent.type(screen.getByLabelText(/Nome completo/i), 'João Duplicado');
-    await userEvent.type(screen.getByLabelText(/Email/i), 'joao@email.com');
-    await userEvent.type(screen.getByLabelText(/Telefone/i), '910333333');
-
-    await userEvent.click(screen.getByRole('button', { name: /Registar Cliente/i }));
+    await screen.findByText("Dados do Cliente");
+    await preencherFormularioCliente({ email: "joao@email.com" });
+    await userEvent.click(
+      screen.getByRole("button", { name: /Continuar para o Animal/i }),
+    );
 
     expect(
-      await screen.findByText('Já existe uma conta com o email "joao@email.com".')
+      await screen.findByText(
+        'Já existe uma conta com o email "joao@email.com".',
+      ),
     ).toBeInTheDocument();
+    expect(screen.getByText("Dados do Cliente")).toBeInTheDocument(); // continua no passo 1
   });
 
-  test('mostra erro 409 da API para NIF duplicado', async () => {
+  test("mostra erro 409 da API para NIF duplicado", async () => {
     global.fetch
       .mockImplementationOnce(() => mockJsonResponse([]))
       .mockImplementationOnce(() =>
-        mockJsonResponse({ error: 'Já existe um cliente com o NIF "123456789".' }, false, 409)
+        mockJsonResponse(
+          { error: 'Já existe um cliente com o NIF "123456789".' },
+          false,
+          409,
+        ),
       );
 
     renderClientes();
-    await screen.findByText('Registo de Clientes');
-
-    await userEvent.type(screen.getByLabelText(/Nome completo/i), 'NIF Duplicado');
-    await userEvent.type(screen.getByLabelText(/Email/i), 'nifduplica@email.com');
-    await userEvent.type(screen.getByLabelText(/Telefone/i), '910444444');
-    await userEvent.type(screen.getByLabelText(/NIF/i), '123456789');
-
-    await userEvent.click(screen.getByRole('button', { name: /Registar Cliente/i }));
+    await screen.findByText("Dados do Cliente");
+    await preencherFormularioCliente({ nif: "123456789" });
+    await userEvent.click(
+      screen.getByRole("button", { name: /Continuar para o Animal/i }),
+    );
 
     expect(
-      await screen.findByText('Já existe um cliente com o NIF "123456789".')
+      await screen.findByText('Já existe um cliente com o NIF "123456789".'),
     ).toBeInTheDocument();
   });
 
-  test('limpa o formulario apos registo com sucesso', async () => {
-    const clienteCriado = { ...CLIENTE_MOCK, id: 'ffffffff-ffff-4fff-8fff-ffffffffffff' };
+  // ── PASSO 2 — FORMULÁRIO DO ANIMAL ──────────────────────────────────────
 
+  test("passo 2 mostra aviso de que o animal e obrigatorio para confirmar registo", async () => {
     global.fetch
       .mockImplementationOnce(() => mockJsonResponse([]))
-      .mockImplementationOnce(() => mockJsonResponse(clienteCriado))
-      .mockImplementationOnce(() => mockJsonResponse([clienteCriado]));
+      .mockImplementationOnce(() => mockJsonResponse(CLIENTE_TEMPORARIO_MOCK));
 
     renderClientes();
-    await screen.findByText('Registo de Clientes');
+    await screen.findByText("Dados do Cliente");
+    await preencherFormularioCliente();
+    await userEvent.click(
+      screen.getByRole("button", { name: /Continuar para o Animal/i }),
+    );
 
-    await userEvent.type(screen.getByLabelText(/Nome completo/i), 'Cliente Limpar');
-    await userEvent.type(screen.getByLabelText(/Email/i), 'limpar@email.com');
-    await userEvent.type(screen.getByLabelText(/Telefone/i), '910555555');
+    expect(
+      await screen.findByText(/É obrigatório registar pelo menos um animal/i),
+    ).toBeInTheDocument();
+  });
 
-    await userEvent.click(screen.getByRole('button', { name: /Registar Cliente/i }));
+  test("passo 2 mostra botao Confirmar Registo", async () => {
+    global.fetch
+      .mockImplementationOnce(() => mockJsonResponse([]))
+      .mockImplementationOnce(() => mockJsonResponse(CLIENTE_TEMPORARIO_MOCK));
+
+    renderClientes();
+    await screen.findByText("Dados do Cliente");
+    await preencherFormularioCliente();
+    await userEvent.click(
+      screen.getByRole("button", { name: /Continuar para o Animal/i }),
+    );
+
+    expect(
+      await screen.findByRole("button", { name: /Confirmar Registo/i }),
+    ).toBeInTheDocument();
+  });
+
+  test("passo 2 mostra botao Cancelar que elimina o cliente temporario", async () => {
+    global.fetch
+      .mockImplementationOnce(() => mockJsonResponse([])) // GET /clientes
+      .mockImplementationOnce(() => mockJsonResponse(CLIENTE_TEMPORARIO_MOCK)) // POST /clientes
+      .mockImplementationOnce(() => mockJsonResponse({ cancelled: true })); // DELETE /clientes/:id
+
+    renderClientes();
+    await screen.findByText("Dados do Cliente");
+    await preencherFormularioCliente();
+    await userEvent.click(
+      screen.getByRole("button", { name: /Continuar para o Animal/i }),
+    );
+
+    await screen.findByText("Primeiro Animal");
+    await userEvent.click(screen.getByRole("button", { name: /Cancelar/i }));
+
+    // Volta ao passo 1
+    expect(await screen.findByText("Dados do Cliente")).toBeInTheDocument();
+
+    const deleteCall = global.fetch.mock.calls[2];
+    expect(deleteCall[1].method).toBe("DELETE");
+    expect(deleteCall[0]).toContain(`/clientes/${CLIENTE_TEMPORARIO_MOCK.id}`);
+  });
+
+  test("validacao: mostra erro quando nome do animal esta vazio", async () => {
+    global.fetch
+      .mockImplementationOnce(() => mockJsonResponse([]))
+      .mockImplementationOnce(() => mockJsonResponse(CLIENTE_TEMPORARIO_MOCK));
+
+    renderClientes();
+    await screen.findByText("Dados do Cliente");
+    await preencherFormularioCliente();
+    await userEvent.click(
+      screen.getByRole("button", { name: /Continuar para o Animal/i }),
+    );
+
+    await screen.findByText("Primeiro Animal");
+    await userEvent.click(
+      screen.getByRole("button", { name: /Confirmar Registo/i }),
+    );
+
+    expect(
+      await screen.findByText("Nome do animal é obrigatório."),
+    ).toBeInTheDocument();
+  });
+
+  test("validacao: mostra erro quando especie esta vazia", async () => {
+    global.fetch
+      .mockImplementationOnce(() => mockJsonResponse([]))
+      .mockImplementationOnce(() => mockJsonResponse(CLIENTE_TEMPORARIO_MOCK));
+
+    renderClientes();
+    await screen.findByText("Dados do Cliente");
+    await preencherFormularioCliente();
+    await userEvent.click(
+      screen.getByRole("button", { name: /Continuar para o Animal/i }),
+    );
+
+    await screen.findByText("Primeiro Animal");
+    await userEvent.type(screen.getByLabelText(/Nome do animal/i), "Rex");
+    await userEvent.click(
+      screen.getByRole("button", { name: /Confirmar Registo/i }),
+    );
+
+    expect(
+      await screen.findByText("Espécie é obrigatória."),
+    ).toBeInTheDocument();
+  });
+
+  test("validacao: mostra erro quando porte nao esta selecionado", async () => {
+    global.fetch
+      .mockImplementationOnce(() => mockJsonResponse([]))
+      .mockImplementationOnce(() => mockJsonResponse(CLIENTE_TEMPORARIO_MOCK));
+
+    renderClientes();
+    await screen.findByText("Dados do Cliente");
+    await preencherFormularioCliente();
+    await userEvent.click(
+      screen.getByRole("button", { name: /Continuar para o Animal/i }),
+    );
+
+    await screen.findByText("Primeiro Animal");
+    await userEvent.type(screen.getByLabelText(/Nome do animal/i), "Rex");
+    await userEvent.type(screen.getByLabelText(/Espécie/i), "Cão");
+    await userEvent.click(
+      screen.getByRole("button", { name: /Confirmar Registo/i }),
+    );
+
+    expect(await screen.findByText("Porte é obrigatório.")).toBeInTheDocument();
+  });
+
+  // ── PASSO 2 → PASSO 3 (CONCLUÍDO) ────────────────────────────────────────
+
+  test("chama POST /clientes/:id/animais/confirmar com payload correcto", async () => {
+    global.fetch
+      .mockImplementationOnce(() => mockJsonResponse([]))
+      .mockImplementationOnce(() => mockJsonResponse(CLIENTE_TEMPORARIO_MOCK))
+      .mockImplementationOnce(() => mockJsonResponse(CONFIRMAR_RESULT_MOCK))
+      .mockImplementationOnce(() => mockJsonResponse([CLIENTE_ATIVO_MOCK]));
+
+    renderClientes();
+    await screen.findByText("Dados do Cliente");
+    await preencherFormularioCliente();
+    await userEvent.click(
+      screen.getByRole("button", { name: /Continuar para o Animal/i }),
+    );
+
+    await screen.findByText("Primeiro Animal");
+    await userEvent.type(screen.getByLabelText(/Nome do animal/i), "Rex");
+    await userEvent.type(screen.getByLabelText(/Espécie/i), "Cão");
+    await userEvent.type(screen.getByLabelText(/Raça/i), "Labrador");
+
+    fireEvent.mouseDown(screen.getByLabelText(/Porte/i));
+    const grandeOption = await screen.findByText(/Grande \(14/i);
+    fireEvent.click(grandeOption);
+
+    await userEvent.click(
+      screen.getByRole("button", { name: /Confirmar Registo/i }),
+    );
+
+    await screen.findByText(/Registo concluído/i);
+
+    const confirmarCall = global.fetch.mock.calls[2];
+    expect(confirmarCall[0]).toContain(
+      `/clientes/${CLIENTE_TEMPORARIO_MOCK.id}/animais/confirmar`,
+    );
+    expect(confirmarCall[1].method).toBe("POST");
+
+    const payload = JSON.parse(confirmarCall[1].body);
+    expect(payload.nome).toBe("Rex");
+    expect(payload.especie).toBe("Cão");
+    expect(payload.raca).toBe("Labrador");
+    expect(payload.porte).toBe("GRANDE");
+  });
+
+  test("avanca para passo 3 com mensagem de sucesso apos confirmar", async () => {
+    global.fetch
+      .mockImplementationOnce(() => mockJsonResponse([]))
+      .mockImplementationOnce(() => mockJsonResponse(CLIENTE_TEMPORARIO_MOCK))
+      .mockImplementationOnce(() => mockJsonResponse(CONFIRMAR_RESULT_MOCK))
+      .mockImplementationOnce(() => mockJsonResponse([CLIENTE_ATIVO_MOCK]));
+
+    renderClientes();
+    await screen.findByText("Dados do Cliente");
+    await preencherFormularioCliente();
+    await userEvent.click(
+      screen.getByRole("button", { name: /Continuar para o Animal/i }),
+    );
+
+    await screen.findByText("Primeiro Animal");
+    await userEvent.type(screen.getByLabelText(/Nome do animal/i), "Rex");
+    await userEvent.type(screen.getByLabelText(/Espécie/i), "Cão");
+
+    fireEvent.mouseDown(screen.getByLabelText(/Porte/i));
+    const grandeOption = await screen.findByText(/Grande \(14/i);
+    fireEvent.click(grandeOption);
+
+    await userEvent.click(
+      screen.getByRole("button", { name: /Confirmar Registo/i }),
+    );
+
+    expect(await screen.findByText(/Registo concluído/i)).toBeInTheDocument();
+    // CORREÇÃO: Usa getAllByText para nome e animal pois aparecem no Alerta e no Resumo
+    expect(screen.getAllByText(/João Silva/)[0]).toBeInTheDocument();
+    expect(screen.getAllByText(/Rex/)[0]).toBeInTheDocument();
+  });
+
+  test("passo 3 mostra botoes de adicionar animal e novo registo", async () => {
+    global.fetch
+      .mockImplementationOnce(() => mockJsonResponse([]))
+      .mockImplementationOnce(() => mockJsonResponse(CLIENTE_TEMPORARIO_MOCK))
+      .mockImplementationOnce(() => mockJsonResponse(CONFIRMAR_RESULT_MOCK))
+      .mockImplementationOnce(() => mockJsonResponse([CLIENTE_ATIVO_MOCK]));
+
+    renderClientes();
+    await screen.findByText("Dados do Cliente");
+    await preencherFormularioCliente();
+    await userEvent.click(
+      screen.getByRole("button", { name: /Continuar para o Animal/i }),
+    );
+
+    await screen.findByText("Primeiro Animal");
+    await userEvent.type(screen.getByLabelText(/Nome do animal/i), "Rex");
+    await userEvent.type(screen.getByLabelText(/Espécie/i), "Cão");
+
+    fireEvent.mouseDown(screen.getByLabelText(/Porte/i));
+    const grandeOption = await screen.findByText(/Grande \(14/i);
+    fireEvent.click(grandeOption);
+
+    await userEvent.click(
+      screen.getByRole("button", { name: /Confirmar Registo/i }),
+    );
+
+    await screen.findByText(/Registo concluído/i);
+
+    expect(
+      screen.getByRole("button", { name: /Adicionar Outro Animal/i }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /Novo Registo de Cliente/i }),
+    ).toBeInTheDocument();
+  });
+
+  // ── NOVO REGISTO (volta ao passo 1) ────────────────────────────────────
+
+  test("botao Novo Registo volta ao passo 1 e limpa o formulario", async () => {
+    global.fetch
+      .mockImplementationOnce(() => mockJsonResponse([]))
+      .mockImplementationOnce(() => mockJsonResponse(CLIENTE_TEMPORARIO_MOCK))
+      .mockImplementationOnce(() => mockJsonResponse(CONFIRMAR_RESULT_MOCK))
+      .mockImplementationOnce(() => mockJsonResponse([CLIENTE_ATIVO_MOCK]));
+
+    renderClientes();
+    await screen.findByText("Dados do Cliente");
+    await preencherFormularioCliente();
+    await userEvent.click(
+      screen.getByRole("button", { name: /Continuar para o Animal/i }),
+    );
+
+    await screen.findByText("Primeiro Animal");
+    await userEvent.type(screen.getByLabelText(/Nome do animal/i), "Rex");
+    await userEvent.type(screen.getByLabelText(/Espécie/i), "Cão");
+
+    fireEvent.mouseDown(screen.getByLabelText(/Porte/i));
+    const grandeOption = await screen.findByText(/Grande \(14/i);
+    fireEvent.click(grandeOption);
+
+    await userEvent.click(
+      screen.getByRole("button", { name: /Confirmar Registo/i }),
+    );
+
+    await screen.findByText(/Registo concluído/i);
+    await userEvent.click(
+      screen.getByRole("button", { name: /Novo Registo de Cliente/i }),
+    );
+
+    expect(await screen.findByText("Dados do Cliente")).toBeInTheDocument();
+    expect(screen.getByLabelText(/Nome completo/i)).toHaveValue("");
+    expect(screen.getByLabelText(/Email/i)).toHaveValue("");
+    expect(screen.getByLabelText(/Telefone/i)).toHaveValue("");
+  });
+
+  // ── ADICIONAR ANIMAL A CLIENTE EXISTENTE ─────────────────────────────────
+
+  test("botao Animal no card de cliente abre painel de adicionar animal", async () => {
+    mockGetClientes();
+    renderClientes();
+
+    await screen.findByText("João Silva");
+    // CORREÇÃO: Usa regex exata /^Animal$/ para não confundir com "Continuar para o Animal"
+    await userEvent.click(screen.getByRole("button", { name: /^Animal$/ }));
+
+    expect(
+      await screen.findByRole("heading", {
+        name: /Adicionar Animal — João Silva/i,
+      }),
+    ).toBeInTheDocument();
+  });
+
+  test("adicionar animal a cliente existente chama POST /clientes/:id/animais", async () => {
+    const novoAnimal = { ...ANIMAL_MOCK, id: "anim-2", nome: "Luna" };
+
+    global.fetch
+      .mockImplementationOnce(() => mockJsonResponse([CLIENTE_ATIVO_MOCK]))
+      .mockImplementationOnce(() => mockJsonResponse(novoAnimal))
+      .mockImplementationOnce(() =>
+        mockJsonResponse([
+          { ...CLIENTE_ATIVO_MOCK, animais: [ANIMAL_MOCK, novoAnimal] },
+        ]),
+      );
+
+    renderClientes();
+    await screen.findByText("João Silva");
+
+    // CORREÇÃO: Usa regex exata /^Animal$/
+    await userEvent.click(screen.getByRole("button", { name: /^Animal$/ }));
+    // CORREÇÃO: Procura pelo cabeçalho para não confundir com o texto do botão
+    await screen.findByRole("heading", { name: /Adicionar Animal/i });
+
+    await userEvent.type(screen.getByLabelText(/Nome do animal/i), "Luna");
+    await userEvent.type(screen.getByLabelText(/Espécie/i), "Gato");
+
+    fireEvent.mouseDown(screen.getByLabelText(/Porte/i));
+    const pequenoOption = await screen.findByText(/Pequeno \(5/i);
+    fireEvent.click(pequenoOption);
+
+    await userEvent.click(
+      screen.getByRole("button", { name: /Adicionar Animal/i }),
+    );
 
     await waitFor(() => {
-      expect(screen.getByText(/registado com sucesso/i)).toBeInTheDocument();
+      expect(screen.getByText(/Luna.*adicionado/i)).toBeInTheDocument();
     });
 
-    expect(screen.getByLabelText(/Nome completo/i)).toHaveValue('');
-    expect(screen.getByLabelText(/Email/i)).toHaveValue('');
-    expect(screen.getByLabelText(/Telefone/i)).toHaveValue('');
+    const postCall = global.fetch.mock.calls[1];
+    expect(postCall[0]).toContain(`/clientes/${CLIENTE_ATIVO_MOCK.id}/animais`);
+    expect(postCall[1].method).toBe("POST");
+
+    const payload = JSON.parse(postCall[1].body);
+    expect(payload.nome).toBe("Luna");
+    expect(payload.especie).toBe("Gato");
+    expect(payload.porte).toBe("PEQUENO");
   });
 
-  test('NIF aceita apenas digitos e limita a 9 caracteres', async () => {
-    mockDefaultFetch([]);
+  test("cancelar no painel de adicionar animal existente fecha o painel", async () => {
+    mockGetClientes();
     renderClientes();
 
-    await screen.findByText('Registo de Clientes');
+    await screen.findByText("João Silva");
+    // CORREÇÃO: Usa regex exata /^Animal$/
+    await userEvent.click(screen.getByRole("button", { name: /^Animal$/ }));
+
+    // CORREÇÃO: Procura pelo cabeçalho
+    await screen.findByRole("heading", { name: /Adicionar Animal/i });
+    await userEvent.click(screen.getByRole("button", { name: /Cancelar/i }));
+
+    await waitFor(() => {
+      expect(
+        screen.queryByRole("heading", { name: /Adicionar Animal/i }),
+      ).not.toBeInTheDocument();
+    });
+  });
+
+  // ── LISTA DE CLIENTES — EXPANDIR ANIMAIS ─────────────────────────────────
+
+  test("mostra chip com contagem de animais no card do cliente", async () => {
+    mockGetClientes();
+    renderClientes();
+
+    await screen.findByText("João Silva");
+    expect(screen.getByText(/1 animal/i)).toBeInTheDocument();
+  });
+
+  test("clicar no icone de expandir mostra os animais do cliente", async () => {
+    mockGetClientes();
+    renderClientes();
+
+    await screen.findByText("João Silva");
+
+    // O botão de expandir só aparece quando há animais
+    const expandBtn = screen.getByTitle(/Ver animais/i);
+    await userEvent.click(expandBtn);
+
+    expect(await screen.findByText("Rex")).toBeInTheDocument();
+    expect(screen.getByText(/Labrador/i)).toBeInTheDocument();
+  });
+
+  test("mostra chip Inativo para cliente inativo", async () => {
+    mockGetClientes([
+      { ...CLIENTE_ATIVO_MOCK, ativo: false, estadoConta: "INATIVA" },
+    ]);
+    renderClientes();
+
+    await screen.findByText("João Silva");
+    expect(screen.getByText("Inativo")).toBeInTheDocument();
+  });
+
+  // ── NIF — CAMPOS DE ENTRADA ───────────────────────────────────────────────
+
+  test("NIF aceita apenas digitos e limita a 9 caracteres", async () => {
+    mockGetClientes([]);
+    renderClientes();
+
+    await screen.findByText("Dados do Cliente");
 
     const nifInput = screen.getByLabelText(/NIF/i);
-    await userEvent.type(nifInput, 'ABC12345678901');
+    await userEvent.type(nifInput, "ABC12345678901");
 
-    // O handleChange filtra não-dígitos e limita a 9
     expect(nifInput.value).toMatch(/^\d{0,9}$/);
     expect(nifInput.value.length).toBeLessThanOrEqual(9);
+  });
+
+  test("telefone aceita apenas digitos e limita a 15 caracteres", async () => {
+    mockGetClientes([]);
+    renderClientes();
+
+    await screen.findByText("Dados do Cliente");
+
+    const telInput = screen.getByLabelText(/Telefone/i);
+    await userEvent.type(telInput, "abc910000001xyz99999999999");
+
+    expect(telInput.value).toMatch(/^\d{0,15}$/);
+    expect(telInput.value.length).toBeLessThanOrEqual(15);
   });
 });
