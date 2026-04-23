@@ -44,7 +44,6 @@ const {
   getAnimaisByCliente,
 } = require("./repositories/repositorioClientes");
 
-
 const app = express();
 const PORT = Number(process.env.PORT || 5000);
 
@@ -265,6 +264,7 @@ app.delete("/servicos/:id", async (req, res) => {
   } catch (error) {
     console.error("Failed to delete servico:", error);
 
+    // Agendamentos futuros impedem a inativação — conflito de negócio
     if (error.message?.startsWith("Não é possível inativar o serviço")) {
       return res.status(409).json({ error: error.message });
     }
@@ -273,6 +273,44 @@ app.delete("/servicos/:id", async (req, res) => {
   }
 });
 
+/**
+ * @swagger
+ * /servicos/{id}/reativar:
+ *   post:
+ *     summary: Reativa um tipo de serviço inativo
+ *     tags: [Servicos]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: ID do tipo de serviço
+ *     responses:
+ *       200:
+ *         description: Serviço reativado com sucesso
+ *       404:
+ *         description: Serviço não encontrado
+ *       500:
+ *         description: Erro interno
+ */
+app.post("/servicos/:id/reativar", async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const result = await reativarTipoServico(id);
+
+    if (!result) {
+      return res.status(404).json({ error: "Servico nao encontrado" });
+    }
+
+    return res.json(result);
+  } catch (error) {
+    console.error("Failed to reativar servico:", error);
+    return res.status(500).json({ error: "Failed to reativar servico" });
+  }
+});
 
 /**
  * @swagger
