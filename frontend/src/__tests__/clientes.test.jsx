@@ -104,16 +104,33 @@ async function preencherFormularioAnimal({
   nome = "Rex",
   especie = "Cão",
   porte = "GRANDE",
+  dataNascimento = "2020-03-15",
 } = {}) {
   await userEvent.type(screen.getByLabelText(/Nome do animal/i), nome);
   await userEvent.type(screen.getByLabelText(/Espécie/i), especie);
+  if (dataNascimento) {
+    await userEvent.type(
+      screen.getByLabelText(/Data de nascimento/i),
+      dataNascimento,
+    );
+  }
 
   // Selecionar porte
-  fireEvent.mouseDown(screen.getByLabelText(/Porte/i));
-  const porteOption = await screen.findByText(
-    new RegExp(porte === "GRANDE" ? "Grande" : porte, "i"),
-  );
-  fireEvent.click(porteOption);
+  if (porte) {
+    fireEvent.mouseDown(screen.getByLabelText(/Porte/i));
+    const porteLabels = {
+      EXTRA_PEQUENO: "Extra Pequeno",
+      PEQUENO: "Pequeno",
+      MEDIO: "Médio",
+      GRANDE: "Grande",
+      EXTRA_GRANDE: "Extra Grande",
+    };
+    const label = porteLabels[porte] || porte;
+    const porteOption = await screen.findByText(
+      new RegExp(`^${label}\\b`, "i"),
+    );
+    fireEvent.click(porteOption);
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -175,7 +192,7 @@ describe("Client page", () => {
     mockGetClientes([]);
     renderClientes();
 
-    await screen.findByText("Registo de Clientes");
+    await screen.findByText(/Registo de Clientes e Animais/i);
     expect(screen.getByText("1. Cliente")).toBeInTheDocument();
     expect(screen.getByText("2. Animal")).toBeInTheDocument();
     expect(screen.getByText("3. Concluído")).toBeInTheDocument();
@@ -553,11 +570,44 @@ describe("Client page", () => {
     await screen.findByText("Primeiro Animal");
     await userEvent.type(screen.getByLabelText(/Nome do animal/i), "Rex");
     await userEvent.type(screen.getByLabelText(/Espécie/i), "Cão");
+    await userEvent.type(
+      screen.getByLabelText(/Data de nascimento/i),
+      "2020-03-15",
+    );
     await userEvent.click(
       screen.getByRole("button", { name: /Confirmar Registo/i }),
     );
 
     expect(await screen.findByText("Porte é obrigatório.")).toBeInTheDocument();
+  });
+
+  test("validacao: mostra erro quando data de nascimento esta vazia", async () => {
+    global.fetch
+      .mockImplementationOnce(() => mockJsonResponse([]))
+      .mockImplementationOnce(() => mockJsonResponse(CLIENTE_TEMPORARIO_MOCK));
+
+    renderClientes();
+    await screen.findByText("Dados do Cliente");
+    await preencherFormularioCliente();
+    await userEvent.click(
+      screen.getByRole("button", { name: /Continuar para o Animal/i }),
+    );
+
+    await screen.findByText("Primeiro Animal");
+    await userEvent.type(screen.getByLabelText(/Nome do animal/i), "Rex");
+    await userEvent.type(screen.getByLabelText(/Espécie/i), "Cão");
+
+    fireEvent.mouseDown(screen.getByLabelText(/Porte/i));
+    const grandeOption = await screen.findByText(/Grande \(14/i);
+    fireEvent.click(grandeOption);
+
+    await userEvent.click(
+      screen.getByRole("button", { name: /Confirmar Registo/i }),
+    );
+
+    expect(
+      await screen.findByText("Data de nascimento é obrigatória."),
+    ).toBeInTheDocument();
   });
 
   // ── PASSO 2 → PASSO 3 (CONCLUÍDO) ────────────────────────────────────────
@@ -577,13 +627,12 @@ describe("Client page", () => {
     );
 
     await screen.findByText("Primeiro Animal");
-    await userEvent.type(screen.getByLabelText(/Nome do animal/i), "Rex");
-    await userEvent.type(screen.getByLabelText(/Espécie/i), "Cão");
+    await preencherFormularioAnimal({
+      nome: "Rex",
+      especie: "Cão",
+      porte: "GRANDE",
+    });
     await userEvent.type(screen.getByLabelText(/Raça/i), "Labrador");
-
-    fireEvent.mouseDown(screen.getByLabelText(/Porte/i));
-    const grandeOption = await screen.findByText(/Grande \(14/i);
-    fireEvent.click(grandeOption);
 
     await userEvent.click(
       screen.getByRole("button", { name: /Confirmar Registo/i }),
@@ -619,12 +668,11 @@ describe("Client page", () => {
     );
 
     await screen.findByText("Primeiro Animal");
-    await userEvent.type(screen.getByLabelText(/Nome do animal/i), "Rex");
-    await userEvent.type(screen.getByLabelText(/Espécie/i), "Cão");
-
-    fireEvent.mouseDown(screen.getByLabelText(/Porte/i));
-    const grandeOption = await screen.findByText(/Grande \(14/i);
-    fireEvent.click(grandeOption);
+    await preencherFormularioAnimal({
+      nome: "Rex",
+      especie: "Cão",
+      porte: "GRANDE",
+    });
 
     await userEvent.click(
       screen.getByRole("button", { name: /Confirmar Registo/i }),
@@ -651,12 +699,11 @@ describe("Client page", () => {
     );
 
     await screen.findByText("Primeiro Animal");
-    await userEvent.type(screen.getByLabelText(/Nome do animal/i), "Rex");
-    await userEvent.type(screen.getByLabelText(/Espécie/i), "Cão");
-
-    fireEvent.mouseDown(screen.getByLabelText(/Porte/i));
-    const grandeOption = await screen.findByText(/Grande \(14/i);
-    fireEvent.click(grandeOption);
+    await preencherFormularioAnimal({
+      nome: "Rex",
+      especie: "Cão",
+      porte: "GRANDE",
+    });
 
     await userEvent.click(
       screen.getByRole("button", { name: /Confirmar Registo/i }),
@@ -689,12 +736,11 @@ describe("Client page", () => {
     );
 
     await screen.findByText("Primeiro Animal");
-    await userEvent.type(screen.getByLabelText(/Nome do animal/i), "Rex");
-    await userEvent.type(screen.getByLabelText(/Espécie/i), "Cão");
-
-    fireEvent.mouseDown(screen.getByLabelText(/Porte/i));
-    const grandeOption = await screen.findByText(/Grande \(14/i);
-    fireEvent.click(grandeOption);
+    await preencherFormularioAnimal({
+      nome: "Rex",
+      especie: "Cão",
+      porte: "GRANDE",
+    });
 
     await userEvent.click(
       screen.getByRole("button", { name: /Confirmar Registo/i }),
@@ -745,23 +791,26 @@ describe("Client page", () => {
 
     // CORREÇÃO: Usa regex exata /^Animal$/
     await userEvent.click(screen.getByRole("button", { name: /^Animal$/ }));
-    // CORREÇÃO: Procura pelo cabeçalho para não confundir com o texto do botão
-    await screen.findByRole("heading", { name: /Adicionar Animal/i });
+    await screen.findByRole("heading", {
+      name: /Adicionar Animal — João Silva/i,
+    });
 
-    await userEvent.type(screen.getByLabelText(/Nome do animal/i), "Luna");
-    await userEvent.type(screen.getByLabelText(/Espécie/i), "Gato");
-
-    fireEvent.mouseDown(screen.getByLabelText(/Porte/i));
-    const pequenoOption = await screen.findByText(/Pequeno \(5/i);
-    fireEvent.click(pequenoOption);
+    await preencherFormularioAnimal({
+      nome: "Luna",
+      especie: "Gato",
+      porte: "PEQUENO",
+      dataNascimento: "2021-05-10",
+    });
 
     await userEvent.click(
       screen.getByRole("button", { name: /Adicionar Animal/i }),
     );
 
-    await waitFor(() => {
-      expect(screen.getByText(/Luna.*adicionado/i)).toBeInTheDocument();
-    });
+    expect(
+      await screen.findByText(
+        /Animal "Luna" adicionado a "João Silva" com sucesso!/i,
+      ),
+    ).toBeInTheDocument();
 
     const postCall = global.fetch.mock.calls[1];
     expect(postCall[0]).toContain(`/clientes/${CLIENTE_ATIVO_MOCK.id}/animais`);
@@ -782,12 +831,16 @@ describe("Client page", () => {
     await userEvent.click(screen.getByRole("button", { name: /^Animal$/ }));
 
     // CORREÇÃO: Procura pelo cabeçalho
-    await screen.findByRole("heading", { name: /Adicionar Animal/i });
+    await screen.findByRole("heading", {
+      name: /Adicionar Animal — João Silva/i,
+    });
     await userEvent.click(screen.getByRole("button", { name: /Cancelar/i }));
 
     await waitFor(() => {
       expect(
-        screen.queryByRole("heading", { name: /Adicionar Animal/i }),
+        screen.queryByRole("heading", {
+          name: /Adicionar Animal — João Silva/i,
+        }),
       ).not.toBeInTheDocument();
     });
   });

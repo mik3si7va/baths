@@ -56,11 +56,30 @@ const INCLUDE_FULL = {
   animais: { orderBy: { createdAt: "asc" } },
 };
 
+// ─── validação de animal ───────────────────────────────────────────────────────
+
+function validateAnimalFields({ nome, especie, porte, dataNascimento }) {
+  if (!nome || !nome.trim()) throw new Error("Nome do animal é obrigatório.");
+  if (!especie || !especie.trim()) throw new Error("Espécie é obrigatória.");
+  if (!dataNascimento) throw new Error("Data de nascimento é obrigatória.");
+
+  // Validar que a data não é futura
+  const dataNasc = new Date(dataNascimento);
+  if (isNaN(dataNasc.getTime()))
+    throw new Error("Data de nascimento inválida.");
+  if (dataNasc > new Date())
+    throw new Error("A data de nascimento não pode ser futura.");
+
+  if (!porte) throw new Error("Porte é obrigatório.");
+  if (!PORTES_VALIDOS.has(porte)) {
+    throw new Error(
+      `Porte inválido: "${porte}". Valores aceites: ${[...PORTES_VALIDOS].join(", ")}.`,
+    );
+  }
+}
+
 // ─── clientes ─────────────────────────────────────────────────────────────────
 
-/**
- * Lista apenas clientes activos (estadoConta = ATIVA).
- */
 async function getAllClientes() {
   const clientes = await prisma.cliente.findMany({
     where: { utilizador: { estadoConta: "ATIVA" } },
@@ -79,10 +98,6 @@ async function getClienteById(id) {
   return mapClienteRow(cliente);
 }
 
-/**
- * Cria um cliente com estadoConta = PENDENTE_VERIFICACAO.
- * O registo só se torna oficial após confirmarClienteComAnimal().
- */
 async function createClienteTemporario({
   nome,
   email,
@@ -105,7 +120,6 @@ async function createClienteTemporario({
 
   const normalizedEmail = String(email).trim().toLowerCase();
 
-  // Verificar email único
   const emailExiste = await prisma.utilizador.findUnique({
     where: { email: normalizedEmail },
     select: { id: true },
@@ -114,7 +128,6 @@ async function createClienteTemporario({
     throw new Error(`Já existe uma conta com o email "${normalizedEmail}".`);
   }
 
-  // Verificar NIF único
   if (nif && nif.trim()) {
     const nifExiste = await prisma.cliente.findUnique({
       where: { nif: nif.trim() },
@@ -137,7 +150,6 @@ async function createClienteTemporario({
           nome: nome.trim(),
           email: normalizedEmail,
           passwordHash,
-          // Temporário — ainda não confirmado
           estadoConta: "PENDENTE_VERIFICACAO",
           ativo: false,
         },
@@ -177,10 +189,6 @@ async function createClienteTemporario({
   }
 }
 
-/**
- * Elimina um cliente temporário (PENDENTE_VERIFICACAO sem animais).
- * Chamado quando o utilizador abandona o fluxo antes de registar o animal.
- */
 async function cancelarClienteTemporario(clienteId) {
   const cliente = await prisma.cliente.findUnique({
     where: { id: clienteId },
@@ -192,7 +200,6 @@ async function cancelarClienteTemporario(clienteId) {
 
   if (!cliente) return null;
 
-  // Só elimina se ainda estiver pendente e sem animais
   if (
     cliente.utilizador?.estadoConta !== "PENDENTE_VERIFICACAO" ||
     cliente.animais.length > 0
@@ -208,23 +215,12 @@ async function cancelarClienteTemporario(clienteId) {
   return { cancelled: true, id: clienteId };
 }
 
-/**
- * Cria o primeiro animal e, na mesma transação, torna o cliente oficial:
- *   estadoConta → ATIVA, ativo → true
- */
 async function confirmarClienteComAnimal(
   clienteId,
   { nome, especie, raca, porte, dataNascimento, alergias, observacoes },
 ) {
-  if (!nome || !nome.trim()) throw new Error("Nome do animal é obrigatório.");
-  if (!especie || !especie.trim()) throw new Error("Espécie é obrigatória.");
-  if (!porte) throw new Error("Porte é obrigatório.");
-
-  if (!PORTES_VALIDOS.has(porte)) {
-    throw new Error(
-      `Porte inválido: "${porte}". Valores aceites: ${[...PORTES_VALIDOS].join(", ")}.`,
-    );
-  }
+  // BET-126: nome, espécie, data de nascimento e porte são obrigatórios
+  validateAnimalFields({ nome, especie, porte, dataNascimento });
 
   const cliente = await prisma.cliente.findUnique({
     where: { id: clienteId },
@@ -240,13 +236,11 @@ async function confirmarClienteComAnimal(
   }
 
   const result = await prisma.$transaction(async (tx) => {
-    // 1. Confirmar o cliente
     await tx.utilizador.update({
       where: { id: clienteId },
       data: { estadoConta: "ATIVA", ativo: true },
     });
 
-    // 2. Criar o animal
     const animal = await tx.animal.create({
       data: {
         clienteId,
@@ -254,14 +248,13 @@ async function confirmarClienteComAnimal(
         especie: especie.trim(),
         raca: raca && raca.trim() ? raca.trim() : null,
         porte,
-        dataNascimento: dataNascimento ? new Date(dataNascimento) : null,
+        dataNascimento: new Date(dataNascimento),
         alergias: alergias && alergias.trim() ? alergias.trim() : null,
         observacoes:
           observacoes && observacoes.trim() ? observacoes.trim() : null,
       },
     });
 
-    // 3. Devolver cliente completo
     const clienteAtualizado = await tx.cliente.findUnique({
       where: { id: clienteId },
       include: INCLUDE_FULL,
@@ -282,15 +275,8 @@ async function createAnimal(
   clienteId,
   { nome, especie, raca, porte, dataNascimento, alergias, observacoes },
 ) {
-  if (!nome || !nome.trim()) throw new Error("Nome do animal é obrigatório.");
-  if (!especie || !especie.trim()) throw new Error("Espécie é obrigatória.");
-  if (!porte) throw new Error("Porte é obrigatório.");
-
-  if (!PORTES_VALIDOS.has(porte)) {
-    throw new Error(
-      `Porte inválido: "${porte}". Valores aceites: ${[...PORTES_VALIDOS].join(", ")}.`,
-    );
-  }
+  // BET-126: nome, espécie, data de nascimento e porte são obrigatórios
+  validateAnimalFields({ nome, especie, porte, dataNascimento });
 
   const clienteExiste = await prisma.cliente.findUnique({
     where: { id: clienteId },
@@ -312,7 +298,7 @@ async function createAnimal(
       especie: especie.trim(),
       raca: raca && raca.trim() ? raca.trim() : null,
       porte,
-      dataNascimento: dataNascimento ? new Date(dataNascimento) : null,
+      dataNascimento: new Date(dataNascimento),
       alergias: alergias && alergias.trim() ? alergias.trim() : null,
       observacoes:
         observacoes && observacoes.trim() ? observacoes.trim() : null,
@@ -330,12 +316,6 @@ async function getAnimaisByCliente(clienteId) {
   return animais.map(mapAnimalRow);
 }
 
-// ─── limpeza de clientes temporários expirados ────────────────────────────────
-
-/**
- * Elimina clientes PENDENTE_VERIFICACAO sem animais criados há mais de `minutosAntigos` minutos.
- * Pode ser chamada por um job periódico ou manualmente em testes.
- */
 async function limparClientesTemporarios(minutosAntigos = 60) {
   const limite = new Date(Date.now() - minutosAntigos * 60 * 1000);
 

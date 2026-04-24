@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import {
   Box,
   Typography,
@@ -13,6 +13,7 @@ import {
   IconButton,
   Collapse,
   InputAdornment,
+  InputBase,
 } from "@mui/material";
 import PersonIcon from "@mui/icons-material/Person";
 import PetsIcon from "@mui/icons-material/Pets";
@@ -23,6 +24,8 @@ import ExpandLessIcon from "@mui/icons-material/ExpandLess";
 import VisibilityIcon from "@mui/icons-material/Visibility";
 import VisibilityOffIcon from "@mui/icons-material/VisibilityOff";
 import WarningAmberIcon from "@mui/icons-material/WarningAmber";
+import SearchIcon from "@mui/icons-material/Search";
+import ClearIcon from "@mui/icons-material/Clear";
 import { useThemeContext } from "../../contexts/ThemeContext";
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || "http://localhost:5000";
@@ -106,6 +109,128 @@ function StepIndicator({ passo }) {
           </React.Fragment>
         );
       })}
+    </Box>
+  );
+}
+
+// ─── Componente de Pesquisa/Seleção de Cliente (BET-127) ──────────────────────
+
+function ClienteSearch({ clientes, onClienteSelected, loading }) {
+  const { colors } = useThemeContext();
+  const [query, setQuery] = useState("");
+  const [focused, setFocused] = useState(false);
+
+  const filtered = useMemo(() => {
+    if (!query.trim()) return [];
+    const q = query.toLowerCase();
+    return clientes.filter(
+      (c) =>
+        c.nome?.toLowerCase().includes(q) ||
+        c.email?.toLowerCase().includes(q) ||
+        c.telefone?.includes(q) ||
+        (c.nif && c.nif.includes(q)),
+    );
+  }, [clientes, query]);
+
+  const showDropdown = focused && query.trim().length > 0;
+
+  return (
+    <Box sx={{ position: "relative" }}>
+      <Paper
+        variant="outlined"
+        sx={{
+          display: "flex",
+          alignItems: "center",
+          px: 2,
+          py: 0.5,
+          borderRadius: 2,
+          borderColor: focused ? colors.primary : undefined,
+          boxShadow: focused ? `0 0 0 2px ${colors.primary}22` : undefined,
+          transition: "all 0.2s",
+        }}
+      >
+        <SearchIcon sx={{ color: colors.textSecondary, mr: 1 }} />
+        <InputBase
+          fullWidth
+          placeholder="Pesquisar por nome, email, telefone ou NIF..."
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          onFocus={() => setFocused(true)}
+          onBlur={() => setTimeout(() => setFocused(false), 200)}
+          inputProps={{ "data-testid": "cliente-search-input" }}
+          sx={{ fontSize: "14px" }}
+        />
+        {loading && <CircularProgress size={16} sx={{ mr: 1 }} />}
+        {query && (
+          <IconButton size="small" onClick={() => setQuery("")} edge="end">
+            <ClearIcon fontSize="small" />
+          </IconButton>
+        )}
+      </Paper>
+
+      {showDropdown && (
+        <Paper
+          elevation={4}
+          sx={{
+            position: "absolute",
+            top: "100%",
+            left: 0,
+            right: 0,
+            zIndex: 1300,
+            mt: 0.5,
+            borderRadius: 2,
+            maxHeight: 280,
+            overflowY: "auto",
+          }}
+        >
+          {filtered.length === 0 ? (
+            <Box sx={{ p: 2 }}>
+              <Typography variant="body2" sx={{ color: colors.textSecondary }}>
+                Nenhum cliente encontrado para "{query}".
+              </Typography>
+            </Box>
+          ) : (
+            filtered.map((c) => (
+              <Box
+                key={c.id}
+                onMouseDown={() => {
+                  onClienteSelected(c);
+                  setQuery("");
+                }}
+                sx={{
+                  px: 2,
+                  py: 1.5,
+                  cursor: "pointer",
+                  borderBottom: "1px solid #f0f0f0",
+                  "&:hover": { backgroundColor: "#f5f0e8" },
+                  "&:last-child": { borderBottom: "none" },
+                }}
+              >
+                <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                  <PersonIcon sx={{ fontSize: 16, color: colors.primary }} />
+                  <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                    {c.nome}
+                  </Typography>
+                  <Chip
+                    size="small"
+                    label={`${c.animais?.length ?? 0} ${(c.animais?.length ?? 0) === 1 ? "animal" : "animais"}`}
+                    variant="outlined"
+                    color="primary"
+                    sx={{ fontSize: "10px", height: 18 }}
+                  />
+                </Box>
+                <Typography
+                  variant="caption"
+                  sx={{ color: colors.textSecondary, pl: 3 }}
+                >
+                  {c.email} | {c.telefone}
+                  {c.nif ? ` | NIF: ${c.nif}` : ""}
+                </Typography>
+              </Box>
+            ))
+          )}
+        </Paper>
+      )}
     </Box>
   );
 }
@@ -300,7 +425,8 @@ function ClienteForm({ onClienteCriado }) {
   );
 }
 
-// ─── Formulário do Animal ─────────────────────────────────────────────────────
+// ─── Formulário do Animal (BET-126) ──────────────────────────────────────────
+// Campos obrigatórios: nome, espécie, data de nascimento e porte (BET-126)
 
 function AnimalForm({
   clienteId,
@@ -318,9 +444,15 @@ function AnimalForm({
 
   const set = (f, v) => setForm((p) => ({ ...p, [f]: v }));
 
+  const today = new Date().toISOString().split("T")[0];
+
+  // BET-126: nome, espécie, data de nascimento e porte são obrigatórios
   const validate = () => {
     if (!form.nome.trim()) return "Nome do animal é obrigatório.";
     if (!form.especie.trim()) return "Espécie é obrigatória.";
+    if (!form.dataNascimento) return "Data de nascimento é obrigatória.";
+    if (form.dataNascimento > today)
+      return "A data de nascimento não pode ser futura.";
     if (!form.porte) return "Porte é obrigatório.";
     return "";
   };
@@ -344,8 +476,8 @@ function AnimalForm({
           nome: form.nome.trim(),
           especie: form.especie.trim(),
           raca: form.raca.trim() || undefined,
-          porte: form.porte,
-          dataNascimento: form.dataNascimento || undefined,
+          porte: form.porte || undefined,
+          dataNascimento: form.dataNascimento,
           alergias: form.alergias.trim() || undefined,
           observacoes: form.observacoes.trim() || undefined,
         }),
@@ -388,6 +520,7 @@ function AnimalForm({
           gap: 2,
         }}
       >
+        {/* Nome — obrigatório (BET-126) */}
         <TextField
           label="Nome do animal"
           name="nomeAnimal"
@@ -397,6 +530,8 @@ function AnimalForm({
           fullWidth
           placeholder="Ex: Rex"
         />
+
+        {/* Espécie — obrigatório (BET-126) */}
         <TextField
           label="Espécie"
           name="especie"
@@ -406,6 +541,8 @@ function AnimalForm({
           fullWidth
           placeholder="Ex: Cão, Gato..."
         />
+
+        {/* Raça — opcional */}
         <TextField
           label="Raça (opcional)"
           name="raca"
@@ -414,6 +551,8 @@ function AnimalForm({
           fullWidth
           placeholder="Ex: Labrador"
         />
+
+        {/* Porte — obrigatório para cálculo de preço */}
         <TextField
           select
           label="Porte"
@@ -429,15 +568,24 @@ function AnimalForm({
             </MenuItem>
           ))}
         </TextField>
+
+        {/* Data de nascimento — obrigatório (BET-126: critério 2) */}
         <TextField
-          label="Data de nascimento (opcional)"
+          label="Data de nascimento"
           name="dataNascimento"
           type="date"
           value={form.dataNascimento}
           onChange={(e) => set("dataNascimento", e.target.value)}
+          required
           fullWidth
           InputLabelProps={{ shrink: true }}
+          helperText="Obrigatório."
+          inputProps={{
+            max: today,
+          }}
         />
+
+        {/* Alergias — opcional (BET-126: critério 3 — observações) */}
         <TextField
           label="Alergias (opcional)"
           name="alergias"
@@ -446,15 +594,17 @@ function AnimalForm({
           fullWidth
           placeholder="Ex: Pólen, determinados champôs..."
         />
+
+        {/* Observações — opcional (BET-126: critério 3) */}
         <TextField
-          label="Observações (opcional)"
+          label="Observações / Cuidados especiais (opcional)"
           name="observacoes"
           value={form.observacoes}
           onChange={(e) => set("observacoes", e.target.value)}
           fullWidth
           multiline
           minRows={2}
-          placeholder="Informações adicionais relevantes..."
+          placeholder="Informações adicionais relevantes, cuidados especiais..."
           sx={{ gridColumn: { md: "1 / -1" } }}
         />
       </Box>
@@ -531,7 +681,7 @@ function ClienteCard({ cliente, onAddAnimal }) {
               <Chip
                 size="small"
                 icon={<PetsIcon sx={{ fontSize: "14px !important" }} />}
-                label={`${cliente.animais.length} animal${cliente.animais.length !== 1 ? "is" : ""}`}
+                label={`${cliente.animais.length ?? 0} ${(cliente.animais.length ?? 0) === 1 ? "animal" : "animais"}`}
                 variant="outlined"
                 color="primary"
                 sx={{ fontSize: "11px", height: 22 }}
@@ -603,7 +753,31 @@ function ClienteCard({ cliente, onAddAnimal }) {
                   variant="body2"
                   sx={{ color: colors.textSecondary, fontSize: "11px" }}
                 >
-                  n. {new Date(a.dataNascimento).toLocaleDateString("pt-PT")}
+                  n.{" "}
+                  {new Date(a.dataNascimento + "T00:00:00").toLocaleDateString(
+                    "pt-PT",
+                  )}
+                </Typography>
+              )}
+              {a.alergias && (
+                <Chip
+                  size="small"
+                  label={`Alergias: ${a.alergias}`}
+                  color="warning"
+                  variant="outlined"
+                  sx={{ fontSize: "10px", height: 20 }}
+                />
+              )}
+              {a.observacoes && (
+                <Typography
+                  variant="body2"
+                  sx={{
+                    color: colors.textSecondary,
+                    fontSize: "11px",
+                    fontStyle: "italic",
+                  }}
+                >
+                  {a.observacoes}
                 </Typography>
               )}
             </Box>
@@ -644,12 +818,9 @@ export default function Client() {
     carregarClientes();
   }, [carregarClientes]);
 
-  // Helpers para resolver id/nome do cliente independentemente da forma da resposta
   const clienteId = clienteAtual?.id ?? clienteAtual?.cliente?.id;
   const clienteNome = clienteAtual?.nome ?? clienteAtual?.cliente?.nome;
   const clienteEmail = clienteAtual?.email ?? clienteAtual?.cliente?.email;
-
-  // ── Handlers ──────────────────────────────────────────────────────────────
 
   const handleClienteCriado = (c) => {
     setClienteAtual(c);
@@ -658,7 +829,6 @@ export default function Client() {
     setPasso("animal");
   };
 
-  // O endpoint /confirmar devolve { cliente, animal }
   const handleConfirmarComAnimal = (result) => {
     const animal = result.animal ?? result;
     const clienteConfirmado = result.cliente ?? clienteAtual;
@@ -671,7 +841,6 @@ export default function Client() {
     carregarClientes();
   };
 
-  // Cancelar no passo do animal — elimina cliente temporário
   const handleCancelarNoAnimal = async () => {
     if (clienteId) {
       try {
@@ -700,6 +869,10 @@ export default function Client() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
+  const handleClienteSearchSelected = (c) => {
+    handleAddAnimalAClienteExistente(c);
+  };
+
   const handleAnimalAdicionadoAClienteExistente = (a) => {
     setMensagemSucesso(
       `Animal "${a.nome}" adicionado a "${clienteParaAnimal.nome}" com sucesso!`,
@@ -715,19 +888,18 @@ export default function Client() {
     setPasso("cliente");
   };
 
-  // ── Render ────────────────────────────────────────────────────────────────
-
   return (
     <Box>
       <Typography variant="h1" sx={{ mb: 1, color: colors.text }}>
-        Registo de Clientes
+        Registo de Clientes e Animais
       </Typography>
       <Typography variant="body1" sx={{ mb: 4, color: colors.textSecondary }}>
-        Registo interno de novos clientes com os seus animais. O cliente só fica
-        ativo após registar pelo menos um animal.
+        Registo interno de novos clientes com os seus animais, ou adição de
+        animais a clientes existentes. O cliente só fica ativo após registar
+        pelo menos um animal.
       </Typography>
 
-      {/* ── Painel: adicionar animal a cliente existente ── */}
+      {/* ── Painel: adicionar animal a cliente existente (BET-126 + BET-127) ── */}
       {clienteParaAnimal && (
         <Paper
           elevation={2}
@@ -763,6 +935,30 @@ export default function Client() {
         >
           {mensagemSucesso}
         </Alert>
+      )}
+
+      {/* ── BET-127: Pesquisa rápida de cliente para adicionar animal ── */}
+      {!clienteParaAnimal && passo === "cliente" && (
+        <Paper elevation={2} sx={{ borderRadius: 3, p: 3, mb: 4 }}>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1.5 }}>
+            <SearchIcon sx={{ color: colors.primary }} />
+            <Typography variant="h2" sx={{ color: colors.text }}>
+              Adicionar Animal a Cliente Existente
+            </Typography>
+          </Box>
+          <Typography
+            variant="body2"
+            sx={{ color: colors.textSecondary, mb: 2 }}
+          >
+            Pesquise um cliente registado para adicionar um novo animal à sua
+            ficha.
+          </Typography>
+          <ClienteSearch
+            clientes={clientes}
+            onClienteSelected={handleClienteSearchSelected}
+            loading={loadingClientes}
+          />
+        </Paper>
       )}
 
       {/* ── Formulário multi-step ── */}
@@ -847,6 +1043,17 @@ export default function Client() {
                       {a.nome} — {a.especie}
                       {a.raca ? ` · ${a.raca}` : ""}
                     </Typography>
+                    {a.dataNascimento && (
+                      <Typography
+                        variant="body2"
+                        sx={{ color: colors.textSecondary, fontSize: "11px" }}
+                      >
+                        n.{" "}
+                        {new Date(
+                          a.dataNascimento + "T00:00:00",
+                        ).toLocaleDateString("pt-PT")}
+                      </Typography>
+                    )}
                   </Box>
                 ))}
               </Box>
