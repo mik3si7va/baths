@@ -192,21 +192,25 @@
               calledElement="sub_gerar_selecionar_opcao">
       <extensionElements>
         <camunda:in source="servicosActualizados" target="servicosActualizados" />
+        <camunda:in source="servicosOrdenados" target="servicosOrdenados" /> 
         <camunda:in source="porteAnimal" target="porteAnimal" />
         <camunda:in source="dataPreferida" target="dataPreferida" />
         <camunda:in source="animalId" target="animalId" />
         <camunda:in source="clienteId" target="clienteId" />
         <camunda:in source="funcionarioPreferido" target="funcionarioPreferido" />
 
+        <camunda:out source="servicosActualizados" target="servicosActualizados" />
         <camunda:out source="solucoes" target="solucoes" />
         <camunda:out source="dataHoraInicio" target="dataHoraInicio" />
         <camunda:out source="dataHoraFim" target="dataHoraFim" />
         <camunda:out source="valorTotal" target="valorTotal" />
         <camunda:out source="funcionarioId" target="funcionarioId" />
         <camunda:out source="salaId" target="salaId" />
-        <camunda:out source="opcaoSelecionadaNormalizada" target="opcaoSelecionadaNormalizada" />
         <camunda:out source="operacaoBemSucedida" target="operacaoBemSucedida" />
         <camunda:out source="mensagemErro" target="mensagemErro" />
+        <camunda:out source="subProcessInstanceId" target="subProcessInstanceId" />
+        <camunda:out source="reservasTemporariasIds" target="reservasTemporariasIds" />
+        <camunda:out source="opcaoSelecionada" target="opcaoSelecionada" />
       </extensionElements>
       <incoming>BP260</incoming>
       <outgoing>BP261</outgoing>

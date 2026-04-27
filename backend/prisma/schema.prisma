@@ -52,8 +52,8 @@ model Sala {
   updatedAt    DateTime      @default(now()) @map("updated_at") @db.Timestamptz(6)
   salasServico SalaServico[]
 
-  agendamentos        Agendamento[]
-  reservasTemporarias ReservaTemporaria[]
+  reservasTemporarias  ReservaTemporaria[]
+  agendamentoServicos  AgendamentoServico[]
 
   @@map("sala")
 }
@@ -79,8 +79,8 @@ model Funcionario {
   horariosTrabalho   HorarioTrabalho[]
   funcionarioServico FuncionarioServico[]
 
-  agendamentos        Agendamento[]
-  reservasTemporarias ReservaTemporaria[]
+  reservasTemporarias  ReservaTemporaria[]
+  agendamentoServicos  AgendamentoServico[]
 
   @@map("funcionario")
 }
@@ -157,8 +157,6 @@ model FuncionarioServico {
 model Agendamento {
   id                  String                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   animalId            String                @map("animal_id") @db.Uuid
-  funcionarioId       String                @map("funcionario_id") @db.Uuid
-  salaId              String                @map("sala_id") @db.Uuid
   dataHoraInicio      DateTime              @map("data_hora_inicio") @db.Timestamptz(6)
   dataHoraFim         DateTime              @map("data_hora_fim") @db.Timestamptz(6)
   valorTotal          Decimal               @map("valor_total") @db.Decimal(10, 2)
@@ -168,8 +166,6 @@ model Agendamento {
   processInstanceId   String?               @map("process_instance_id")
   createdAt           DateTime              @default(now()) @map("created_at") @db.Timestamptz(6)
   animal              Animal                @relation(fields: [animalId], references: [id], onDelete: Restrict, map: "fk_agendamento_animal")
-  funcionario         Funcionario           @relation(fields: [funcionarioId], references: [id], onDelete: Restrict, map: "fk_agendamento_funcionario")
-  sala                Sala                  @relation(fields: [salaId], references: [id], onDelete: Restrict, map: "fk_agendamento_sala")
   servicos            AgendamentoServico[]
 
   metodoPagamento     MetodoPagamentoEnum?  @map("metodo_pagamento")
@@ -183,11 +179,17 @@ model AgendamentoServico {
   id               String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   agendamentoId    String      @map("agendamento_id") @db.Uuid
   tipoServicoId    String      @map("tipo_servico_id") @db.Uuid
+  funcionarioId    String      @map("funcionario_id") @db.Uuid
+  salaId           String      @map("sala_id") @db.Uuid
+  dataHoraInicio   DateTime    @map("data_hora_inicio") @db.Timestamptz(6)
+  dataHoraFim      DateTime    @map("data_hora_fim") @db.Timestamptz(6)
   precoNoMomento   Decimal     @map("preco_no_momento") @db.Decimal(10, 2)
   duracaoNoMomento Int         @map("duracao_no_momento")
   ordem            Int
   agendamento      Agendamento @relation(fields: [agendamentoId], references: [id], onDelete: Cascade, map: "fk_agendamento_servico_agendamento")
   tipoServico      TipoServico @relation(fields: [tipoServicoId], references: [id], onDelete: Restrict, map: "fk_agendamento_servico_tipo")
+  funcionario      Funcionario @relation(fields: [funcionarioId], references: [id], onDelete: Restrict, map: "fk_agendamento_servico_funcionario")
+  sala             Sala        @relation(fields: [salaId], references: [id], onDelete: Restrict, map: "fk_agendamento_servico_sala")
 
   @@map("agendamento_servico")
 }

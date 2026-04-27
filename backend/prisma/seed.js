@@ -255,7 +255,16 @@ async function seedFuncionarios() {
       horaFim: '18:00',
       pausaInicio: '13:00',
       pausaFim: '14:00',
-      especialidades: ['TOSQUIA_COMPLETA', 'BANHO'],
+      especialidades: ['TOSQUIA_COMPLETA', 
+                      'BANHO', 
+                      'CORTE_UNHAS',
+                      'LIMPEZA_OUVIDOS',
+                      'EXPRESSAO_GLANDULAS',
+                      'LIMPEZA_DENTES',
+                      'APARAR_PELO_CARA',
+                      'ANTI_PULGAS',
+                      'ANTI_QUEDA',
+                      'REMOCAO_NOS',],
     },
     {
       nomeCompleto: 'Miguel Torres',
@@ -268,7 +277,14 @@ async function seedFuncionarios() {
       horaFim: '17:00',
       pausaInicio: '13:00',
       pausaFim: '14:00',
-      especialidades: ['BANHO'],
+      especialidades: ['BANHO',
+                      'CORTE_UNHAS',
+                      'LIMPEZA_OUVIDOS',
+                      'EXPRESSAO_GLANDULAS',
+                      'LIMPEZA_DENTES',
+                      'ANTI_PULGAS',
+                      'ANTI_QUEDA',
+                      'REMOCAO_NOS',],
     },
     {
       nomeCompleto: 'Ana Rita Costa',
@@ -281,7 +297,16 @@ async function seedFuncionarios() {
       horaFim: '18:00',
       pausaInicio: '13:00',
       pausaFim: '14:00',
-      especialidades: ['BANHO', 'TOSQUIA_HIGIENICA'],
+      especialidades: ['BANHO',
+                     'TOSQUIA_HIGIENICA',
+                      'CORTE_UNHAS',
+                      'LIMPEZA_OUVIDOS',
+                      'EXPRESSAO_GLANDULAS',
+                      'LIMPEZA_DENTES',
+                      'APARAR_PELO_CARA',
+                      'ANTI_PULGAS',
+                      'ANTI_QUEDA',
+                      'REMOCAO_NOS',],
     },
     {
       nomeCompleto: 'Mariana Cruz',
@@ -294,7 +319,14 @@ async function seedFuncionarios() {
       horaFim: '18:00',
       pausaInicio: '13:00',
       pausaFim: '14:00',
-      especialidades: ['TOSQUIA_HIGIENICA'],
+      especialidades: ['TOSQUIA_HIGIENICA',
+                      'CORTE_UNHAS',
+                      'LIMPEZA_OUVIDOS',
+                      'LIMPEZA_DENTES',
+                      'APARAR_PELO_CARA',
+                      'ANTI_PULGAS',
+                      'ANTI_QUEDA',
+                      'REMOCAO_NOS',],
     },
     {
       nomeCompleto: 'Tiago Lopes',
@@ -307,7 +339,14 @@ async function seedFuncionarios() {
       horaFim: '18:00',
       pausaInicio: '13:00',
       pausaFim: '14:00',
-      especialidades: ['TOSQUIA_COMPLETA'],
+      especialidades: ['TOSQUIA_COMPLETA',
+                      'CORTE_UNHAS',
+                      'LIMPEZA_OUVIDOS',
+                      'LIMPEZA_DENTES',
+                      'APARAR_PELO_CARA',
+                      'ANTI_PULGAS',
+                      'ANTI_QUEDA',
+                      'REMOCAO_NOS',],
     },
     {
       nomeCompleto: 'Joao Miguel',
@@ -320,7 +359,7 @@ async function seedFuncionarios() {
       horaFim: '19:00',
       pausaInicio: '13:00',
       pausaFim: '14:00',
-      especialidades: ['BANHO'],
+      especialidades: ['BANHO', 'CORTE_UNHAS', 'LIMPEZA_OUVIDOS', 'LIMPEZA_DENTES', 'ANTI_PULGAS'],
     },
     {
       nomeCompleto: 'Carla Simoes',
@@ -351,15 +390,6 @@ async function seedFuncionarios() {
   ];
 
   for (const f of funcionarios) {
-    const exists = await prisma.utilizador.findUnique({
-      where: { email: f.email },
-      select: { id: true },
-    });
-
-    if (exists) {
-      continue;
-    }
-
     const servicoIds = f.especialidades.map((tipo) => {
       const servicoId = servicoIdByTipo.get(tipo);
       if (!servicoId) {
@@ -368,45 +398,66 @@ async function seedFuncionarios() {
       return servicoId;
     });
 
-    const utilizadorId = randomUUID();
-
     await prisma.$transaction(async (tx) => {
-      await tx.utilizador.create({
-        data: {
-          id: utilizadorId,
+      const utilizador = await tx.utilizador.upsert({
+        where: { email: f.email },
+        create: {
+          id: randomUUID(),
           nome: f.nomeCompleto,
           email: f.email,
           estadoConta: 'ATIVA',
           ativo: true,
         },
+        update: {
+          nome: f.nomeCompleto,
+          estadoConta: 'ATIVA',
+          ativo: true,
+        },
       });
 
-      await tx.funcionario.create({
-        data: {
-          id: utilizadorId,
+      await tx.funcionario.upsert({
+        where: { id: utilizador.id },
+        create: {
+          id: utilizador.id,
           cargo: f.cargo,
           telefone: f.telefone,
           porteAnimais: f.porteAnimais,
-          horariosTrabalho: {
-            create: {
-              diasSemana: f.diasSemana,
-              horaInicio: asTime(f.horaInicio),
-              horaFim: asTime(f.horaFim),
-              pausaInicio: asTime(f.pausaInicio),
-              pausaFim: asTime(f.pausaFim),
-              ativo: true,
-            },
-          },
-          funcionarioServico:
-            servicoIds.length > 0
-              ? {
-                create: servicoIds.map((tipoServicoId) => ({
-                  tipoServicoId,
-                })),
-              }
-              : undefined,
+        },
+        update: {
+          cargo: f.cargo,
+          telefone: f.telefone,
+          porteAnimais: f.porteAnimais,
         },
       });
+
+      await tx.horarioTrabalho.deleteMany({
+        where: { funcionarioId: utilizador.id },
+      });
+
+      await tx.horarioTrabalho.create({
+        data: {
+          funcionarioId: utilizador.id,
+          diasSemana: f.diasSemana,
+          horaInicio: asTime(f.horaInicio),
+          horaFim: asTime(f.horaFim),
+          pausaInicio: asTime(f.pausaInicio),
+          pausaFim: asTime(f.pausaFim),
+          ativo: true,
+        },
+      });
+
+      await tx.funcionarioServico.deleteMany({
+        where: { funcionarioId: utilizador.id },
+      });
+
+      if (servicoIds.length > 0) {
+        await tx.funcionarioServico.createMany({
+          data: servicoIds.map((tipoServicoId) => ({
+            funcionarioId: utilizador.id,
+            tipoServicoId,
+          })),
+        });
+      }
     });
   }
 }

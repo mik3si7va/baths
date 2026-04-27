@@ -5,6 +5,10 @@ camunda.bpm:
   generic-properties:
     properties:
       enforceHistoryTimeToLive: false
+  admin-user:
+    id: admin
+    password: admin
+    firstName: Admin
 
 spring:
   datasource:
