@@ -53,8 +53,6 @@ async function criarAgendamentoFuturo(tipoServicoId) {
   const agendamento = await prisma.agendamento.create({
     data: {
       animalId: animal.id,
-      funcionarioId: utilizadorFuncionarioId,
-      salaId,
       dataHoraInicio: inicio,
       dataHoraFim: fim,
       valorTotal: 30,
@@ -66,6 +64,10 @@ async function criarAgendamentoFuturo(tipoServicoId) {
     data: {
       agendamentoId: agendamento.id,
       tipoServicoId,
+      funcionarioId: utilizadorFuncionarioId,
+      salaId,
+      dataHoraInicio: inicio,
+      dataHoraFim: fim,
       precoNoMomento: 30,
       duracaoNoMomento: 30,
       ordem: 1,
@@ -319,7 +321,7 @@ describe('Gestão de Serviços — Testes Unitários', () => {
 
   test('updateTipoServico atualiza nome e substitui regras com sucesso', async () => {
     // Nomes completamente únicos para evitar colisão com dados de execuções anteriores
-    const nomeOriginal  = uniqueNome('Orig Update');
+    const nomeOriginal = uniqueNome('Orig Update');
     const nomeAtualizado = uniqueNome('Novo Update');
 
     const s = await createTipoServico({ tipo: nomeOriginal });
@@ -329,7 +331,7 @@ describe('Gestão de Serviços — Testes Unitários', () => {
       tipo: nomeAtualizado,
       regrasPreco: [
         { porteAnimal: 'GRANDE', precoBase: 50.5, duracaoMinutos: 90 },
-        { porteAnimal: 'MEDIO',  precoBase: 30,   duracaoMinutos: 45 },
+        { porteAnimal: 'MEDIO', precoBase: 30, duracaoMinutos: 45 },
       ],
     });
 
