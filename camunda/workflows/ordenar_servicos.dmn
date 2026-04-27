@@ -37,7 +37,7 @@
           <text>false</text>
         </inputEntry>
         <outputEntry id="LiteralExpression_13b6uc6">
-          <text>"BANHO→TOSQUIA_COMPLETA→APARAR_PELO_CARA→RESTO"</text>
+          <text>"BANHO -> TOSQUIA_COMPLETA -> APARAR_PELO_CARA -> RESTO"</text>
         </outputEntry>
       </rule>
       <rule id="DecisionRule_114zazb">
@@ -54,7 +54,7 @@
           <text>true</text>
         </inputEntry>
         <outputEntry id="LiteralExpression_0zbkf0t">
-          <text>"BANHO→TOSQUIA_HIGIENICA→APARAR_PELO_CARA→RESTO"</text>
+          <text>"BANHO -> TOSQUIA_HIGIENICA -> APARAR_PELO_CARA -> RESTO"</text>
         </outputEntry>
       </rule>
       <rule id="DecisionRule_1rnji9q">
@@ -71,7 +71,7 @@
           <text>false</text>
         </inputEntry>
         <outputEntry id="LiteralExpression_05pt7qh">
-          <text>"TOSQUIA_COMPLETA→APARAR_PELO_CARA→RESTO"</text>
+          <text>"TOSQUIA_COMPLETA -> APARAR_PELO_CARA -> RESTO"</text>
         </outputEntry>
       </rule>
       <rule id="DecisionRule_0i8jd63">
@@ -88,7 +88,7 @@
           <text>true</text>
         </inputEntry>
         <outputEntry id="LiteralExpression_1te96qz">
-          <text>"TOSQUIA_HIGIENICA→APARAR_PELO_CARA→RESTO"</text>
+          <text>"TOSQUIA_HIGIENICA -> APARAR_PELO_CARA -> RESTO"</text>
         </outputEntry>
       </rule>
       <rule id="DecisionRule_0x9bpfn">
@@ -105,7 +105,7 @@
           <text>false</text>
         </inputEntry>
         <outputEntry id="LiteralExpression_07iakvp">
-          <text>BANHO→TOSQUIA_COMPLETA→RESTO</text>
+          <text>"BANHO -> TOSQUIA_COMPLETA -> RESTO"</text>
         </outputEntry>
       </rule>
       <rule id="DecisionRule_0ra2f9c">
@@ -122,7 +122,7 @@
           <text>false</text>
         </inputEntry>
         <outputEntry id="LiteralExpression_1pnswyn">
-          <text>BANHO→TOSQUIA_HIGIENICA→RESTO</text>
+          <text>"BANHO -> TOSQUIA_HIGIENICA -> RESTO"</text>
         </outputEntry>
       </rule>
       <rule id="DecisionRule_0rtfqk7">
@@ -139,7 +139,7 @@
           <text>false</text>
         </inputEntry>
         <outputEntry id="LiteralExpression_07mytvj">
-          <text>"ORDEM_SELECAO"</text>
+          <text>""</text>
         </outputEntry>
       </rule>
     </decisionTable>
