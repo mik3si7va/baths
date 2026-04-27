@@ -1,42 +1,59 @@
 const prisma = require('../utils/db');
 const { log } = require('../utils/logger');
+const { AGENDAMENTO_COMPLETO_INCLUDE } = require('./agendamentos');
 
 async function gerarFatura(agendamentoId) {
     if (!agendamentoId) throw new Error('agendamentoId é obrigatório');
 
-    log('faturacao', `Gerando fatura para agendamento ${agendamentoId}`, 'info');
+    log('faturacao', `Gerar fatura para agendamento ${agendamentoId}`, 'info');
 
     const agendamento = await prisma.agendamento.findUnique({
         where: { id: agendamentoId },
-        include: {
-            animal: { include: { cliente: { include: { utilizador: true } } } },
-            funcionario: { include: { utilizador: true } },
-            sala: true,
-            servicos: { include: { tipoServico: true } },
-        },
+        include: AGENDAMENTO_COMPLETO_INCLUDE,
     });
 
     if (!agendamento) throw new Error(`Agendamento ${agendamentoId} não encontrado`);
 
-    const totalServicos = agendamento.servicos.reduce((sum, s) =>
-        sum + Number(s.precoNoMomento || 0), 0
+    const totalServicos = agendamento.servicos.reduce(
+        (sum, s) => sum + Number(s.precoNoMomento || 0),
+        0,
     );
 
+    const servicosFormatados = agendamento.servicos.map(s => ({
+        nome: s.tipoServico?.tipo || 'Serviço',
+        preco: Number(s.precoNoMomento),
+        duracao: s.duracaoNoMomento,
+        dataHoraInicio: s.dataHoraInicio,
+        dataHoraFim: s.dataHoraFim,
+        funcionarioNome: s.funcionario?.utilizador?.nome || 'Funcionário',
+        salaNome: s.sala?.nome || 'Sem sala',
+    }));
+
+    // Listas únicas — úteis para cabeçalhos de template sem iterar os serviços.
+    const funcionarios = [...new Set(servicosFormatados.map(s => s.funcionarioNome))];
+    const salas = [...new Set(servicosFormatados.map(s => s.salaNome))];
+
+    const faturaId = agendamento.faturaId
+        || `FAT-${Date.now().toString(36).toUpperCase()}-${agendamentoId.slice(0, 8)}`;
+
+    if (!agendamento.faturaId) {
+        await prisma.agendamento.update({
+            where: { id: agendamentoId },
+            data: { faturaId },
+        });
+    }
+
     const fatura = {
-        faturaId: `FAT-${Date.now().toString(36).toUpperCase()}-${agendamentoId.slice(0, 8)}`,
+        faturaId,
         agendamentoId,
         clienteNome: agendamento.animal?.cliente?.utilizador?.nome || 'Cliente',
         clienteEmail: agendamento.animal?.cliente?.utilizador?.email,
         animalNome: agendamento.animal?.nome || 'Animal',
-        funcionarioNome: agendamento.funcionario?.utilizador?.nome || 'Funcionário',
-        salaNome: agendamento.sala?.nome || 'Sem sala',
         dataHoraInicio: agendamento.dataHoraInicio,
         dataHoraFim: agendamento.dataHoraFim,
-        servicos: agendamento.servicos.map(s => ({
-            nome: s.tipoServico?.tipo || 'Serviço',
-            preco: Number(s.precoNoMomento),
-            duracao: s.duracaoNoMomento,
-        })),
+        servicos: servicosFormatados,
+        funcionarios,
+        salas,
         totalServicos,
         valorTotal: Number(agendamento.valorTotal),
         dataEmissao: new Date(),
@@ -51,13 +68,12 @@ async function registarPagamento({ agendamentoId, valorPago, metodoPagamento }) 
         throw new Error('agendamentoId, valorPago e metodoPagamento são obrigatórios');
     }
 
-    // Valida enum
     const metodosValidos = ['DINHEIRO', 'MULTIBANCO', 'TRANSFERENCIA'];
     if (!metodosValidos.includes(metodoPagamento)) {
         throw new Error(`Método de pagamento inválido: ${metodoPagamento}`);
     }
 
-    log('faturacao', `Registando pagamento: ${valorPago}€ via ${metodoPagamento}`, 'info');
+    log('faturacao', `Registar pagamento: ${valorPago}€ via ${metodoPagamento}`, 'info');
 
     const agendamento = await prisma.agendamento.update({
         where: { id: agendamentoId },

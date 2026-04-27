@@ -1,8 +1,7 @@
 const nodemailer = require('nodemailer');
 const { log } = require('../utils/logger');
 
-let transporter; // Singleton
-
+let transporter;
 function getTransporter() {
     if (!transporter) {
         transporter = nodemailer.createTransport({
@@ -12,7 +11,6 @@ function getTransporter() {
                 user: process.env.MAIL_USER,
                 pass: process.env.MAIL_PASS,
             },
-
             debug: process.env.NODE_ENV === 'development',
             logger: process.env.NODE_ENV === 'development',
         });
@@ -20,121 +18,108 @@ function getTransporter() {
     return transporter;
 }
 
-/**
- * Função base para enviar email
- */
-async function enviarEmail({ to, subject, html, text }) {
-    if (!to) {
-        log('notificacoes', 'Email sem destinatário — ignorado', 'warn');
-        return false;
-    }
+const fmt = (d) => new Date(d).toLocaleString('pt-PT');
 
-    try {
-        const mailOptions = {
-            from: process.env.MAIL_FROM || 'noreply@bet.pt',
-            to,
-            subject: `[B&T] ${subject}`,
-            html,
-            ...(text && { text }),
-        };
-
-        await getTransporter().sendMail(mailOptions);
-        log('notificacoes', `✓ Email enviado para ${to} | ${subject}`, 'success');
-        return true;
-
-    } catch (error) {
-        log('notificacoes', `✗ Falha ao enviar email para ${to}: ${error.message}`, 'error');
-        // emails são best-effort
-        return false;
-    }
-}
-
-/**
- * Templates de email
- */
-function templateConfirmacao(nomeCliente, dataHora, servicos) {
+function layout(nomeCliente, corpo) {
     return `
     <h2>Olá ${nomeCliente}!</h2>
-    <p>O seu agendamento foi confirmado para <strong>${new Date(dataHora).toLocaleString('pt-PT')}</strong>.</p>
-    <p><strong>Serviços:</strong> ${servicos.join(', ')}</p>
-    <p>Obrigado por escolher a B&T!</p>
+    ${corpo}
     <hr>
     <small>Este é um email automático. Não responda a este endereço.</small>
   `;
 }
 
-function templateCancelamento(nomeCliente, dataHora) {
-    return `
-    <h2>Olá ${nomeCliente}!</h2>
-    <p>O seu agendamento de <strong>${new Date(dataHora).toLocaleString('pt-PT')}</strong> foi cancelado.</p>
-    <p>Se pretender reagendar, contacte-nos ou aceda ao nosso portal.</p>
-    <hr>
-    <small>Este é um email automático.</small>
-  `;
+const TEMPLATES = {
+    confirmacao: {
+        subject: () => 'Confirmação de Agendamento',
+        html: ({ nomeCliente, dataHoraInicio, servicos = [] }) => layout(nomeCliente, `
+            <p>O seu agendamento foi <strong>confirmado</strong> para <strong>${fmt(dataHoraInicio)}</strong>.</p>
+            <p><strong>Serviços:</strong> ${servicos.join(', ') || '—'}</p>
+            <p>Obrigado por escolher a B&T!</p>
+        `),
+    },
+    cancelamento: {
+        subject: () => 'Cancelamento de Agendamento',
+        html: ({ nomeCliente, dataHoraInicio }) => layout(nomeCliente, `
+            <p>O seu agendamento de <strong>${fmt(dataHoraInicio)}</strong> foi cancelado.</p>
+            <p>Se pretender reagendar, contacte-nos.</p>
+        `),
+    },
+    reagendamento: {
+        subject: () => 'Reagendamento Confirmado',
+        html: ({ nomeCliente, dataHoraInicio }) => layout(nomeCliente, `
+            <p>O seu agendamento foi reagendado para <strong>${fmt(dataHoraInicio)}</strong>.</p>
+            <p>Obrigado por continuar a confiar na B&T!</p>
+        `),
+    },
+    naoCompareceu: {
+        subject: () => 'Falta ao Agendamento',
+        html: ({ nomeCliente, dataHoraInicio }) => layout(nomeCliente, `
+            <p>Registámos a sua falta ao agendamento de <strong>${fmt(dataHoraInicio)}</strong>.</p>
+            <p>Se pretender reagendar, contacte-nos.</p>
+        `),
+    },
+    fatura: {
+        subject: ({ faturaId }) => `Fatura ${faturaId}`,
+        html: ({ nomeCliente, faturaId, faturaUrl }) => layout(nomeCliente, `
+            <p>Obrigado pela sua visita à B&T.</p>
+            <p>A sua fatura <strong>${faturaId}</strong> foi emitida com sucesso.</p>
+            ${faturaUrl ? `<p><a href="${faturaUrl}">Descarregar PDF</a></p>` : ''}
+        `),
+    },
+};
+
+/**
+ * Envia um email via SMTP. Se DISABLE_EMAILS=true (default), apenas loga e devolve true.
+ * Best-effort: erros são logados e devolvem false, nunca propagam.
+ */
+async function enviarEmail({ to, subject, html }) {
+    if (!to) {
+        log('notificacoes', 'sem destinatário — ignorado', 'warn');
+        return false;
+    }
+
+    const disabled = String(process.env.DISABLE_EMAILS ?? 'true').toLowerCase() !== 'false';
+    if (disabled) {
+        log('notificacoes', `[SIMULACAO] ${to} | ${subject}`, 'info');
+        return true;
+    }
+
+    try {
+        await getTransporter().sendMail({
+            from: process.env.MAIL_FROM || 'noreply@bet.pt',
+            to,
+            subject: `[B&T] ${subject}`,
+            html,
+        });
+        return true;
+    } catch (error) {
+        log('notificacoes', `falha para ${to}: ${error.message}`, 'error');
+        return false;
+    }
 }
 
-function templateNaoCompareceu(nomeCliente, dataHora) {
-    return `
-    <h2>Olá ${nomeCliente}!</h2>
-    <p>Registámos a sua falta ao agendamento de <strong>${new Date(dataHora).toLocaleString('pt-PT')}</strong>.</p>
-    <p>Se pretender reagendar, contacte-nos.</p>
-    <hr>
-    <small>Este é um email automático.</small>
-  `;
-}
-
-function templateReagendamento(nomeCliente, dataHora) {
-    return `
-    <h2>Olá ${nomeCliente}!</h2>
-    <p>O seu agendamento foi reagendado para <strong>${new Date(dataHora).toLocaleString('pt-PT')}</strong>.</p>
-    <p>Obrigado por continuar a confiar na B&T!</p>
-    <hr>
-    <small>Este é um email automático.</small>
-  `;
-}
-
-/* ====================== Funções Públicas ====================== */
-
-async function enviarEmailConfirmacao({ emailCliente, nomeCliente, dataHoraInicio, servicos = [] }) {
-    const html = templateConfirmacao(nomeCliente, dataHoraInicio, servicos);
+function enviarTipo(tipo, dados) {
+    const t = TEMPLATES[tipo];
+    if (!t) throw new Error(`Tipo de email desconhecido: ${tipo}`);
     return enviarEmail({
-        to: emailCliente,
-        subject: 'Confirmação de Agendamento',
-        html
+        to: dados.emailCliente,
+        subject: t.subject(dados),
+        html: t.html(dados),
     });
 }
 
-async function enviarEmailCancelamento({ emailCliente, nomeCliente, dataHoraInicio }) {
-    const html = templateCancelamento(nomeCliente, dataHoraInicio);
-    return enviarEmail({
-        to: emailCliente,
-        subject: 'Cancelamento de Agendamento',
-        html
-    });
-}
-
-async function enviarEmailNaoCompareceu({ emailCliente, nomeCliente, dataHoraInicio }) {
-    const html = templateNaoCompareceu(nomeCliente, dataHoraInicio);
-    return enviarEmail({
-        to: emailCliente,
-        subject: 'Falta ao Agendamento',
-        html
-    });
-}
-
-async function enviarEmailReagendamento({ emailCliente, nomeCliente, dataHoraInicio }) {
-    const html = templateReagendamento(nomeCliente, dataHoraInicio);
-    return enviarEmail({
-        to: emailCliente,
-        subject: 'Reagendamento Confirmado',
-        html
-    });
-}
+const enviarEmailConfirmacao = (d) => enviarTipo('confirmacao', d);
+const enviarEmailCancelamento = (d) => enviarTipo('cancelamento', d);
+const enviarEmailReagendamento = (d) => enviarTipo('reagendamento', d);
+const enviarEmailNaoCompareceu = (d) => enviarTipo('naoCompareceu', d);
+const enviarEmailFatura = (d) => enviarTipo('fatura', d);
 
 module.exports = {
     enviarEmail,
     enviarEmailConfirmacao,
     enviarEmailCancelamento,
-    enviarEmailNaoCompareceu,
     enviarEmailReagendamento,
+    enviarEmailNaoCompareceu,
+    enviarEmailFatura,
 };
