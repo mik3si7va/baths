@@ -1,4 +1,5 @@
 const { log } = require('./logger');
+const { format } = require('date-fns');
 
 /**
  * Lê uma variável do task do Camunda.
@@ -19,7 +20,7 @@ function getVariable(task, name, defaultVal = null) {
         }
         return raw;
     } catch (err) {
-        log('worker-utils', `getVariable("${name}") falhou: ${err.message}`, 'warn');
+        log('utilsWorker', `getVariable("${name}") falhou: ${err.message}`, 'warn');
         return defaultVal;
     }
 }
@@ -39,7 +40,7 @@ function parseJsonSafe(str, defaultVal = null, label = '') {
     try {
         return JSON.parse(str);
     } catch (err) {
-        log('worker-utils', `parseJsonSafe${label ? ` [${label}]` : ''} falhou: ${err.message}`, 'warn');
+        log('utilsWorker', `parseJsonSafe${label ? ` [${label}]` : ''} falhou: ${err.message}`, 'warn');
         return defaultVal;
     }
 }
@@ -59,4 +60,51 @@ function getJsonVariable(task, name, defaultVal = null) {
     return parseJsonSafe(raw, defaultVal, name);
 }
 
-module.exports = { getVariable, parseJsonSafe, getJsonVariable };
+/**
+ * Formata uma data para dd/MM/yyyy HH:mm:ss (hora local).
+ * Aceita Date, ISO string ou timestamp.
+ */
+function formatDt(date) {
+    if (!date) return '—';
+    return format(new Date(date), 'dd/MM/yyyy HH:mm:ss');
+}
+
+/**
+ * Resolve o objeto da opção escolhida pelo utilizador.
+ *
+ * Prioridade:
+ *   1. `opcaoSelecionada` como objeto → usa directamente.
+ *   2. `opcaoSelecionada` como índice numérico → resolve `solucoes[idx]` (ou `opcoes[idx]`).
+ *   3. Sem `opcaoSelecionada` → fallback para `solucoes[0]` (primeira, já ordenada por `ordenar-solucoes`).
+ *   4. null.
+ *
+ * @returns {object|null}
+ */
+function resolverOpcao(task) {
+    let opcao = task.variables.get('opcaoSelecionada');
+    if (typeof opcao === 'string') {
+        try { opcao = JSON.parse(opcao); } catch { /* preserva string original */ }
+    }
+
+    // 1. Objeto com dados — escolha directa (raro, mas possível via API).
+    if (opcao && typeof opcao === 'object' && !Array.isArray(opcao)) {
+        return opcao;
+    }
+
+    let solucoes = task.variables.get('solucoes') || task.variables.get('opcoes');
+    if (typeof solucoes === 'string') {
+        try { solucoes = JSON.parse(solucoes); } catch { solucoes = null; }
+    }
+    if (!Array.isArray(solucoes) || solucoes.length === 0) return null;
+
+    // 2. Índice numérico explícito.
+    if (typeof opcao === 'number' || (typeof opcao === 'string' && !isNaN(opcao))) {
+        const idx = Number(opcao);
+        if (solucoes[idx]) return solucoes[idx];
+    }
+
+    // 3. Sem escolha — primeira solução (já ordenada).
+    return solucoes[0];
+}
+
+module.exports = { getVariable, parseJsonSafe, getJsonVariable, formatDt, resolverOpcao };

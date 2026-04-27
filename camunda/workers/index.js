@@ -4,12 +4,12 @@ const client = require('./utils/camundaClient');
 const { log } = require('./utils/logger');
 
 
-const reservaWorkers = require('./workers/reservaWorkers');
-const emailWorkers = require('./workers/emailWorkers');
-const precoEServicoWorkers = require('./workers/precoEServicoWorkers');
-const agendamentoWorkers = require('./workers/agendamentoWorkers');
-const gerarSolucoesWorkers = require('./workers/gerarSolucoesWorkers');
-const faturaWorkers = require('./workers/faturaWorkers');
+const reservaWorkers = require('./workers/reservas');
+const emailWorkers = require('./workers/email');
+const precoEServicoWorkers = require('./workers/precoEServico');
+const agendamentoWorkers = require('./workers/agendamento');
+const solucoesWorkers = require('./workers/solucoes');
+const faturaWorkers = require('./workers/fatura');
 
 log('Workers', '🚀 Iniciando todos os workers do Camunda...', 'info');
 
@@ -17,7 +17,7 @@ reservaWorkers(client);
 emailWorkers(client);
 precoEServicoWorkers(client);
 agendamentoWorkers(client);
-gerarSolucoesWorkers(client);
+solucoesWorkers(client);
 faturaWorkers(client);
 
 client.start();
