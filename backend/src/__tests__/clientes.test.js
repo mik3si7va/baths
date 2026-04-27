@@ -303,6 +303,7 @@ describe("Gestao de Clientes — Testes Unitarios", () => {
       nome: "Animal",
       especie: "Cão",
       porte: "MEDIO",
+      dataNascimento: "2022-01-01",
     });
 
     const resultado = await cancelarClienteTemporario(temp.id);
@@ -338,6 +339,7 @@ describe("Gestao de Clientes — Testes Unitarios", () => {
         nome: "Rex",
         especie: "Cão",
         porte: "MEDIO",
+        dataNascimento: "2020-01-01",
       }),
     ).rejects.toThrow("Cliente não encontrado.");
   });
@@ -351,6 +353,7 @@ describe("Gestao de Clientes — Testes Unitarios", () => {
       nome: "Rex",
       especie: "Cão",
       porte: "MEDIO",
+      dataNascimento: "2020-01-01",
     });
 
     await expect(
@@ -358,6 +361,7 @@ describe("Gestao de Clientes — Testes Unitarios", () => {
         nome: "Max",
         especie: "Gato",
         porte: "PEQUENO",
+        dataNascimento: "2021-05-05",
       }),
     ).rejects.toThrow("Este cliente já foi confirmado");
   });
@@ -372,6 +376,7 @@ describe("Gestao de Clientes — Testes Unitarios", () => {
         nome: "",
         especie: "Cão",
         porte: "MEDIO",
+        dataNascimento: "2020-01-01",
       }),
     ).rejects.toThrow("Nome do animal é obrigatório.");
   });
@@ -386,6 +391,7 @@ describe("Gestao de Clientes — Testes Unitarios", () => {
         nome: "Rex",
         especie: "",
         porte: "MEDIO",
+        dataNascimento: "2020-01-01",
       }),
     ).rejects.toThrow("Espécie é obrigatória.");
   });
@@ -400,6 +406,7 @@ describe("Gestao de Clientes — Testes Unitarios", () => {
         nome: "Rex",
         especie: "Cão",
         porte: "GIGANTE",
+        dataNascimento: "2020-01-01",
       }),
     ).rejects.toThrow("Porte inválido");
   });
@@ -415,6 +422,7 @@ describe("Gestao de Clientes — Testes Unitarios", () => {
       nome: "Mia",
       especie: "Gato",
       porte: "PEQUENO",
+      dataNascimento: "2021-03-03",
     });
 
     const clientes = await getAllClientes();
@@ -457,6 +465,7 @@ describe("Gestao de Animais — Testes Unitarios", () => {
       nome: "PrimeiroAnimal",
       especie: "Cão",
       porte: "MEDIO",
+      dataNascimento: "2020-06-06",
     });
     clienteAtivo = resultado.cliente;
   });
@@ -506,12 +515,13 @@ describe("Gestao de Animais — Testes Unitarios", () => {
       nome: "Luna",
       especie: "Gato",
       porte: "PEQUENO",
+      dataNascimento: "2022-02-02",
     });
 
     expect(animal.id).toBeTruthy();
     expect(animal.nome).toBe("Luna");
     expect(animal.raca).toBeNull();
-    expect(animal.dataNascimento).toBeNull();
+    expect(animal.dataNascimento).toBe("2022-02-02");
     expect(animal.alergias).toBeNull();
     expect(animal.observacoes).toBeNull();
   });
@@ -530,6 +540,7 @@ describe("Gestao de Animais — Testes Unitarios", () => {
         nome: `Animal ${porte}`,
         especie: "Cão",
         porte,
+        dataNascimento: "2022-02-02",
       });
       expect(animal.porte).toBe(porte);
     }
@@ -541,6 +552,7 @@ describe("Gestao de Animais — Testes Unitarios", () => {
         nome: "Rex",
         especie: "Cão",
         porte: "MEDIO",
+        dataNascimento: "2020-01-01",
       }),
     ).rejects.toThrow("Cliente não encontrado.");
   });
@@ -556,7 +568,12 @@ describe("Gestao de Animais — Testes Unitarios", () => {
     createdEmails.push(email);
 
     await expect(
-      createAnimal(temp.id, { nome: "Rex", especie: "Cão", porte: "MEDIO" }),
+      createAnimal(temp.id, {
+        nome: "Rex",
+        especie: "Cão",
+        porte: "MEDIO",
+        dataNascimento: "2020-01-01",
+      }),
     ).rejects.toThrow(
       "Não é possível adicionar animais a um cliente que não está ativo.",
     );
@@ -568,6 +585,7 @@ describe("Gestao de Animais — Testes Unitarios", () => {
         nome: "",
         especie: "Cão",
         porte: "MEDIO",
+        dataNascimento: "2020-01-01",
       }),
     ).rejects.toThrow("Nome do animal é obrigatório.");
   });
@@ -578,13 +596,19 @@ describe("Gestao de Animais — Testes Unitarios", () => {
         nome: "Rex",
         especie: "",
         porte: "MEDIO",
+        dataNascimento: "2020-01-01",
       }),
     ).rejects.toThrow("Espécie é obrigatória.");
   });
 
   test("createAnimal falha sem porte", async () => {
     await expect(
-      createAnimal(clienteAtivo.id, { nome: "Rex", especie: "Cão", porte: "" }),
+      createAnimal(clienteAtivo.id, {
+        nome: "Rex",
+        especie: "Cão",
+        porte: "",
+        dataNascimento: "2020-01-01",
+      }),
     ).rejects.toThrow("Porte é obrigatório.");
   });
 
@@ -594,6 +618,7 @@ describe("Gestao de Animais — Testes Unitarios", () => {
         nome: "Rex",
         especie: "Cão",
         porte: "GIGANTE",
+        dataNascimento: "2020-01-01",
       }),
     ).rejects.toThrow("Porte inválido");
   });
