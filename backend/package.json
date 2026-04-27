@@ -5,7 +5,7 @@
   "main": "index.js",
   "scripts": {
     "test": "jest",
-    "start": "node src/server.js",
+    "start": "cross-env TZ=UTC node src/server.js",
     "db:prepare": "node src/db/prepareDatabases.js",
     "db:wait": "node src/db/waitForDb.js",
     "db:baseline": "node src/db/baselinePrisma.js",

@@ -11,11 +11,10 @@
     "camunda:deploy": "node ./camunda/deploy-bpmn.js",
     "camunda:boot": "npm run camunda:up && node ./camunda/deploy-bpmn.js",
     "camunda:wipe-processes": "node ./camunda/wipe-processes.js",
-    "workers": "node camunda/workers/index.js",
-    "workers:dev": "nodemon camunda/workers/index.js",
+    "workers": "cross-env TZ=UTC node camunda/workers/index.js",
+    "workers:dev": "cross-env TZ=UTC nodemon camunda/workers/index.js",
     "prisma:generate": "npx prisma generate --schema=backend/prisma/schema.prisma",
-
-    "camunda:test-auto": "node ./camunda/test-auto.mjs"
+    "camunda:test-single": "cross-env TZ=UTC node ./camunda/test-single.mjs"
   },
   "dependencies": {
     "@prisma/client": "^6.19.0",
@@ -25,7 +24,8 @@
     "nodemailer": "^8.0.4"
   },
   "devDependencies": {
-    "prisma": "^6.19.0",
-    "nodemon": "^3.1.0"
+    "cross-env": "^10.1.0",
+    "nodemon": "^3.1.0",
+    "prisma": "^6.19.0"
   }
 }
