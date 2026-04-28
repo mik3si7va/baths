@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { Box, Typography, Grid } from "@mui/material";
 import { useThemeContext } from "../../contexts/ThemeContext";
 import { SummaryCard, QuickAcessCard } from "../../components";
@@ -14,15 +14,61 @@ import PaymentIcon from "@mui/icons-material/Payment";
 import ContentCutIcon from "@mui/icons-material/ContentCut";
 import ShoppingCartIcon from "@mui/icons-material/ShoppingCart";
 
+const API_BASE_URL = process.env.REACT_APP_API_URL || "http://localhost:5000";
+
 export default function Home() {
   const { colors } = useThemeContext();
+  const [stats, setStats] = useState({
+    totalClientes: 0,
+    totalAnimais: 0,
+    totalFuncionarios: 0,
+    totalSalas: 0,
+  });
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchStats = async () => {
+      try {
+        // Fetch clientes e contar animais
+        const clientesRes = await fetch(`${API_BASE_URL}/clientes`);
+        const clientes = await clientesRes.json();
+        const totalClientes = Array.isArray(clientes) ? clientes.length : 0;
+        const totalAnimais = Array.isArray(clientes)
+          ? clientes.reduce((acc, cliente) => acc + (cliente.animais?.length || 0), 0)
+          : 0;
+
+        // Fetch funcionarios
+        const funcionariosRes = await fetch(`${API_BASE_URL}/funcionarios`);
+        const funcionarios = await funcionariosRes.json();
+        const totalFuncionarios = Array.isArray(funcionarios) ? funcionarios.length : 0;
+
+        // Fetch salas
+        const salasRes = await fetch(`${API_BASE_URL}/salas`);
+        const salas = await salasRes.json();
+        const totalSalas = Array.isArray(salas) ? salas.length : 0;
+
+        setStats({
+          totalClientes,
+          totalAnimais,
+          totalFuncionarios,
+          totalSalas,
+        });
+      } catch (error) {
+        console.error("Erro ao buscar estatísticas:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchStats();
+  }, []);
 
   // Dados dos cards
   const cardData = [
-    { icon: PeopleIcon, label: "Clientes", height: 80, width: 238 },
-    { icon: PetsIcon, label: "Animais", height: 80, width: 238 },
-    { icon: BadgeIcon, label: "Funcionários", height: 80, width: 238 },
-    { icon: MeetingRoomIcon, label: "Salas", height: 80, width: 238 },
+    { icon: PeopleIcon, label: "Clientes", height: 80, width: 238, value: stats.totalClientes },
+    { icon: PetsIcon, label: "Animais", height: 80, width: 238, value: stats.totalAnimais },
+    { icon: BadgeIcon, label: "Funcionários", height: 80, width: 238, value: stats.totalFuncionarios },
+    { icon: MeetingRoomIcon, label: "Salas", height: 80, width: 238, value: stats.totalSalas },
   ];
 
   // Dados dos cards de acesso rápido (Quick Acess Cards)
@@ -120,6 +166,7 @@ export default function Home() {
               label={item.label}
               height={item.height}
               width={item.width}
+              value={loading ? "..." : item.value}
             />
           </Grid>
         ))}
