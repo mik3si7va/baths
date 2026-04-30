@@ -1,136 +1,229 @@
-const express = require("express");
 const cors = require("cors");
-const bcrypt = require("bcrypt");
-const { randomUUID } = require("node:crypto");
-const { PrismaClient, Prisma } = require("@prisma/client");
+const express = require("express");
+const http = require("node:http");
+const net = require("node:net");
+const path = require("node:path");
+const { spawn } = require("node:child_process");
+
 require("dotenv").config();
 
 const app = express();
-const prisma = new PrismaClient();
+
 const PORT = Number(process.env.CLIENT_APP_BACKEND_PORT || 5001);
-const BCRYPT_ROUNDS = 10;
+const CLIENT_ORIGIN = process.env.CLIENT_APP_FRONTEND_URL || "http://localhost:3002";
+const TARGET_BACKEND_URL = process.env.ORIGINAL_BACKEND_URL || "http://localhost:5000";
+const ORIGINAL_BACKEND_DIR = path.resolve(__dirname, "../../../backend");
+const ROOT_DIR = path.resolve(__dirname, "../../..");
 
-app.use(cors({ origin: process.env.CLIENT_APP_FRONTEND_URL || "http://localhost:3001" }));
-app.use(express.json());
+let originalBackendProcess = null;
 
-function isValidNif(nif) {
-  return /^\d{9}$/.test(String(nif).trim());
-}
+app.use(cors({ origin: CLIENT_ORIGIN }));
 
-function mapClienteRow(row) {
+function getTarget() {
+  const url = new URL(TARGET_BACKEND_URL);
   return {
-    id: row.id,
-    nome: row.utilizador?.nome,
-    email: row.utilizador?.email,
-    telefone: row.telefone,
-    nif: row.nif || null,
-    morada: row.morada || null,
-    ativo: row.utilizador?.ativo,
-    estadoConta: row.utilizador?.estadoConta,
-    createdAt: row.utilizador?.createdAt,
+    hostname: url.hostname,
+    port: Number(url.port || (url.protocol === "https:" ? 443 : 80)),
+    protocol: url.protocol,
   };
 }
 
-app.get("/health", (_req, res) => {
-  res.json({ ok: true, service: "AppClient backend" });
-});
+function isPortOpen(hostname, port) {
+  return new Promise((resolve) => {
+    const socket = net.createConnection({ host: hostname, port });
 
-app.post("/clientes", async (req, res) => {
-  const { nome, email, telefone, password, nif, morada } = req.body || {};
-
-  if (!nome || !email || !telefone || !password) {
-    return res
-      .status(400)
-      .json({ error: "nome, email, telefone e password sao obrigatorios" });
-  }
-
-  if (password.trim().length < 8) {
-    return res
-      .status(400)
-      .json({ error: "A password deve ter pelo menos 8 caracteres." });
-  }
-
-  if (nif && !isValidNif(nif)) {
-    return res.status(400).json({ error: "O NIF deve ter 9 digitos numericos." });
-  }
-
-  const normalizedEmail = String(email).trim().toLowerCase();
-
-  try {
-    const emailExiste = await prisma.utilizador.findUnique({
-      where: { email: normalizedEmail },
-      select: { id: true },
+    socket.once("connect", () => {
+      socket.end();
+      resolve(true);
     });
 
-    if (emailExiste) {
-      return res
-        .status(409)
-        .json({ error: `Ja existe uma conta com o email "${normalizedEmail}".` });
+    socket.once("error", () => resolve(false));
+    socket.setTimeout(1000, () => {
+      socket.destroy();
+      resolve(false);
+    });
+  });
+}
+
+async function waitForPort(hostname, port, timeoutMs = 20000) {
+  const deadline = Date.now() + timeoutMs;
+
+  while (Date.now() < deadline) {
+    if (await isPortOpen(hostname, port)) {
+      return true;
     }
 
-    if (nif && nif.trim()) {
-      const nifExiste = await prisma.cliente.findUnique({
-        where: { nif: nif.trim() },
-        select: { id: true },
-      });
+    await new Promise((resolve) => setTimeout(resolve, 500));
+  }
 
-      if (nifExiste) {
-        return res
-          .status(409)
-          .json({ error: `Ja existe um cliente com o NIF "${nif.trim()}".` });
+  return false;
+}
+
+function runCommand(command, args, options = {}) {
+  return new Promise((resolve, reject) => {
+    const child = spawn(command, args, {
+      stdio: "inherit",
+      shell: false,
+      ...options,
+    });
+
+    child.once("error", reject);
+    child.once("exit", (code) => {
+      if (code === 0) {
+        resolve();
+        return;
       }
-    }
 
-    const utilizadorId = randomUUID();
-    const passwordHash = await bcrypt.hash(password.trim(), BCRYPT_ROUNDS);
-
-    const cliente = await prisma.$transaction(async (tx) => {
-      await tx.utilizador.create({
-        data: {
-          id: utilizadorId,
-          nome: nome.trim(),
-          email: normalizedEmail,
-          passwordHash,
-          estadoConta: "PENDENTE_VERIFICACAO",
-          ativo: false,
-        },
-      });
-
-      return tx.cliente.create({
-        data: {
-          id: utilizadorId,
-          telefone: telefone.trim(),
-          nif: nif && nif.trim() ? nif.trim() : null,
-          morada: morada && morada.trim() ? morada.trim() : null,
-        },
-        include: { utilizador: true },
-      });
+      reject(new Error(`${command} ${args.join(" ")} terminou com codigo ${code}`));
     });
+  });
+}
 
-    return res.status(201).json(mapClienteRow(cliente));
-  } catch (error) {
-    if (
-      error instanceof Prisma.PrismaClientKnownRequestError &&
-      error.code === "P2002"
-    ) {
-      return res.status(409).json({ error: "Dados duplicados." });
-    }
+function getChildEnv(extraEnv = {}) {
+  return Object.fromEntries(
+    Object.entries({ ...process.env, ...extraEnv }).filter(
+      ([key, value]) => key && !key.startsWith("=") && value !== undefined
+    )
+  );
+}
 
-    console.error("Failed to register client:", error);
-    return res.status(500).json({ error: "Erro ao criar cliente." });
+function getNpmCommand(scriptName) {
+  if (process.platform === "win32") {
+    return {
+      command: "cmd.exe",
+      args: ["/d", "/s", "/c", "npm.cmd", "run", scriptName],
+    };
   }
+
+  return {
+    command: "npm",
+    args: ["run", scriptName],
+  };
+}
+
+async function startDatabaseIfNeeded() {
+  if (process.env.CLIENT_APP_SKIP_DB_UP === "true") {
+    console.log("A saltar arranque automatico da DB.");
+    return;
+  }
+
+  const dockerCommand = process.platform === "win32" ? "docker.exe" : "docker";
+
+  console.log("A acordar PostgreSQL do projeto principal...");
+  await runCommand(
+    dockerCommand,
+    ["compose", "-f", path.join(ROOT_DIR, "docker-compose.yml"), "up", "-d", "postgres"],
+    { cwd: ROOT_DIR }
+  );
+}
+
+async function startOriginalBackendIfNeeded() {
+  const target = getTarget();
+  const isLocalTarget = ["localhost", "127.0.0.1", "::1"].includes(target.hostname);
+
+  if (!isLocalTarget) {
+    console.log(`AppClient backend vai usar backend externo: ${TARGET_BACKEND_URL}`);
+    return;
+  }
+
+  if (await isPortOpen(target.hostname, target.port)) {
+    console.log(`Backend original ja esta ativo em ${TARGET_BACKEND_URL}.`);
+    return;
+  }
+
+  await startDatabaseIfNeeded();
+
+  const npmStart = getNpmCommand("start");
+
+  console.log(`A arrancar backend original em ${ORIGINAL_BACKEND_DIR}...`);
+  originalBackendProcess = spawn(npmStart.command, npmStart.args, {
+    cwd: ORIGINAL_BACKEND_DIR,
+    env: getChildEnv({ PORT: String(target.port) }),
+    stdio: "inherit",
+  });
+
+  originalBackendProcess.once("exit", (code, signal) => {
+    originalBackendProcess = null;
+    if (code !== 0 && signal !== "SIGTERM" && signal !== "SIGINT") {
+      console.error(`Backend original terminou com code=${code} signal=${signal}.`);
+    }
+  });
+
+  if (await waitForPort(target.hostname, target.port)) {
+    console.log(`Backend original ativo em ${TARGET_BACKEND_URL}.`);
+    return;
+  }
+
+  console.warn(
+    `Backend original ainda nao respondeu em ${TARGET_BACKEND_URL}; o mirror continua ativo.`
+  );
+}
+
+function proxyToOriginalBackend(req, res) {
+  const targetUrl = new URL(req.originalUrl, TARGET_BACKEND_URL);
+  const target = getTarget();
+
+  const proxyReq = http.request(
+    {
+      protocol: target.protocol,
+      hostname: target.hostname,
+      port: target.port,
+      method: req.method,
+      path: `${targetUrl.pathname}${targetUrl.search}`,
+      headers: {
+        ...req.headers,
+        host: targetUrl.host,
+      },
+    },
+    (proxyRes) => {
+      res.writeHead(proxyRes.statusCode || 502, proxyRes.headers);
+      proxyRes.pipe(res);
+    }
+  );
+
+  proxyReq.on("error", (error) => {
+    console.error("Falha ao contactar backend original:", error.message);
+    if (!res.headersSent) {
+      res.status(502).json({
+        error: "Backend original indisponivel.",
+        target: TARGET_BACKEND_URL,
+      });
+    }
+  });
+
+  req.pipe(proxyReq);
+}
+
+app.get("/health", (_req, res) => {
+  res.json({
+    ok: true,
+    service: "AppClient backend mirror",
+    target: TARGET_BACKEND_URL,
+  });
 });
 
-const server = app.listen(PORT, () => {
-  console.log(`AppClient backend a ouvir na porta ${PORT}.`);
-});
+app.use(proxyToOriginalBackend);
 
 async function shutdown() {
-  server.close(async () => {
-    await prisma.$disconnect();
-    process.exit(0);
+  if (originalBackendProcess) {
+    originalBackendProcess.kill("SIGTERM");
+  }
+  process.exit(0);
+}
+
+async function main() {
+  await startOriginalBackendIfNeeded();
+
+  app.listen(PORT, () => {
+    console.log(`AppClient backend mirror a ouvir na porta ${PORT}.`);
+    console.log(`Pedidos encaminhados para ${TARGET_BACKEND_URL}.`);
   });
 }
 
 process.on("SIGINT", shutdown);
 process.on("SIGTERM", shutdown);
+
+main().catch((error) => {
+  console.error("Falha ao arrancar AppClient backend mirror:", error);
+  process.exit(1);
+});

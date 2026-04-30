@@ -1,28 +1,43 @@
 import { createTheme } from "@mui/material/styles";
 
+export const colors = {
+  primary: "#475C51",
+  background: "#F5F0E8",
+  surface: "#FFFFFF",
+  text: "#102622",
+  textSecondary: "#666666",
+  error: "#E53935",
+  success: "#4caf50",
+};
+
 export const theme = createTheme({
   palette: {
     primary: {
-      main: "#475C51",
+      main: colors.primary,
     },
     error: {
-      main: "#E53935",
+      main: colors.error,
     },
     success: {
-      main: "#4caf50",
+      main: colors.success,
     },
     background: {
-      default: "#FFFFFF",
+      default: colors.background,
+      paper: colors.surface,
     },
     text: {
-      primary: "#102622",
+      primary: colors.text,
+      secondary: colors.textSecondary,
     },
   },
+  shape: {
+    borderRadius: 8,
+  },
   typography: {
-    fontFamily: "Inter, sans-serif",
+    fontFamily: "Inter, Arial, sans-serif",
     h1: { fontSize: "24px", fontWeight: 700 },
     h2: { fontSize: "18px", fontWeight: 600 },
     body1: { fontSize: "14px", fontWeight: 400 },
-    caption: { fontSize: "12px", fontWeight: 500 },
+    button: { fontSize: "14px", fontWeight: 700, textTransform: "none" },
   },
 });

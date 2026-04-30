@@ -1,0 +1,22 @@
+[
+  {
+    "name": "Mafalda Orbitas",
+    "email": "mafalda.orbitas@baths.local",
+    "password": "TorradaComWiFi!42"
+  },
+  {
+    "name": "Rui Batatinha",
+    "email": "rui.batatinha@baths.local",
+    "password": "BanheiraLaser_777"
+  },
+  {
+    "name": "Casanova Debug",
+    "email": "casanova.debug@baths.local",
+    "password": "PatoNaoMasCodigo99!"
+  },
+  {
+    "name": "Cliente Demo",
+    "email": "cliente.demo@baths.local",
+    "password": "MiauMiauBanho123"
+  }
+]

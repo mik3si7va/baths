@@ -6,6 +6,9 @@
   "scripts": {
     "start": "node src/server.js",
     "dev": "nodemon src/server.js",
+    "db:up": "docker compose -f ../../docker-compose.yml up -d postgres",
+    "db:down": "docker compose -f ../../docker-compose.yml stop postgres",
+    "db:full": "npm --prefix ../../backend run db:full",
     "prisma:generate": "prisma generate --schema=../../backend/prisma/schema.prisma"
   },
   "dependencies": {
