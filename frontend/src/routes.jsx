@@ -3,7 +3,15 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { MainLayout, CompactLayout } from "./layouts";
 import ServicosPage from "./pages/servicos/servicos";
 import Clientes from "./pages/clientes/clientes";
-import { Home, Calendar, Login, Salas, SalaDetalhes, Users } from "./pages";
+import {
+  Home,
+  Calendar,
+  Login,
+  Salas,
+  SalaDetalhes,
+  Users,
+  Pesquisa,
+} from "./pages";
 import App from "./App";
 
 const PrivateRoute = ({ element }) => {
@@ -40,6 +48,18 @@ export default function AppRoutes() {
               element={
                 <CompactLayout showBack>
                   <Clientes />
+                </CompactLayout>
+              }
+            />
+          }
+        />
+        <Route
+          path="/pesquisa"
+          element={
+            <PrivateRoute
+              element={
+                <CompactLayout showBack>
+                  <Pesquisa />
                 </CompactLayout>
               }
             />
