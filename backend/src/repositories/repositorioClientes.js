@@ -316,6 +316,127 @@ async function getAnimaisByCliente(clienteId) {
   return animais.map(mapAnimalRow);
 }
 
+async function updateCliente(
+  clienteId,
+  { nome, email, telefone, nif, morada, password },
+) {
+  if (!nome || !nome.trim()) throw new Error("nome é obrigatório.");
+  if (!email || !email.trim()) throw new Error("email é obrigatório.");
+  if (!telefone || !telefone.trim()) throw new Error("telefone é obrigatório.");
+
+  const cliente = await prisma.cliente.findUnique({
+    where: { id: clienteId },
+    include: { utilizador: true },
+  });
+  if (!cliente) throw new Error("Cliente não encontrado.");
+
+  const normalizedEmail = String(email).trim().toLowerCase();
+  const emailExists = await prisma.utilizador.findUnique({
+    where: { email: normalizedEmail },
+    select: { id: true },
+  });
+  if (emailExists && emailExists.id !== clienteId) {
+    throw new Error(`Já existe uma conta com o email "${normalizedEmail}".`);
+  }
+
+  let normalizedNif = null;
+  if (nif !== undefined && nif !== null && nif !== "") {
+    if (!isValidNif(nif))
+      throw new Error("O NIF deve ter 9 dígitos numéricos.");
+    normalizedNif = String(nif).trim();
+    const nifExists = await prisma.cliente.findUnique({
+      where: { nif: normalizedNif },
+      select: { id: true },
+    });
+    if (nifExists && nifExists.id !== clienteId) {
+      throw new Error(`Já existe um cliente com o NIF "${normalizedNif}".`);
+    }
+  }
+
+  let passwordHash;
+  if (password !== undefined && password !== null && password !== "") {
+    if (String(password).trim().length < 8) {
+      throw new Error("A password deve ter pelo menos 8 caracteres.");
+    }
+    passwordHash = await bcrypt.hash(String(password).trim(), BCRYPT_ROUNDS);
+  }
+
+  await prisma.$transaction(async (tx) => {
+    await tx.utilizador.update({
+      where: { id: clienteId },
+      data: {
+        nome: nome.trim(),
+        email: normalizedEmail,
+        ...(passwordHash ? { passwordHash } : {}),
+        updatedAt: new Date(),
+      },
+    });
+
+    await tx.cliente.update({
+      where: { id: clienteId },
+      data: {
+        telefone: telefone.trim(),
+        nif: normalizedNif,
+        morada: morada && morada.trim() ? morada.trim() : null,
+      },
+    });
+  });
+
+  const updatedCliente = await prisma.cliente.findUnique({
+    where: { id: clienteId },
+    include: INCLUDE_FULL,
+  });
+
+  return mapClienteRow(updatedCliente);
+}
+
+async function updateAnimal(
+  animalId,
+  {
+    clienteId,
+    nome,
+    especie,
+    raca,
+    porte,
+    dataNascimento,
+    alergias,
+    observacoes,
+  },
+) {
+  if (!clienteId || !clienteId.trim())
+    throw new Error("clienteId é obrigatório.");
+  validateAnimalFields({ nome, especie, porte, dataNascimento });
+
+  const animal = await prisma.animal.findUnique({ where: { id: animalId } });
+  if (!animal) throw new Error("Animal não encontrado.");
+
+  const clienteExiste = await prisma.cliente.findUnique({
+    where: { id: clienteId },
+    include: { utilizador: { select: { estadoConta: true } } },
+  });
+  if (!clienteExiste) throw new Error("Cliente não encontrado.");
+  if (clienteExiste.utilizador?.estadoConta !== "ATIVA") {
+    throw new Error("Só é possível associar o animal a um cliente ativo.");
+  }
+
+  const updatedAnimal = await prisma.animal.update({
+    where: { id: animalId },
+    data: {
+      clienteId,
+      nome: nome.trim(),
+      especie: especie.trim(),
+      raca: raca && raca.trim() ? raca.trim() : null,
+      porte,
+      dataNascimento: new Date(dataNascimento),
+      alergias: alergias && alergias.trim() ? alergias.trim() : null,
+      observacoes:
+        observacoes && observacoes.trim() ? observacoes.trim() : null,
+    },
+  });
+
+  return mapAnimalRow(updatedAnimal);
+}
+
 async function limparClientesTemporarios(minutosAntigos = 60) {
   const limite = new Date(Date.now() - minutosAntigos * 60 * 1000);
 
@@ -349,6 +470,8 @@ module.exports = {
   cancelarClienteTemporario,
   confirmarClienteComAnimal,
   createAnimal,
+  updateCliente,
+  updateAnimal,
   getAnimaisByCliente,
   limparClientesTemporarios,
 };

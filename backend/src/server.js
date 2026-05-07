@@ -41,6 +41,8 @@ const {
   cancelarClienteTemporario,
   confirmarClienteComAnimal,
   createAnimal,
+  updateCliente,
+  updateAnimal,
   getAnimaisByCliente,
 } = require("./repositories/repositorioClientes");
 
@@ -80,6 +82,38 @@ app.get("/clientes", async (_req, res) => {
  *   get:
  *     summary: Obtem um cliente por id (inclui animais)
  *     tags: [Clientes]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: ID do cliente
+ *     responses:
+ *       200:
+ *         description: Cliente encontrado
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Cliente'
+ *       404:
+ *         description: Cliente nao encontrado
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *             examples:
+ *               naoEncontrado:
+ *                 summary: Sem resultado para o id
+ *                 value:
+ *                   error: Cliente nao encontrado
+ *       500:
+ *         description: Erro interno
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
  */
 app.get("/clientes/:id", async (req, res) => {
   try {
@@ -90,6 +124,239 @@ app.get("/clientes/:id", async (req, res) => {
   } catch (error) {
     console.error("Failed to fetch cliente:", error);
     return res.status(500).json({ error: "Failed to fetch cliente" });
+  }
+});
+
+/**
+ * @swagger
+ * /clientes/{id}:
+ *   put:
+ *     summary: Atualiza os dados de um cliente existente
+ *     tags: [Clientes]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: ID do cliente
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               nome:
+ *                 type: string
+ *                 example: João Silva
+ *               email:
+ *                 type: string
+ *                 format: email
+ *                 example: joao@email.com
+ *               telefone:
+ *                 type: string
+ *                 example: '912345678'
+ *               nif:
+ *                 type: string
+ *                 example: '123456789'
+ *               morada:
+ *                 type: string
+ *                 example: Rua das Flores, 10
+ *               password:
+ *                 type: string
+ *                 minLength: 8
+ *     responses:
+ *       200:
+ *         description: Cliente atualizado com sucesso
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Cliente'
+ *       400:
+ *         description: Dados inválidos
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       404:
+ *         description: Cliente não encontrado
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *             examples:
+ *               naoEncontrado:
+ *                 summary: Sem resultado para o id
+ *                 value:
+ *                   error: Cliente não encontrado.
+ *       409:
+ *         description: Email ou NIF duplicado
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *             examples:
+ *               emailDuplicado:
+ *                 summary: Email já em uso
+ *                 value:
+ *                   error: Já existe uma conta com o email "joao@email.com".
+ *               nifDuplicado:
+ *                 summary: NIF já em uso
+ *                 value:
+ *                   error: Já existe um cliente com o NIF "123456789".
+ *       500:
+ *         description: Erro interno
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ */
+app.put("/clientes/:id", async (req, res) => {
+  const { nome, email, telefone, nif, morada, password } = req.body || {};
+
+  try {
+    const clienteAtualizado = await updateCliente(req.params.id, {
+      nome,
+      email,
+      telefone,
+      nif,
+      morada,
+      password,
+    });
+    return res.json(clienteAtualizado);
+  } catch (error) {
+    console.error("Failed to update cliente:", error);
+    if (error.message === "Cliente não encontrado.") {
+      return res.status(404).json({ error: error.message });
+    }
+    if (
+      error.message?.startsWith("Já existe uma conta com o email") ||
+      error.message?.startsWith("Já existe um cliente com o NIF")
+    ) {
+      return res.status(409).json({ error: error.message });
+    }
+    return res.status(400).json({ error: error.message });
+  }
+});
+
+/**
+ * @swagger
+ * /animais/{id}:
+ *   put:
+ *     summary: Atualiza os dados de um animal existente
+ *     tags: [Clientes]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: ID do animal
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [clienteId]
+ *             properties:
+ *               clienteId:
+ *                 type: string
+ *                 format: uuid
+ *                 description: ID do cliente dono do animal
+ *               nome:
+ *                 type: string
+ *                 example: Rex
+ *               especie:
+ *                 type: string
+ *                 example: Cão
+ *               raca:
+ *                 type: string
+ *                 example: Labrador
+ *               porte:
+ *                 type: string
+ *                 example: GRANDE
+ *               dataNascimento:
+ *                 type: string
+ *                 format: date
+ *                 example: '2020-03-15'
+ *               alergias:
+ *                 type: string
+ *                 example: Pólen
+ *               observacoes:
+ *                 type: string
+ *                 example: Muito ativo
+ *     responses:
+ *       200:
+ *         description: Animal atualizado com sucesso
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Animal'
+ *       400:
+ *         description: Dados inválidos
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       404:
+ *         description: Animal ou cliente nao encontrado
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *             examples:
+ *               animalNaoEncontrado:
+ *                 summary: Animal inexistente
+ *                 value:
+ *                   error: Animal não encontrado.
+ *               clienteNaoEncontrado:
+ *                 summary: Cliente inexistente
+ *                 value:
+ *                   error: Cliente não encontrado.
+ *       500:
+ *         description: Erro interno
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ */
+app.put("/animais/:id", async (req, res) => {
+  const {
+    clienteId,
+    nome,
+    especie,
+    raca,
+    porte,
+    dataNascimento,
+    alergias,
+    observacoes,
+  } = req.body || {};
+
+  try {
+    const animalAtualizado = await updateAnimal(req.params.id, {
+      clienteId,
+      nome,
+      especie,
+      raca,
+      porte,
+      dataNascimento,
+      alergias,
+      observacoes,
+    });
+    return res.json(animalAtualizado);
+  } catch (error) {
+    console.error("Failed to update animal:", error);
+    if (
+      error.message === "Cliente não encontrado." ||
+      error.message === "Animal não encontrado."
+    ) {
+      return res.status(404).json({ error: error.message });
+    }
+    return res.status(400).json({ error: error.message });
   }
 });
 
@@ -160,6 +427,56 @@ app.post("/clientes", async (req, res) => {
  *   delete:
  *     summary: Cancela e elimina um cliente temporário (PENDENTE_VERIFICACAO sem animais)
  *     tags: [Clientes]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: ID do cliente
+ *     responses:
+ *       200:
+ *         description: Cliente cancelado com sucesso
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 cancelled:
+ *                   type: boolean
+ *                   example: true
+ *                 id:
+ *                   type: string
+ *                   format: uuid
+ *       404:
+ *         description: Cliente nao encontrado
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *             examples:
+ *               naoEncontrado:
+ *                 summary: Sem resultado para o id
+ *                 value:
+ *                   error: Cliente nao encontrado
+ *       409:
+ *         description: Cliente ja confirmado ou com animais registados
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *             examples:
+ *               naoPermitido:
+ *                 summary: Cancelamento nao permitido
+ *                 value:
+ *                   error: Nao e possivel cancelar um cliente ja confirmado ou com animais registados.
+ *       500:
+ *         description: Erro interno
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
  */
 app.delete("/clientes/:id", async (req, res) => {
   try {
@@ -167,12 +484,10 @@ app.delete("/clientes/:id", async (req, res) => {
     if (!result)
       return res.status(404).json({ error: "Cliente nao encontrado" });
     if (!result.cancelled) {
-      return res
-        .status(409)
-        .json({
-          error:
-            "Nao e possivel cancelar um cliente ja confirmado ou com animais registados.",
-        });
+      return res.status(409).json({
+        error:
+          "Nao e possivel cancelar um cliente ja confirmado ou com animais registados.",
+      });
     }
     return res.json(result);
   } catch (error) {
@@ -256,6 +571,29 @@ app.post("/clientes/:id/animais/confirmar", async (req, res) => {
  *   get:
  *     summary: Lista os animais de um cliente
  *     tags: [Clientes]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: ID do cliente
+ *     responses:
+ *       200:
+ *         description: Lista de animais do cliente
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/Animal'
+ *       500:
+ *         description: Erro interno
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
  */
 app.get("/clientes/:id/animais", async (req, res) => {
   try {
@@ -1586,6 +1924,28 @@ app.delete("/funcionarios/:id", async (req, res) => {
   }
 });
 
+/**
+ * @swagger
+ * /events:
+ *   get:
+ *     summary: Lista todos os eventos
+ *     tags: [Events]
+ *     responses:
+ *       200:
+ *         description: Lista de eventos obtida com sucesso
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/Event'
+ *       500:
+ *         description: Erro interno
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ */
 app.get("/events", async (_req, res) => {
   try {
     const events = await getAllEvents();
@@ -1596,6 +1956,56 @@ app.get("/events", async (_req, res) => {
   }
 });
 
+/**
+ * @swagger
+ * /events:
+ *   post:
+ *     summary: Cria um novo evento
+ *     tags: [Events]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [title, start, end]
+ *             properties:
+ *               title:
+ *                 type: string
+ *                 example: Consulta de rotina
+ *               start:
+ *                 type: string
+ *                 format: date-time
+ *                 example: '2026-06-01T09:00:00.000Z'
+ *               end:
+ *                 type: string
+ *                 format: date-time
+ *                 example: '2026-06-01T10:00:00.000Z'
+ *     responses:
+ *       201:
+ *         description: Evento criado com sucesso
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Event'
+ *       400:
+ *         description: Dados inválidos — title, start e end são obrigatórios
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *             examples:
+ *               camposObrigatorios:
+ *                 summary: Campos em falta
+ *                 value:
+ *                   error: title, start, and end are required
+ *       500:
+ *         description: Erro interno
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ */
 app.post("/events", async (req, res) => {
   const { title, start, end } = req.body || {};
 

@@ -54,6 +54,16 @@ const CLIENTE_ATIVO_MOCK = {
   ],
 };
 
+const CLIENTE_ATIVO_COM_NIF_MORADA = {
+  ...CLIENTE_ATIVO_MOCK,
+  id: "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+  nome: "Maria Santos",
+  email: "maria.santos@email.com",
+  telefone: "920000002",
+  nif: "987654321",
+  morada: "Rua das Flores, 10, Lisboa",
+};
+
 const ANIMAL_MOCK = {
   id: "anim-1",
   clienteId: CLIENTE_TEMPORARIO_MOCK.id,
@@ -71,12 +81,10 @@ const CONFIRMAR_RESULT_MOCK = {
   animal: ANIMAL_MOCK,
 };
 
-// Mock para o GET /clientes inicial
 function mockGetClientes(lista = [CLIENTE_ATIVO_MOCK]) {
   global.fetch.mockImplementationOnce(() => mockJsonResponse(lista));
 }
 
-// Preenche o formulário do passo 1 (dados do cliente)
 async function preencherFormularioCliente({
   nome = "João Silva",
   email = "joao.silva@email.com",
@@ -89,7 +97,6 @@ async function preencherFormularioCliente({
   await userEvent.type(screen.getByLabelText(/Email/i), email);
   await userEvent.type(screen.getByLabelText(/Telefone/i), telefone);
 
-  // Preencher password (há dois campos: password e confirmar password)
   const passwordInputs = screen.getAllByLabelText(/password/i);
   await userEvent.type(passwordInputs[0], password);
   await userEvent.type(passwordInputs[1], confirmarPassword);
@@ -99,7 +106,6 @@ async function preencherFormularioCliente({
   }
 }
 
-// Preenche o formulário do passo 2 (dados do animal)
 async function preencherFormularioAnimal({
   nome = "Rex",
   especie = "Cão",
@@ -114,8 +120,6 @@ async function preencherFormularioAnimal({
       dataNascimento,
     );
   }
-
-  // Selecionar porte
   if (porte) {
     fireEvent.mouseDown(screen.getByLabelText(/Porte/i));
     const porteLabels = {
@@ -131,6 +135,32 @@ async function preencherFormularioAnimal({
     );
     fireEvent.click(porteOption);
   }
+}
+
+// Helper para chegar ao passo 3 (concluído)
+async function chegarAoPasso3() {
+  global.fetch
+    .mockImplementationOnce(() => mockJsonResponse([])) // GET /clientes (mount)
+    .mockImplementationOnce(() => mockJsonResponse(CLIENTE_TEMPORARIO_MOCK)) // POST /clientes
+    .mockImplementationOnce(() => mockJsonResponse(CONFIRMAR_RESULT_MOCK)) // POST confirmar
+    .mockImplementationOnce(() => mockJsonResponse([CLIENTE_ATIVO_MOCK])); // GET /clientes (reload)
+
+  renderClientes();
+  await screen.findByText("Dados do Cliente");
+  await preencherFormularioCliente();
+  await userEvent.click(
+    screen.getByRole("button", { name: /Continuar para o Animal/i }),
+  );
+  await screen.findByText("Primeiro Animal");
+  await preencherFormularioAnimal({
+    nome: "Rex",
+    especie: "Cão",
+    porte: "GRANDE",
+  });
+  await userEvent.click(
+    screen.getByRole("button", { name: /Confirmar Registo/i }),
+  );
+  await screen.findByText(/Registo concluído/i);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -217,7 +247,7 @@ describe("Client page", () => {
     );
 
     expect(await screen.findByText("Nome é obrigatório.")).toBeInTheDocument();
-    expect(global.fetch).toHaveBeenCalledTimes(1); // só o GET inicial
+    expect(global.fetch).toHaveBeenCalledTimes(1);
   });
 
   test("mostra erro quando email esta vazio", async () => {
@@ -276,7 +306,7 @@ describe("Client page", () => {
     await userEvent.type(screen.getByLabelText(/Telefone/i), "910000001");
 
     const passwordInputs = screen.getAllByLabelText(/password/i);
-    await userEvent.type(passwordInputs[0], "1234567"); // 7 chars
+    await userEvent.type(passwordInputs[0], "1234567");
     await userEvent.click(
       screen.getByRole("button", { name: /Continuar para o Animal/i }),
     );
@@ -334,8 +364,8 @@ describe("Client page", () => {
 
   test("avanca para passo 2 apos POST /clientes com sucesso", async () => {
     global.fetch
-      .mockImplementationOnce(() => mockJsonResponse([])) // GET /clientes
-      .mockImplementationOnce(() => mockJsonResponse(CLIENTE_TEMPORARIO_MOCK)); // POST /clientes
+      .mockImplementationOnce(() => mockJsonResponse([]))
+      .mockImplementationOnce(() => mockJsonResponse(CLIENTE_TEMPORARIO_MOCK));
 
     renderClientes();
     await screen.findByText("Dados do Cliente");
@@ -376,11 +406,11 @@ describe("Client page", () => {
 
     const payload = JSON.parse(postCall[1].body);
     expect(payload.nome).toBe("Maria Santos");
-    expect(payload.email).toBe("maria@email.com"); // normalizado para lowercase
+    expect(payload.email).toBe("maria@email.com");
     expect(payload.telefone).toBe("910111111");
     expect(payload.nif).toBe("987654321");
     expect(payload.password).toBe("minhapassword");
-    expect(payload.confirmarPassword).toBeUndefined(); // não enviado
+    expect(payload.confirmarPassword).toBeUndefined();
   });
 
   test("nao envia NIF quando esta vazio", async () => {
@@ -424,7 +454,7 @@ describe("Client page", () => {
         'Já existe uma conta com o email "joao@email.com".',
       ),
     ).toBeInTheDocument();
-    expect(screen.getByText("Dados do Cliente")).toBeInTheDocument(); // continua no passo 1
+    expect(screen.getByText("Dados do Cliente")).toBeInTheDocument();
   });
 
   test("mostra erro 409 da API para NIF duplicado", async () => {
@@ -448,6 +478,22 @@ describe("Client page", () => {
     expect(
       await screen.findByText('Já existe um cliente com o NIF "123456789".'),
     ).toBeInTheDocument();
+  });
+
+  test("erro de rede no POST /clientes mostra mensagem de erro generico", async () => {
+    global.fetch
+      .mockImplementationOnce(() => mockJsonResponse([]))
+      .mockImplementationOnce(() => Promise.reject(new Error("Network error")));
+
+    renderClientes();
+    await screen.findByText("Dados do Cliente");
+    await preencherFormularioCliente();
+    await userEvent.click(
+      screen.getByRole("button", { name: /Continuar para o Animal/i }),
+    );
+
+    expect(await screen.findByText(/Network error/i)).toBeInTheDocument();
+    expect(screen.getByText("Dados do Cliente")).toBeInTheDocument();
   });
 
   // ── PASSO 2 — FORMULÁRIO DO ANIMAL ──────────────────────────────────────
@@ -488,9 +534,9 @@ describe("Client page", () => {
 
   test("passo 2 mostra botao Cancelar que elimina o cliente temporario", async () => {
     global.fetch
-      .mockImplementationOnce(() => mockJsonResponse([])) // GET /clientes
-      .mockImplementationOnce(() => mockJsonResponse(CLIENTE_TEMPORARIO_MOCK)) // POST /clientes
-      .mockImplementationOnce(() => mockJsonResponse({ cancelled: true })); // DELETE /clientes/:id
+      .mockImplementationOnce(() => mockJsonResponse([]))
+      .mockImplementationOnce(() => mockJsonResponse(CLIENTE_TEMPORARIO_MOCK))
+      .mockImplementationOnce(() => mockJsonResponse({ cancelled: true }));
 
     renderClientes();
     await screen.findByText("Dados do Cliente");
@@ -502,7 +548,6 @@ describe("Client page", () => {
     await screen.findByText("Primeiro Animal");
     await userEvent.click(screen.getByRole("button", { name: /Cancelar/i }));
 
-    // Volta ao passo 1
     expect(await screen.findByText("Dados do Cliente")).toBeInTheDocument();
 
     const deleteCall = global.fetch.mock.calls[2];
@@ -610,6 +655,33 @@ describe("Client page", () => {
     ).toBeInTheDocument();
   });
 
+  test("erro de rede no POST confirmar animal mostra mensagem de erro", async () => {
+    global.fetch
+      .mockImplementationOnce(() => mockJsonResponse([]))
+      .mockImplementationOnce(() => mockJsonResponse(CLIENTE_TEMPORARIO_MOCK))
+      .mockImplementationOnce(() => Promise.reject(new Error("Network error")));
+
+    renderClientes();
+    await screen.findByText("Dados do Cliente");
+    await preencherFormularioCliente();
+    await userEvent.click(
+      screen.getByRole("button", { name: /Continuar para o Animal/i }),
+    );
+
+    await screen.findByText("Primeiro Animal");
+    await preencherFormularioAnimal({
+      nome: "Rex",
+      especie: "Cão",
+      porte: "GRANDE",
+    });
+    await userEvent.click(
+      screen.getByRole("button", { name: /Confirmar Registo/i }),
+    );
+
+    expect(await screen.findByText(/Network error/i)).toBeInTheDocument();
+    expect(screen.getByText("Primeiro Animal")).toBeInTheDocument();
+  });
+
   // ── PASSO 2 → PASSO 3 (CONCLUÍDO) ────────────────────────────────────────
 
   test("chama POST /clientes/:id/animais/confirmar com payload correcto", async () => {
@@ -679,7 +751,6 @@ describe("Client page", () => {
     );
 
     expect(await screen.findByText(/Registo concluído/i)).toBeInTheDocument();
-    // CORREÇÃO: Usa getAllByText para nome e animal pois aparecem no Alerta e no Resumo
     expect(screen.getAllByText(/João Silva/)[0]).toBeInTheDocument();
     expect(screen.getAllByText(/Rex/)[0]).toBeInTheDocument();
   });
@@ -717,6 +788,135 @@ describe("Client page", () => {
     expect(
       screen.getByRole("button", { name: /Novo Registo de Cliente/i }),
     ).toBeInTheDocument();
+  });
+
+  test("passo 3 recarrega lista de clientes apos confirmacao", async () => {
+    global.fetch
+      .mockImplementationOnce(() => mockJsonResponse([]))
+      .mockImplementationOnce(() => mockJsonResponse(CLIENTE_TEMPORARIO_MOCK))
+      .mockImplementationOnce(() => mockJsonResponse(CONFIRMAR_RESULT_MOCK))
+      .mockImplementationOnce(() => mockJsonResponse([CLIENTE_ATIVO_MOCK]));
+
+    renderClientes();
+    await screen.findByText("Dados do Cliente");
+    await preencherFormularioCliente();
+    await userEvent.click(
+      screen.getByRole("button", { name: /Continuar para o Animal/i }),
+    );
+    await screen.findByText("Primeiro Animal");
+    await preencherFormularioAnimal({
+      nome: "Rex",
+      especie: "Cão",
+      porte: "GRANDE",
+    });
+    await userEvent.click(
+      screen.getByRole("button", { name: /Confirmar Registo/i }),
+    );
+
+    await screen.findByText(/Registo concluído/i);
+
+    const getCalls = global.fetch.mock.calls.filter(
+      (c) => c[0] === "http://localhost:5000/clientes",
+    );
+    expect(getCalls.length).toBeGreaterThanOrEqual(2);
+  });
+
+  // ── PASSO EXTRA — ADICIONAR SEGUNDO ANIMAL AO MESMO CLIENTE ─────────────
+
+  test("botao Adicionar Outro Animal abre formulario de animal extra", async () => {
+    await chegarAoPasso3();
+
+    await userEvent.click(
+      screen.getByRole("button", { name: /Adicionar Outro Animal/i }),
+    );
+
+    expect(
+      await screen.findByRole("heading", { name: /Adicionar Animal/i }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /Adicionar Animal/i }),
+    ).toBeInTheDocument();
+  });
+
+  test("adicionar animal extra chama POST /clientes/:id/animais e volta ao passo 3", async () => {
+    const segundoAnimal = { ...ANIMAL_MOCK, id: "anim-2", nome: "Luna" };
+
+    global.fetch
+      .mockImplementationOnce(() => mockJsonResponse([]))
+      .mockImplementationOnce(() => mockJsonResponse(CLIENTE_TEMPORARIO_MOCK))
+      .mockImplementationOnce(() => mockJsonResponse(CONFIRMAR_RESULT_MOCK))
+      .mockImplementationOnce(() => mockJsonResponse([CLIENTE_ATIVO_MOCK]))
+      .mockImplementationOnce(() => mockJsonResponse(segundoAnimal))
+      .mockImplementationOnce(() => mockJsonResponse([CLIENTE_ATIVO_MOCK]));
+
+    renderClientes();
+    await screen.findByText("Dados do Cliente");
+    await preencherFormularioCliente();
+    await userEvent.click(
+      screen.getByRole("button", { name: /Continuar para o Animal/i }),
+    );
+    await screen.findByText("Primeiro Animal");
+    await preencherFormularioAnimal({
+      nome: "Rex",
+      especie: "Cão",
+      porte: "GRANDE",
+    });
+    await userEvent.click(
+      screen.getByRole("button", { name: /Confirmar Registo/i }),
+    );
+    await screen.findByText(/Registo concluído/i);
+
+    await userEvent.click(
+      screen.getByRole("button", { name: /Adicionar Outro Animal/i }),
+    );
+    await screen.findByRole("heading", { name: /Adicionar Animal/i });
+
+    await preencherFormularioAnimal({
+      nome: "Luna",
+      especie: "Gato",
+      porte: "PEQUENO",
+      dataNascimento: "2021-01-01",
+    });
+    await userEvent.click(
+      screen.getByRole("button", { name: /Adicionar Animal/i }),
+    );
+
+    expect(
+      await screen.findByText(/Animal "Luna" adicionado com sucesso!/i),
+    ).toBeInTheDocument();
+
+    const postAnimalCall = global.fetch.mock.calls[4];
+    expect(postAnimalCall[0]).toContain(
+      `/clientes/${CLIENTE_TEMPORARIO_MOCK.id}/animais`,
+    );
+    expect(JSON.parse(postAnimalCall[1].body).nome).toBe("Luna");
+  });
+
+  // FIX: "cancelar no passo animal_extra volta ao passo 3"
+  // Ao entrar no passo animal_extra, mensagemSucesso é limpa (setMensagemSucesso("")).
+  // Ao cancelar, volta ao estado "concluido" mas a mensagem continua vazia.
+  // Verificamos que os botões característicos do passo 3 voltam a estar visíveis.
+  test("cancelar no passo animal_extra volta ao passo 3", async () => {
+    await chegarAoPasso3();
+
+    await userEvent.click(
+      screen.getByRole("button", { name: /Adicionar Outro Animal/i }),
+    );
+    await screen.findByRole("heading", { name: /Adicionar Animal/i });
+
+    await userEvent.click(screen.getByRole("button", { name: /Cancelar/i }));
+
+    // Ao voltar ao passo 3, os dois botões característicos devem estar presentes
+    expect(
+      await screen.findByRole("button", { name: /Adicionar Outro Animal/i }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /Novo Registo de Cliente/i }),
+    ).toBeInTheDocument();
+    // O formulário de animal extra já não deve estar visível
+    expect(
+      screen.queryByRole("heading", { name: /Adicionar Animal/i }),
+    ).not.toBeInTheDocument();
   });
 
   // ── NOVO REGISTO (volta ao passo 1) ────────────────────────────────────
@@ -764,7 +964,6 @@ describe("Client page", () => {
     renderClientes();
 
     await screen.findByText("João Silva");
-    // CORREÇÃO: Usa regex exata /^Animal$/ para não confundir com "Continuar para o Animal"
     await userEvent.click(screen.getByRole("button", { name: /^Animal$/ }));
 
     expect(
@@ -789,7 +988,6 @@ describe("Client page", () => {
     renderClientes();
     await screen.findByText("João Silva");
 
-    // CORREÇÃO: Usa regex exata /^Animal$/
     await userEvent.click(screen.getByRole("button", { name: /^Animal$/ }));
     await screen.findByRole("heading", {
       name: /Adicionar Animal — João Silva/i,
@@ -827,10 +1025,8 @@ describe("Client page", () => {
     renderClientes();
 
     await screen.findByText("João Silva");
-    // CORREÇÃO: Usa regex exata /^Animal$/
     await userEvent.click(screen.getByRole("button", { name: /^Animal$/ }));
 
-    // CORREÇÃO: Procura pelo cabeçalho
     await screen.findByRole("heading", {
       name: /Adicionar Animal — João Silva/i,
     });
@@ -843,6 +1039,30 @@ describe("Client page", () => {
         }),
       ).not.toBeInTheDocument();
     });
+  });
+
+  test("erro de rede ao adicionar animal a cliente existente mostra mensagem de erro", async () => {
+    global.fetch
+      .mockImplementationOnce(() => mockJsonResponse([CLIENTE_ATIVO_MOCK]))
+      .mockImplementationOnce(() => Promise.reject(new Error("Network error")));
+
+    renderClientes();
+    await screen.findByText("João Silva");
+    await userEvent.click(screen.getByRole("button", { name: /^Animal$/ }));
+    await screen.findByRole("heading", {
+      name: /Adicionar Animal — João Silva/i,
+    });
+
+    await preencherFormularioAnimal({
+      nome: "Luna",
+      especie: "Gato",
+      porte: "PEQUENO",
+    });
+    await userEvent.click(
+      screen.getByRole("button", { name: /Adicionar Animal/i }),
+    );
+
+    expect(await screen.findByText(/Network error/i)).toBeInTheDocument();
   });
 
   // ── LISTA DE CLIENTES — EXPANDIR ANIMAIS ─────────────────────────────────
@@ -861,12 +1081,38 @@ describe("Client page", () => {
 
     await screen.findByText("João Silva");
 
-    // O botão de expandir só aparece quando há animais
     const expandBtn = screen.getByTitle(/Ver animais/i);
     await userEvent.click(expandBtn);
 
     expect(await screen.findByText("Rex")).toBeInTheDocument();
     expect(screen.getByText(/Labrador/i)).toBeInTheDocument();
+  });
+
+  // FIX: "clicar novamente no icone de expandir oculta os animais"
+  // "Rex" pode aparecer noutros sítios da página (ex.: resumo do passo 3).
+  // Verificamos que o elemento específico dentro do Collapse desaparece
+  // usando o data-testid do card expandido, ou verificamos que o título
+  // "Ocultar animais" desaparece (o que implica que o collapse fechou).
+  test("clicar novamente no icone de expandir oculta os animais", async () => {
+    mockGetClientes();
+    renderClientes();
+
+    await screen.findByText("João Silva");
+    const expandBtn = screen.getByTitle(/Ver animais/i);
+
+    await userEvent.click(expandBtn);
+    // Após expandir, "Rex" deve estar visível dentro da secção de animais
+    expect(await screen.findByText("Rex")).toBeInTheDocument();
+
+    // Clicar de novo para colapsar
+    await userEvent.click(screen.getByTitle(/Ocultar animais/i));
+
+    // O botão "Ocultar animais" deve desaparecer, voltando a "Ver animais"
+    await waitFor(() => {
+      expect(screen.queryByTitle(/Ocultar animais/i)).not.toBeInTheDocument();
+    });
+    // E o botão "Ver animais" deve voltar a aparecer
+    expect(screen.getByTitle(/Ver animais/i)).toBeInTheDocument();
   });
 
   test("mostra chip Inativo para cliente inativo", async () => {
@@ -877,6 +1123,765 @@ describe("Client page", () => {
 
     await screen.findByText("João Silva");
     expect(screen.getByText("Inativo")).toBeInTheDocument();
+  });
+
+  test("card de cliente mostra NIF e morada quando existem", async () => {
+    mockGetClientes([CLIENTE_ATIVO_COM_NIF_MORADA]);
+    renderClientes();
+
+    await screen.findByText("Maria Santos");
+    expect(screen.getByText(/NIF: 987654321/)).toBeInTheDocument();
+    expect(screen.getByText(/Rua das Flores, 10, Lisboa/)).toBeInTheDocument();
+  });
+
+  test("card de cliente nao mostra NIF quando ausente", async () => {
+    mockGetClientes([{ ...CLIENTE_ATIVO_MOCK, nif: null }]);
+    renderClientes();
+
+    await screen.findByText("João Silva");
+    expect(screen.queryByText(/NIF:/)).not.toBeInTheDocument();
+  });
+
+  test("animais expandidos mostram chip de alergias quando existem", async () => {
+    const clienteComAlergias = {
+      ...CLIENTE_ATIVO_MOCK,
+      animais: [{ ...ANIMAL_MOCK, alergias: "Pólen" }],
+    };
+    mockGetClientes([clienteComAlergias]);
+    renderClientes();
+
+    await screen.findByText("João Silva");
+    await userEvent.click(screen.getByTitle(/Ver animais/i));
+
+    expect(await screen.findByText(/Alergias: Pólen/i)).toBeInTheDocument();
+  });
+
+  test("animais expandidos mostram observacoes quando existem", async () => {
+    const clienteComObs = {
+      ...CLIENTE_ATIVO_MOCK,
+      animais: [{ ...ANIMAL_MOCK, observacoes: "Muito ansioso" }],
+    };
+    mockGetClientes([clienteComObs]);
+    renderClientes();
+
+    await screen.findByText("João Silva");
+    await userEvent.click(screen.getByTitle(/Ver animais/i));
+
+    expect(await screen.findByText(/Muito ansioso/i)).toBeInTheDocument();
+  });
+
+  test("animais expandidos mostram data de nascimento formatada", async () => {
+    mockGetClientes();
+    renderClientes();
+
+    await screen.findByText("João Silva");
+    await userEvent.click(screen.getByTitle(/Ver animais/i));
+
+    expect(await screen.findByText(/15\/03\/2020/)).toBeInTheDocument();
+  });
+
+  test("card sem animais nao mostra botao de expandir", async () => {
+    mockGetClientes([{ ...CLIENTE_ATIVO_MOCK, animais: [] }]);
+    renderClientes();
+
+    await screen.findByText("João Silva");
+    expect(screen.queryByTitle(/Ver animais/i)).not.toBeInTheDocument();
+  });
+
+  // ── PESQUISA DE CLIENTE (BET-127 — ClienteSearch) ────────────────────────
+
+  test("campo de pesquisa esta presente no passo 1", async () => {
+    mockGetClientes([]);
+    renderClientes();
+
+    await screen.findByText("Dados do Cliente");
+    expect(
+      screen.getByPlaceholderText(
+        /Pesquisar por nome, email, telefone ou NIF/i,
+      ),
+    ).toBeInTheDocument();
+  });
+
+  test("pesquisa filtra clientes por nome e mostra dropdown", async () => {
+    mockGetClientes([CLIENTE_ATIVO_MOCK]);
+    renderClientes();
+
+    await screen.findByText("João Silva");
+
+    const searchInput = screen.getByPlaceholderText(
+      /Pesquisar por nome, email, telefone ou NIF/i,
+    );
+    fireEvent.focus(searchInput);
+    await userEvent.type(searchInput, "João");
+
+    // FIX: usar getAllByText para evitar falha quando o nome aparece tanto no
+    // dropdown como no card da lista
+    const matches = await screen.findAllByText(/joao.silva@email.com/i);
+    expect(matches.length).toBeGreaterThan(0);
+  });
+
+  test("pesquisa filtra clientes por email", async () => {
+    mockGetClientes([CLIENTE_ATIVO_MOCK]);
+    renderClientes();
+
+    await screen.findByText("João Silva");
+
+    const searchInput = screen.getByPlaceholderText(
+      /Pesquisar por nome, email, telefone ou NIF/i,
+    );
+    fireEvent.focus(searchInput);
+    await userEvent.type(searchInput, "joao.silva@email.com");
+
+    // FIX: usar getAllByText — o nome pode aparecer no dropdown e no card
+    const matches = await screen.findAllByText(/João Silva/);
+    expect(matches.length).toBeGreaterThan(0);
+  });
+
+  test("pesquisa filtra clientes por telefone", async () => {
+    mockGetClientes([CLIENTE_ATIVO_MOCK]);
+    renderClientes();
+
+    await screen.findByText("João Silva");
+
+    const searchInput = screen.getByPlaceholderText(
+      /Pesquisar por nome, email, telefone ou NIF/i,
+    );
+    fireEvent.focus(searchInput);
+    await userEvent.type(searchInput, "910000001");
+
+    // FIX: usar getAllByText — o nome pode aparecer no dropdown e no card
+    const matches = await screen.findAllByText(/João Silva/);
+    expect(matches.length).toBeGreaterThan(0);
+  });
+
+  test("pesquisa mostra mensagem quando nenhum cliente encontrado", async () => {
+    mockGetClientes([CLIENTE_ATIVO_MOCK]);
+    renderClientes();
+
+    await screen.findByText("João Silva");
+
+    const searchInput = screen.getByPlaceholderText(
+      /Pesquisar por nome, email, telefone ou NIF/i,
+    );
+    fireEvent.focus(searchInput);
+    await userEvent.type(searchInput, "xyzNaoExiste");
+
+    expect(
+      await screen.findByText(/Nenhum cliente encontrado para/i),
+    ).toBeInTheDocument();
+  });
+
+  // FIX: "pesquisa nao mostra dropdown quando query esta vazia"
+  // Qualquer texto do ClienteCard (email, nome, chip "1 animal") existe na página
+  // independentemente do dropdown. A única coisa exclusiva do dropdown quando
+  // aberto sem resultados é "Nenhum cliente encontrado". Com query vazia, o
+  // dropdown simplesmente não renderiza — basta confirmar que essa mensagem
+  // exclusiva não está presente.
+  test("pesquisa nao mostra dropdown quando query esta vazia", async () => {
+    mockGetClientes([CLIENTE_ATIVO_MOCK]);
+    renderClientes();
+
+    await screen.findByText("João Silva");
+
+    const searchInput = screen.getByPlaceholderText(
+      /Pesquisar por nome, email, telefone ou NIF/i,
+    );
+    fireEvent.focus(searchInput);
+
+    // Com query vazia, o dropdown não renderiza — não deve aparecer a mensagem
+    // exclusiva do dropdown vazio nem o botão de limpar
+    expect(
+      screen.queryByText(/Nenhum cliente encontrado para/i),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByTestId("ClearIcon")).not.toBeInTheDocument();
+  });
+
+  test("seleccionar cliente na pesquisa abre painel de adicionar animal", async () => {
+    mockGetClientes([CLIENTE_ATIVO_MOCK]);
+    renderClientes();
+
+    await screen.findByText("João Silva");
+
+    const searchInput = screen.getByPlaceholderText(
+      /Pesquisar por nome, email, telefone ou NIF/i,
+    );
+    fireEvent.focus(searchInput);
+    await userEvent.type(searchInput, "João");
+
+    // FIX: pode haver múltiplos elementos com o email; usar findAllByText e
+    // clicar no primeiro resultado do dropdown (o que está dentro do Paper)
+    const emailMatches = await screen.findAllByText(/joao.silva@email.com/i);
+    const clienteNoDropdown = emailMatches[0];
+    fireEvent.mouseDown(
+      clienteNoDropdown.closest("[class]") || clienteNoDropdown,
+    );
+
+    expect(
+      await screen.findByRole("heading", {
+        name: /Adicionar Animal — João Silva/i,
+      }),
+    ).toBeInTheDocument();
+  });
+
+  // FIX: "botao X limpa o campo de pesquisa"
+  // O IconButton de limpar não tem aria-label, por isso não pode ser encontrado
+  // por getByRole com name. Usamos o data-testid do input para localizar o
+  // container e depois o botão dentro dele via querySelector.
+  test("botao X limpa o campo de pesquisa", async () => {
+    mockGetClientes([CLIENTE_ATIVO_MOCK]);
+    renderClientes();
+
+    await screen.findByText("João Silva");
+
+    const searchInput = screen.getByPlaceholderText(
+      /Pesquisar por nome, email, telefone ou NIF/i,
+    );
+    fireEvent.focus(searchInput);
+    await userEvent.type(searchInput, "João");
+
+    expect(searchInput.value).toBe("João");
+
+    // Localizar o botão de limpar pelo ícone ClearIcon dentro do container de pesquisa
+    const clearBtn = screen.getByTestId("ClearIcon").closest("button");
+    expect(clearBtn).not.toBeNull();
+    await userEvent.click(clearBtn);
+
+    expect(searchInput.value).toBe("");
+  });
+
+  // ── STEP INDICATOR ────────────────────────────────────────────────────────
+
+  test("step indicator marca passo 1 como concluido ao avancar para passo 2", async () => {
+    global.fetch
+      .mockImplementationOnce(() => mockJsonResponse([]))
+      .mockImplementationOnce(() => mockJsonResponse(CLIENTE_TEMPORARIO_MOCK));
+
+    renderClientes();
+    await screen.findByText("Dados do Cliente");
+    await preencherFormularioCliente();
+    await userEvent.click(
+      screen.getByRole("button", { name: /Continuar para o Animal/i }),
+    );
+
+    await screen.findByText("Primeiro Animal");
+
+    const chip1 = screen.getByText("1. Cliente").closest(".MuiChip-root");
+    const chip2 = screen.getByText("2. Animal").closest(".MuiChip-root");
+
+    expect(chip1).toHaveClass("MuiChip-colorSuccess");
+    expect(chip2).toHaveClass("MuiChip-colorPrimary");
+  });
+
+  test("step indicator mostra passo 3 como activo apos confirmacao", async () => {
+    global.fetch
+      .mockImplementationOnce(() => mockJsonResponse([]))
+      .mockImplementationOnce(() => mockJsonResponse(CLIENTE_TEMPORARIO_MOCK))
+      .mockImplementationOnce(() => mockJsonResponse(CONFIRMAR_RESULT_MOCK))
+      .mockImplementationOnce(() => mockJsonResponse([CLIENTE_ATIVO_MOCK]));
+
+    renderClientes();
+    await screen.findByText("Dados do Cliente");
+    await preencherFormularioCliente();
+    await userEvent.click(
+      screen.getByRole("button", { name: /Continuar para o Animal/i }),
+    );
+    await screen.findByText("Primeiro Animal");
+    await preencherFormularioAnimal({
+      nome: "Rex",
+      especie: "Cão",
+      porte: "GRANDE",
+    });
+    await userEvent.click(
+      screen.getByRole("button", { name: /Confirmar Registo/i }),
+    );
+    await screen.findByText(/Registo concluído/i);
+
+    const chip3 = screen.getByText("3. Concluído").closest(".MuiChip-root");
+    expect(chip3).toHaveClass("MuiChip-colorPrimary");
+  });
+
+  // ── EDITAR CLIENTE (ClienteEditForm) ─────────────────────────────────────
+
+  test("clicar no icone de editar cliente abre o formulario de edicao inline", async () => {
+    mockGetClientes();
+    renderClientes();
+
+    await screen.findByText("João Silva");
+    await userEvent.click(screen.getByTitle(/Editar cliente/i));
+
+    expect(
+      await screen.findByText(/Editar Cliente — João Silva/i),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /Guardar alterações/i }),
+    ).toBeInTheDocument();
+  });
+
+  test("formulario de edicao pre-preenche os dados do cliente", async () => {
+    mockGetClientes();
+    renderClientes();
+
+    await screen.findByText("João Silva");
+    await userEvent.click(screen.getByTitle(/Editar cliente/i));
+
+    await screen.findByText(/Editar Cliente — João Silva/i);
+
+    // FIX: usar getAllByLabelText e verificar que pelo menos um input tem o
+    // valor correcto — o form de edição é renderizado por cima do form do passo 1
+    const nomeInputs = screen.getAllByLabelText(/Nome completo/i);
+    expect(nomeInputs.some((input) => input.value === "João Silva")).toBe(true);
+
+    const emailInputs = screen.getAllByLabelText(/Email/i);
+    expect(
+      emailInputs.some((input) => input.value === "joao.silva@email.com"),
+    ).toBe(true);
+  });
+
+  test("cancelar edicao de cliente fecha o formulario sem chamar a API", async () => {
+    mockGetClientes();
+    renderClientes();
+
+    await screen.findByText("João Silva");
+    await userEvent.click(screen.getByTitle(/Editar cliente/i));
+    await screen.findByText(/Editar Cliente — João Silva/i);
+
+    const cancelarBtns = screen.getAllByRole("button", { name: /Cancelar/i });
+    await userEvent.click(cancelarBtns[cancelarBtns.length - 1]);
+
+    await waitFor(() => {
+      expect(
+        screen.queryByText(/Editar Cliente — João Silva/i),
+      ).not.toBeInTheDocument();
+    });
+
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+  });
+
+  // FIX: "guardar edicao chama PUT /clientes/:id com payload correcto"
+  // O form de edição é renderizado ACIMA do form do passo 1, por isso o input
+  // do form de edição é o PRIMEIRO no DOM (índice 0), não o último.
+  // Usamos getAllByLabelText e filtramos pelo form de edição via closest('form').
+  test("guardar edicao chama PUT /clientes/:id com payload correcto", async () => {
+    const clienteAtualizado = {
+      ...CLIENTE_ATIVO_MOCK,
+      nome: "João Silva Atualizado",
+      telefone: "920000002",
+    };
+
+    global.fetch
+      .mockImplementationOnce(() => mockJsonResponse([CLIENTE_ATIVO_MOCK]))
+      .mockImplementationOnce(() => mockJsonResponse(clienteAtualizado))
+      .mockImplementationOnce(() => mockJsonResponse([clienteAtualizado]));
+
+    renderClientes();
+    await screen.findByText("João Silva");
+    await userEvent.click(screen.getByTitle(/Editar cliente/i));
+    await screen.findByText(/Editar Cliente — João Silva/i);
+
+    // O form de edição está dentro do Paper com o título "Editar Cliente —"
+    // Apanhar todos os inputs de "Nome completo" e escolher o que pertence
+    // ao form de edição (que tem valor pré-preenchido "João Silva")
+    const nomeInputs = screen.getAllByLabelText(/Nome completo/i);
+    const nomeEditInput = nomeInputs.find(
+      (input) => input.value === "João Silva",
+    );
+    expect(nomeEditInput).toBeTruthy();
+    await userEvent.clear(nomeEditInput);
+    await userEvent.type(nomeEditInput, "João Silva Atualizado");
+
+    await userEvent.click(
+      screen.getByRole("button", { name: /Guardar alterações/i }),
+    );
+
+    expect(
+      await screen.findByText(
+        /Cliente "João Silva Atualizado" atualizado com sucesso!/i,
+      ),
+    ).toBeInTheDocument();
+
+    const putCall = global.fetch.mock.calls[1];
+    expect(putCall[0]).toContain(`/clientes/${CLIENTE_ATIVO_MOCK.id}`);
+    expect(putCall[1].method).toBe("PUT");
+
+    const payload = JSON.parse(putCall[1].body);
+    expect(payload.nome).toBe("João Silva Atualizado");
+  });
+
+  // FIX: "formulario de edicao valida nome obrigatorio"
+  // O mock do fetch para o GET inicial estava em falta nos testes de validação
+  // do form de edição, causando "Cannot read properties of undefined (reading 'json')".
+  // Adicionado mockGetClientes() correctamente + mock para o PUT que não deve
+  // ser chamado (mas o fetch não é invocado de todo na validação local).
+  test("formulario de edicao valida nome obrigatorio", async () => {
+    mockGetClientes();
+    renderClientes();
+
+    await screen.findByText("João Silva");
+    await userEvent.click(screen.getByTitle(/Editar cliente/i));
+    await screen.findByText(/Editar Cliente — João Silva/i);
+
+    // Limpar o input de nome do form de edição (o que tem valor pré-preenchido)
+    const nomeInputs = screen.getAllByLabelText(/Nome completo/i);
+    const nomeEditInput = nomeInputs.find(
+      (input) => input.value === "João Silva",
+    );
+    expect(nomeEditInput).toBeTruthy();
+    await userEvent.clear(nomeEditInput);
+
+    await userEvent.click(
+      screen.getByRole("button", { name: /Guardar alterações/i }),
+    );
+
+    expect(await screen.findByText("Nome é obrigatório.")).toBeInTheDocument();
+    // FIX: apenas o GET inicial deve ter sido chamado (sem PUT)
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+  });
+
+  test("formulario de edicao valida nova password curta", async () => {
+    mockGetClientes();
+    renderClientes();
+
+    await screen.findByText("João Silva");
+    await userEvent.click(screen.getByTitle(/Editar cliente/i));
+    await screen.findByText(/Editar Cliente — João Silva/i);
+
+    const pwdInput = screen.getByLabelText(/Nova password temporária/i);
+    await userEvent.type(pwdInput, "abc");
+
+    await userEvent.click(
+      screen.getByRole("button", { name: /Guardar alterações/i }),
+    );
+
+    expect(
+      await screen.findByText(
+        /A nova password deve ter pelo menos 8 caracteres/i,
+      ),
+    ).toBeInTheDocument();
+  });
+
+  test("formulario de edicao valida que passwords coincidem", async () => {
+    mockGetClientes();
+    renderClientes();
+
+    await screen.findByText("João Silva");
+    await userEvent.click(screen.getByTitle(/Editar cliente/i));
+    await screen.findByText(/Editar Cliente — João Silva/i);
+
+    const pwdInput = screen.getByLabelText(/Nova password temporária/i);
+    await userEvent.type(pwdInput, "password123");
+
+    const confirmInputs = screen.getAllByLabelText(/Confirmar password/i);
+    await userEvent.type(confirmInputs[confirmInputs.length - 1], "outracoisa");
+
+    await userEvent.click(
+      screen.getByRole("button", { name: /Guardar alterações/i }),
+    );
+
+    expect(
+      await screen.findByText("As passwords não coincidem."),
+    ).toBeInTheDocument();
+  });
+
+  // FIX: "formulario de edicao valida NIF invalido"
+  // Mesmo problema: mock em falta + editar o NIF correcto (o do form de edição).
+  test("formulario de edicao valida NIF invalido", async () => {
+    mockGetClientes();
+    renderClientes();
+
+    await screen.findByText("João Silva");
+    await userEvent.click(screen.getByTitle(/Editar cliente/i));
+    await screen.findByText(/Editar Cliente — João Silva/i);
+
+    // O form de edição pré-preenche o NIF com "123456789". Encontramos esse input.
+    const nifInputs = screen.getAllByLabelText(/NIF/i);
+    const nifEditInput = nifInputs.find((input) => input.value === "123456789");
+    expect(nifEditInput).toBeTruthy();
+    await userEvent.clear(nifEditInput);
+    await userEvent.type(nifEditInput, "123");
+
+    await userEvent.click(
+      screen.getByRole("button", { name: /Guardar alterações/i }),
+    );
+
+    expect(
+      await screen.findByText("O NIF deve ter 9 dígitos numéricos."),
+    ).toBeInTheDocument();
+  });
+
+  test("erro da API ao guardar edicao de cliente mostra mensagem de erro", async () => {
+    global.fetch
+      .mockImplementationOnce(() => mockJsonResponse([CLIENTE_ATIVO_MOCK]))
+      .mockImplementationOnce(() =>
+        mockJsonResponse(
+          { error: "Já existe uma conta com o email." },
+          false,
+          409,
+        ),
+      );
+
+    renderClientes();
+    await screen.findByText("João Silva");
+    await userEvent.click(screen.getByTitle(/Editar cliente/i));
+    await screen.findByText(/Editar Cliente — João Silva/i);
+
+    await userEvent.click(
+      screen.getByRole("button", { name: /Guardar alterações/i }),
+    );
+
+    expect(
+      await screen.findByText(/Já existe uma conta com o email/i),
+    ).toBeInTheDocument();
+  });
+
+  test("edicao bem sucedida recarrega lista de clientes", async () => {
+    const clienteAtualizado = { ...CLIENTE_ATIVO_MOCK, nome: "João Novo" };
+
+    global.fetch
+      .mockImplementationOnce(() => mockJsonResponse([CLIENTE_ATIVO_MOCK]))
+      .mockImplementationOnce(() => mockJsonResponse(clienteAtualizado))
+      .mockImplementationOnce(() => mockJsonResponse([clienteAtualizado]));
+
+    renderClientes();
+    await screen.findByText("João Silva");
+    await userEvent.click(screen.getByTitle(/Editar cliente/i));
+    await screen.findByText(/Editar Cliente — João Silva/i);
+
+    await userEvent.click(
+      screen.getByRole("button", { name: /Guardar alterações/i }),
+    );
+
+    await screen.findByText(/atualizado com sucesso/i);
+
+    const getCalls = global.fetch.mock.calls.filter(
+      (c) => c[0] === "http://localhost:5000/clientes",
+    );
+    expect(getCalls.length).toBeGreaterThanOrEqual(2);
+  });
+
+  // ── EDITAR ANIMAL (AnimalEditDialog) ─────────────────────────────────────
+
+  test("icone de editar animal abre o dialog de edicao", async () => {
+    mockGetClientes();
+    renderClientes();
+
+    await screen.findByText("João Silva");
+    await userEvent.click(screen.getByTitle(/Ver animais/i));
+    await screen.findByText("Rex");
+
+    await userEvent.click(screen.getByTitle(/Editar animal/i));
+
+    expect(await screen.findByRole("dialog")).toBeInTheDocument();
+    expect(screen.getByText("Editar Animal")).toBeInTheDocument();
+  });
+
+  test("dialog de edicao de animal pre-preenche os dados", async () => {
+    mockGetClientes();
+    renderClientes();
+
+    await screen.findByText("João Silva");
+    await userEvent.click(screen.getByTitle(/Ver animais/i));
+    await screen.findByText("Rex");
+    await userEvent.click(screen.getByTitle(/Editar animal/i));
+
+    await screen.findByRole("dialog");
+
+    const nomeInputDialog = screen.getAllByLabelText(/Nome do animal/i);
+    expect(nomeInputDialog[nomeInputDialog.length - 1]).toHaveValue("Rex");
+  });
+
+  test("fechar dialog de edicao de animal fecha sem chamar a API", async () => {
+    mockGetClientes();
+    renderClientes();
+
+    await screen.findByText("João Silva");
+    await userEvent.click(screen.getByTitle(/Ver animais/i));
+    await screen.findByText("Rex");
+    await userEvent.click(screen.getByTitle(/Editar animal/i));
+
+    await screen.findByRole("dialog");
+    const cancelarBtns = screen.getAllByRole("button", { name: /Cancelar/i });
+    await userEvent.click(cancelarBtns[cancelarBtns.length - 1]);
+
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    });
+
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+  });
+
+  test("guardar edicao de animal chama PUT /animais/:id com payload correcto", async () => {
+    const animalAtualizado = { ...ANIMAL_MOCK, nome: "RexAtualizado" };
+
+    global.fetch
+      .mockImplementationOnce(() => mockJsonResponse([CLIENTE_ATIVO_MOCK]))
+      .mockImplementationOnce(() => mockJsonResponse(animalAtualizado))
+      .mockImplementationOnce(() => mockJsonResponse([CLIENTE_ATIVO_MOCK]));
+
+    renderClientes();
+    await screen.findByText("João Silva");
+    await userEvent.click(screen.getByTitle(/Ver animais/i));
+    await screen.findByText("Rex");
+    await userEvent.click(screen.getByTitle(/Editar animal/i));
+
+    await screen.findByRole("dialog");
+
+    const nomeInputs = screen.getAllByLabelText(/Nome do animal/i);
+    const nomeInput = nomeInputs[nomeInputs.length - 1];
+    await userEvent.clear(nomeInput);
+    await userEvent.type(nomeInput, "RexAtualizado");
+
+    const guardarBtns = screen.getAllByRole("button", {
+      name: /Guardar alterações/i,
+    });
+    await userEvent.click(guardarBtns[guardarBtns.length - 1]);
+
+    expect(
+      await screen.findByText(
+        /Animal "RexAtualizado" atualizado com sucesso!/i,
+      ),
+    ).toBeInTheDocument();
+
+    const putCall = global.fetch.mock.calls[1];
+    expect(putCall[0]).toContain(`/animais/${ANIMAL_MOCK.id}`);
+    expect(putCall[1].method).toBe("PUT");
+
+    const payload = JSON.parse(putCall[1].body);
+    expect(payload.nome).toBe("RexAtualizado");
+    expect(payload.clienteId).toBe(CLIENTE_ATIVO_MOCK.id);
+  });
+
+  test("dialog de edicao valida nome do animal obrigatorio", async () => {
+    mockGetClientes();
+    renderClientes();
+
+    await screen.findByText("João Silva");
+    await userEvent.click(screen.getByTitle(/Ver animais/i));
+    await screen.findByText("Rex");
+    await userEvent.click(screen.getByTitle(/Editar animal/i));
+
+    await screen.findByRole("dialog");
+
+    const nomeInputs = screen.getAllByLabelText(/Nome do animal/i);
+    await userEvent.clear(nomeInputs[nomeInputs.length - 1]);
+
+    const guardarBtns = screen.getAllByRole("button", {
+      name: /Guardar alterações/i,
+    });
+    await userEvent.click(guardarBtns[guardarBtns.length - 1]);
+
+    expect(
+      await screen.findByText("Nome do animal é obrigatório."),
+    ).toBeInTheDocument();
+  });
+
+  test("dialog de edicao valida especie obrigatoria", async () => {
+    mockGetClientes();
+    renderClientes();
+
+    await screen.findByText("João Silva");
+    await userEvent.click(screen.getByTitle(/Ver animais/i));
+    await screen.findByText("Rex");
+    await userEvent.click(screen.getByTitle(/Editar animal/i));
+
+    await screen.findByRole("dialog");
+
+    const especieInputs = screen.getAllByLabelText(/Espécie/i);
+    await userEvent.clear(especieInputs[especieInputs.length - 1]);
+
+    const guardarBtns = screen.getAllByRole("button", {
+      name: /Guardar alterações/i,
+    });
+    await userEvent.click(guardarBtns[guardarBtns.length - 1]);
+
+    expect(
+      await screen.findByText("Espécie é obrigatória."),
+    ).toBeInTheDocument();
+  });
+
+  test("dialog de edicao valida que clienteId e obrigatorio quando nao selecionado", async () => {
+    const animalSemCliente = { ...ANIMAL_MOCK, clienteId: "" };
+    const clienteSemClienteId = {
+      ...CLIENTE_ATIVO_MOCK,
+      animais: [animalSemCliente],
+    };
+    mockGetClientes([clienteSemClienteId]);
+    renderClientes();
+
+    await screen.findByText("João Silva");
+    await userEvent.click(screen.getByTitle(/Ver animais/i));
+    await screen.findByText("Rex");
+    await userEvent.click(screen.getByTitle(/Editar animal/i));
+
+    await screen.findByRole("dialog");
+
+    global.fetch.mockImplementationOnce(() =>
+      mockJsonResponse({ error: "clienteId é obrigatório." }, false, 400),
+    );
+
+    const guardarBtns = screen.getAllByRole("button", {
+      name: /Guardar alterações/i,
+    });
+    await userEvent.click(guardarBtns[guardarBtns.length - 1]);
+
+    expect(
+      await screen.findByText(
+        /clienteId é obrigatório\.|Selecione um cliente/i,
+      ),
+    ).toBeInTheDocument();
+  });
+
+  test("erro da API ao guardar edicao de animal mostra mensagem de erro", async () => {
+    global.fetch
+      .mockImplementationOnce(() => mockJsonResponse([CLIENTE_ATIVO_MOCK]))
+      .mockImplementationOnce(() =>
+        mockJsonResponse({ error: "Animal não encontrado." }, false, 404),
+      );
+
+    renderClientes();
+    await screen.findByText("João Silva");
+    await userEvent.click(screen.getByTitle(/Ver animais/i));
+    await screen.findByText("Rex");
+    await userEvent.click(screen.getByTitle(/Editar animal/i));
+
+    await screen.findByRole("dialog");
+
+    const guardarBtns = screen.getAllByRole("button", {
+      name: /Guardar alterações/i,
+    });
+    await userEvent.click(guardarBtns[guardarBtns.length - 1]);
+
+    expect(
+      await screen.findByText(/Animal não encontrado/i),
+    ).toBeInTheDocument();
+  });
+
+  test("edicao bem sucedida de animal recarrega lista de clientes", async () => {
+    const animalAtualizado = { ...ANIMAL_MOCK, nome: "RexNovo" };
+
+    global.fetch
+      .mockImplementationOnce(() => mockJsonResponse([CLIENTE_ATIVO_MOCK]))
+      .mockImplementationOnce(() => mockJsonResponse(animalAtualizado))
+      .mockImplementationOnce(() => mockJsonResponse([CLIENTE_ATIVO_MOCK]));
+
+    renderClientes();
+    await screen.findByText("João Silva");
+    await userEvent.click(screen.getByTitle(/Ver animais/i));
+    await screen.findByText("Rex");
+    await userEvent.click(screen.getByTitle(/Editar animal/i));
+
+    await screen.findByRole("dialog");
+
+    const guardarBtns = screen.getAllByRole("button", {
+      name: /Guardar alterações/i,
+    });
+    await userEvent.click(guardarBtns[guardarBtns.length - 1]);
+
+    await screen.findByText(/atualizado com sucesso/i);
+
+    const getCalls = global.fetch.mock.calls.filter(
+      (c) => c[0] === "http://localhost:5000/clientes",
+    );
+    expect(getCalls.length).toBeGreaterThanOrEqual(2);
   });
 
   // ── NIF — CAMPOS DE ENTRADA ───────────────────────────────────────────────

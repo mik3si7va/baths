@@ -14,6 +14,10 @@ import {
   Collapse,
   InputAdornment,
   InputBase,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
 } from "@mui/material";
 import PersonIcon from "@mui/icons-material/Person";
 import PetsIcon from "@mui/icons-material/Pets";
@@ -26,6 +30,7 @@ import VisibilityOffIcon from "@mui/icons-material/VisibilityOff";
 import WarningAmberIcon from "@mui/icons-material/WarningAmber";
 import SearchIcon from "@mui/icons-material/Search";
 import ClearIcon from "@mui/icons-material/Clear";
+import EditIcon from "@mui/icons-material/Edit";
 import { useThemeContext } from "../../contexts/ThemeContext";
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || "http://localhost:5000";
@@ -639,9 +644,373 @@ function AnimalForm({
   );
 }
 
+function ClienteEditForm({ cliente, onSave, onCancel, loading, error }) {
+  const { colors } = useThemeContext();
+  const [form, setForm] = useState(initialClienteForm);
+  const [erroLocal, setErroLocal] = useState("");
+
+  useEffect(() => {
+    if (cliente) {
+      setForm({
+        nome: cliente.nome || "",
+        email: cliente.email || "",
+        telefone: cliente.telefone || "",
+        nif: cliente.nif || "",
+        morada: cliente.morada || "",
+        password: "",
+        confirmarPassword: "",
+      });
+      setErroLocal("");
+    }
+  }, [cliente]);
+
+  const set = (field, value) =>
+    setForm((prev) => ({ ...prev, [field]: value }));
+
+  const validate = () => {
+    if (!form.nome.trim()) return "Nome é obrigatório.";
+    if (!form.email.trim()) return "Email é obrigatório.";
+    if (!form.telefone.trim()) return "Telefone é obrigatório.";
+    if (form.password || form.confirmarPassword) {
+      if (form.password.trim().length < 8)
+        return "A nova password deve ter pelo menos 8 caracteres.";
+      if (form.password !== form.confirmarPassword)
+        return "As passwords não coincidem.";
+    }
+    if (form.nif && !/^\d{9}$/.test(form.nif.trim()))
+      return "O NIF deve ter 9 dígitos numéricos.";
+    return "";
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    const err = validate();
+    if (err) {
+      setErroLocal(err);
+      return;
+    }
+    setErroLocal("");
+    onSave({
+      nome: form.nome.trim(),
+      email: form.email.trim().toLowerCase(),
+      telefone: form.telefone.trim(),
+      nif: form.nif.trim() || undefined,
+      morada: form.morada.trim() || undefined,
+      password: form.password.trim() || undefined,
+    });
+  };
+
+  return (
+    <Box
+      component="form"
+      onSubmit={handleSubmit}
+      noValidate
+      sx={{ display: "flex", flexDirection: "column", gap: 2 }}
+    >
+      {erroLocal && (
+        <Alert severity="error" onClose={() => setErroLocal("")}>
+          {erroLocal}
+        </Alert>
+      )}
+      {error && (
+        <Alert severity="error" onClose={() => {}}>
+          {error}
+        </Alert>
+      )}
+      <Alert severity="info">
+        Apenas funcionários autenticados devem editar dados de clientes.
+      </Alert>
+
+      <Box
+        sx={{
+          display: "grid",
+          gridTemplateColumns: { xs: "1fr", md: "repeat(2, 1fr)" },
+          gap: 2,
+        }}
+      >
+        <TextField
+          label="Nome completo"
+          name="nome"
+          value={form.nome}
+          onChange={(e) => set("nome", e.target.value)}
+          required
+          fullWidth
+        />
+        <TextField
+          label="Email"
+          name="email"
+          type="email"
+          value={form.email}
+          onChange={(e) => set("email", e.target.value)}
+          required
+          fullWidth
+        />
+        <TextField
+          label="Telefone"
+          name="telefone"
+          value={form.telefone}
+          onChange={(e) =>
+            set("telefone", e.target.value.replace(/\D/g, "").slice(0, 15))
+          }
+          required
+          fullWidth
+          placeholder="Ex: 910000000"
+        />
+        <TextField
+          label="NIF"
+          name="nif"
+          value={form.nif}
+          onChange={(e) =>
+            set("nif", e.target.value.replace(/\D/g, "").slice(0, 9))
+          }
+          fullWidth
+          inputProps={{ maxLength: 9 }}
+          placeholder="Ex: 123456789"
+          helperText="Opcional; 9 dígitos numéricos."
+        />
+        <TextField
+          label="Morada"
+          name="morada"
+          value={form.morada}
+          onChange={(e) => set("morada", e.target.value)}
+          fullWidth
+          sx={{ gridColumn: { md: "1 / -1" } }}
+        />
+        <TextField
+          label="Nova password temporária (opcional)"
+          name="password"
+          type="password"
+          value={form.password}
+          onChange={(e) => set("password", e.target.value)}
+          fullWidth
+          helperText="Deixe em branco para manter a password atual."
+        />
+        <TextField
+          label="Confirmar password"
+          name="confirmarPassword"
+          type="password"
+          value={form.confirmarPassword}
+          onChange={(e) => set("confirmarPassword", e.target.value)}
+          fullWidth
+        />
+      </Box>
+
+      <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap" }}>
+        <Button
+          type="submit"
+          variant="contained"
+          disabled={loading}
+          sx={{
+            py: 1.5,
+            backgroundColor: colors.primary,
+            "&:hover": { backgroundColor: `${colors.primary}dd` },
+          }}
+        >
+          {loading ? (
+            <CircularProgress size={22} sx={{ color: "#fff" }} />
+          ) : (
+            "Guardar alterações"
+          )}
+        </Button>
+        <Button variant="outlined" onClick={onCancel} sx={{ py: 1.5 }}>
+          Cancelar
+        </Button>
+      </Box>
+    </Box>
+  );
+}
+
+function AnimalEditDialog({
+  open,
+  animal,
+  clientes,
+  onSave,
+  onClose,
+  loading,
+  error,
+}) {
+  const { colors } = useThemeContext();
+  const [form, setForm] = useState(initialAnimalForm);
+  const [clientId, setClientId] = useState("");
+  const [erroLocal, setErroLocal] = useState("");
+
+  useEffect(() => {
+    if (animal) {
+      setForm({
+        nome: animal.nome || "",
+        especie: animal.especie || "",
+        raca: animal.raca || "",
+        porte: animal.porte || "",
+        dataNascimento: animal.dataNascimento || "",
+        alergias: animal.alergias || "",
+        observacoes: animal.observacoes || "",
+      });
+      setClientId(animal.clienteId || "");
+      setErroLocal("");
+    }
+  }, [animal]);
+
+  const set = (field, value) =>
+    setForm((prev) => ({ ...prev, [field]: value }));
+
+  const validate = () => {
+    if (!form.nome.trim()) return "Nome do animal é obrigatório.";
+    if (!form.especie.trim()) return "Espécie é obrigatória.";
+    if (!form.dataNascimento) return "Data de nascimento é obrigatória.";
+    if (!form.porte) return "Porte é obrigatório.";
+    return "";
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    const err = validate();
+    if (err) {
+      setErroLocal(err);
+      return;
+    }
+    if (!clientId) {
+      setErroLocal("Selecione um cliente para associar o animal.");
+      return;
+    }
+    setErroLocal("");
+    onSave({
+      clienteId: clientId,
+      nome: form.nome.trim(),
+      especie: form.especie.trim(),
+      raca: form.raca.trim() || undefined,
+      porte: form.porte,
+      dataNascimento: form.dataNascimento,
+      alergias: form.alergias.trim() || undefined,
+      observacoes: form.observacoes.trim() || undefined,
+    });
+  };
+
+  return (
+    <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm">
+      <DialogTitle>Editar Animal</DialogTitle>
+      <DialogContent>
+        {erroLocal && (
+          <Alert
+            severity="error"
+            sx={{ mb: 2 }}
+            onClose={() => setErroLocal("")}
+          >
+            {erroLocal}
+          </Alert>
+        )}
+        {error && (
+          <Alert severity="error" sx={{ mb: 2 }}>
+            {error}
+          </Alert>
+        )}
+        <Alert severity="info" sx={{ mb: 2 }}>
+          Pode alterar os dados do animal e associá-lo a outro cliente.
+        </Alert>
+        <Box
+          component="form"
+          onSubmit={handleSubmit}
+          noValidate
+          sx={{ display: "grid", gap: 2 }}
+        >
+          <TextField
+            select
+            label="Cliente proprietário"
+            value={clientId}
+            onChange={(e) => setClientId(e.target.value)}
+            fullWidth
+          >
+            {clientes.map((c) => (
+              <MenuItem key={c.id} value={c.id}>
+                {c.nome} — {c.email}
+              </MenuItem>
+            ))}
+          </TextField>
+          <TextField
+            label="Nome do animal"
+            value={form.nome}
+            onChange={(e) => set("nome", e.target.value)}
+            required
+            fullWidth
+          />
+          <TextField
+            label="Espécie"
+            value={form.especie}
+            onChange={(e) => set("especie", e.target.value)}
+            required
+            fullWidth
+          />
+          <TextField
+            label="Raça"
+            value={form.raca}
+            onChange={(e) => set("raca", e.target.value)}
+            fullWidth
+          />
+          <TextField
+            select
+            label="Porte"
+            value={form.porte}
+            onChange={(e) => set("porte", e.target.value)}
+            required
+            fullWidth
+          >
+            {PORTE_OPTIONS.map((o) => (
+              <MenuItem key={o.value} value={o.value}>
+                {o.label}
+              </MenuItem>
+            ))}
+          </TextField>
+          <TextField
+            label="Data de nascimento"
+            type="date"
+            value={form.dataNascimento}
+            onChange={(e) => set("dataNascimento", e.target.value)}
+            required
+            fullWidth
+            InputLabelProps={{ shrink: true }}
+          />
+          <TextField
+            label="Alergias"
+            value={form.alergias}
+            onChange={(e) => set("alergias", e.target.value)}
+            fullWidth
+          />
+          <TextField
+            label="Observações"
+            value={form.observacoes}
+            onChange={(e) => set("observacoes", e.target.value)}
+            fullWidth
+            multiline
+            minRows={2}
+          />
+        </Box>
+      </DialogContent>
+      <DialogActions sx={{ p: 2 }}>
+        <Button onClick={onClose} variant="outlined">
+          Cancelar
+        </Button>
+        <Button
+          onClick={handleSubmit}
+          variant="contained"
+          disabled={loading}
+          sx={{
+            backgroundColor: colors.primary,
+            "&:hover": { backgroundColor: `${colors.primary}dd` },
+          }}
+        >
+          {loading ? (
+            <CircularProgress size={22} sx={{ color: "#fff" }} />
+          ) : (
+            "Guardar alterações"
+          )}
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
+}
+
 // ─── Card de cliente na lista ─────────────────────────────────────────────────
 
-function ClienteCard({ cliente, onAddAnimal }) {
+function ClienteCard({ cliente, onAddAnimal, onEditCliente, onEditAnimal }) {
   const { colors } = useThemeContext();
   const [expanded, setExpanded] = useState(false);
 
@@ -704,6 +1073,14 @@ function ClienteCard({ cliente, onAddAnimal }) {
           >
             Animal
           </Button>
+          <IconButton
+            size="small"
+            onClick={() => onEditCliente(cliente)}
+            sx={{ color: colors.textSecondary }}
+            title="Editar cliente"
+          >
+            <EditIcon fontSize="small" />
+          </IconButton>
           {(cliente.animais?.length ?? 0) > 0 && (
             <IconButton
               size="small"
@@ -780,6 +1157,14 @@ function ClienteCard({ cliente, onAddAnimal }) {
                   {a.observacoes}
                 </Typography>
               )}
+              <IconButton
+                size="small"
+                onClick={() => onEditAnimal(a, cliente)}
+                sx={{ color: colors.textSecondary }}
+                title="Editar animal"
+              >
+                <EditIcon fontSize="small" />
+              </IconButton>
             </Box>
           ))}
         </Box>
@@ -800,6 +1185,12 @@ export default function Client() {
   const [clientes, setClientes] = useState([]);
   const [loadingClientes, setLoadingClientes] = useState(true);
   const [mensagemSucesso, setMensagemSucesso] = useState("");
+  const [editingCliente, setEditingCliente] = useState(null);
+  const [editingClienteError, setEditingClienteError] = useState("");
+  const [editingClienteLoading, setEditingClienteLoading] = useState(false);
+  const [editingAnimal, setEditingAnimal] = useState(null);
+  const [editingAnimalError, setEditingAnimalError] = useState("");
+  const [editingAnimalLoading, setEditingAnimalLoading] = useState(false);
 
   const carregarClientes = useCallback(async () => {
     setLoadingClientes(true);
@@ -888,6 +1279,73 @@ export default function Client() {
     setPasso("cliente");
   };
 
+  const handleEditClienteClick = (cliente) => {
+    setEditingCliente(cliente);
+    setEditingClienteError("");
+    setMensagemSucesso("");
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const handleCancelEditCliente = () => {
+    setEditingCliente(null);
+    setEditingClienteError("");
+  };
+
+  const handleSaveCliente = async (formData) => {
+    if (!editingCliente) return;
+    setEditingClienteLoading(true);
+    setEditingClienteError("");
+    try {
+      const res = await fetch(`${API_BASE_URL}/clientes/${editingCliente.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(formData),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body.error || `Erro (${res.status})`);
+      setEditingCliente(null);
+      setMensagemSucesso(`Cliente "${body.nome}" atualizado com sucesso!`);
+      await carregarClientes();
+    } catch (err) {
+      setEditingClienteError(err.message || "Erro ao atualizar cliente.");
+    } finally {
+      setEditingClienteLoading(false);
+    }
+  };
+
+  const handleEditAnimalClick = (animal, cliente) => {
+    setEditingAnimal({ ...animal, clienteId: cliente.id });
+    setEditingAnimalError("");
+    setMensagemSucesso("");
+  };
+
+  const handleCloseEditAnimal = () => {
+    setEditingAnimal(null);
+    setEditingAnimalError("");
+  };
+
+  const handleSaveAnimal = async (formData) => {
+    if (!editingAnimal) return;
+    setEditingAnimalLoading(true);
+    setEditingAnimalError("");
+    try {
+      const res = await fetch(`${API_BASE_URL}/animais/${editingAnimal.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(formData),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body.error || `Erro (${res.status})`);
+      setEditingAnimal(null);
+      setMensagemSucesso(`Animal "${body.nome}" atualizado com sucesso!`);
+      await carregarClientes();
+    } catch (err) {
+      setEditingAnimalError(err.message || "Erro ao atualizar animal.");
+    } finally {
+      setEditingAnimalLoading(false);
+    }
+  };
+
   return (
     <Box>
       <Typography variant="h1" sx={{ mb: 1, color: colors.text }}>
@@ -898,6 +1356,34 @@ export default function Client() {
         animais a clientes existentes. O cliente só fica ativo após registar
         pelo menos um animal.
       </Typography>
+
+      {editingCliente && (
+        <Paper elevation={2} sx={{ borderRadius: 3, p: 3, mb: 4 }}>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 2 }}>
+            <PersonIcon sx={{ color: colors.primary }} />
+            <Typography variant="h2" sx={{ color: colors.text }}>
+              Editar Cliente — {editingCliente.nome}
+            </Typography>
+          </Box>
+          <ClienteEditForm
+            cliente={editingCliente}
+            onSave={handleSaveCliente}
+            onCancel={handleCancelEditCliente}
+            loading={editingClienteLoading}
+            error={editingClienteError}
+          />
+        </Paper>
+      )}
+
+      <AnimalEditDialog
+        open={Boolean(editingAnimal)}
+        animal={editingAnimal}
+        clientes={clientes}
+        onSave={handleSaveAnimal}
+        onClose={handleCloseEditAnimal}
+        loading={editingAnimalLoading}
+        error={editingAnimalError}
+      />
 
       {/* ── Painel: adicionar animal a cliente existente (BET-126 + BET-127) ── */}
       {clienteParaAnimal && (
@@ -1145,6 +1631,8 @@ export default function Client() {
               key={c.id}
               cliente={c}
               onAddAnimal={handleAddAnimalAClienteExistente}
+              onEditCliente={handleEditClienteClick}
+              onEditAnimal={handleEditAnimalClick}
             />
           ))}
         </Box>
