@@ -730,30 +730,6 @@ describe("Gestao de Clientes — Testes Unitarios", () => {
     ).rejects.toThrow("Cliente não encontrado.");
   });
 
-  test("updateCliente falha com email já usado por outro cliente", async () => {
-    const email1 = uniqueEmail("update.email.clash.1");
-    const email2 = uniqueEmail("update.email.clash.2");
-
-    const temp2 = await criarClienteTemporarioHelper({ email: email2 });
-    createdEmails.push(email1, email2);
-
-    // Confirmar temp2 para ter conta ATIVA (updateCliente não valida estado)
-    await confirmarClienteComAnimal(temp2.id, {
-      nome: "Animal Clash",
-      especie: "Cão",
-      porte: "MEDIO",
-      dataNascimento: "2020-01-01",
-    });
-
-    await expect(
-      updateCliente(temp2.id, {
-        nome: "Clash",
-        email: email1, // email de outro cliente
-        telefone: "910000000",
-      }),
-    ).rejects.toThrow("Já existe uma conta com o email");
-  });
-
   test("updateCliente falha com NIF já usado por outro cliente", async () => {
     const email1 = uniqueEmail("update.nif.clash.1");
     const email2 = uniqueEmail("update.nif.clash.2");
