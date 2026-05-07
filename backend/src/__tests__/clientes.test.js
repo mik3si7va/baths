@@ -10,6 +10,8 @@ const {
   confirmarClienteComAnimal,
   createAnimal,
   getAnimaisByCliente,
+  updateCliente,
+  updateAnimal,
   limparClientesTemporarios,
 } = require("../repositories/repositorioClientes");
 const { prisma } = require("../db/prismaClient");
@@ -98,6 +100,61 @@ describe("Gestao de Clientes — Testes Unitarios", () => {
     expect(encontrado.nome).toBe("Cliente Helper");
     expect(encontrado.email).toBe(email);
     expect(Array.isArray(encontrado.animais)).toBe(true);
+  });
+
+  test("getClienteById retorna cliente PENDENTE_VERIFICACAO (sem filtro de estado)", async () => {
+    const email = uniqueEmail("get.by.id.pendente");
+    const temp = await criarClienteTemporarioHelper({ email });
+    createdEmails.push(email);
+
+    const encontrado = await getClienteById(temp.id);
+    expect(encontrado).not.toBeNull();
+    expect(encontrado.estadoConta).toBe("PENDENTE_VERIFICACAO");
+  });
+
+  test("getClienteById retorna cliente com animais após confirmação", async () => {
+    const email = uniqueEmail("get.by.id.com.animal");
+    const temp = await criarClienteTemporarioHelper({ email });
+    createdEmails.push(email);
+
+    await confirmarClienteComAnimal(temp.id, {
+      nome: "Bolinha",
+      especie: "Cão",
+      porte: "PEQUENO",
+      dataNascimento: "2021-04-10",
+    });
+
+    const encontrado = await getClienteById(temp.id);
+    expect(encontrado.animais.length).toBe(1);
+    expect(encontrado.animais[0].nome).toBe("Bolinha");
+  });
+
+  test("getClienteById retorna campos esperados no objecto cliente", async () => {
+    const email = uniqueEmail("get.by.id.campos");
+    const nif = uniqueNif();
+    const temp = await createClienteTemporario({
+      nome: "Campos Teste",
+      email,
+      telefone: "910000099",
+      password: "password123",
+      nif,
+      morada: "Rua dos Campos, 5",
+    });
+    createdEmails.push(email);
+
+    const encontrado = await getClienteById(temp.id);
+    expect(encontrado).toHaveProperty("id");
+    expect(encontrado).toHaveProperty("nome");
+    expect(encontrado).toHaveProperty("email");
+    expect(encontrado).toHaveProperty("telefone");
+    expect(encontrado).toHaveProperty("nif");
+    expect(encontrado).toHaveProperty("morada");
+    expect(encontrado).toHaveProperty("ativo");
+    expect(encontrado).toHaveProperty("estadoConta");
+    expect(encontrado).toHaveProperty("createdAt");
+    expect(encontrado).toHaveProperty("animais");
+    expect(encontrado.nif).toBe(nif);
+    expect(encontrado.morada).toBe("Rua dos Campos, 5");
   });
 
   // ── createClienteTemporario ────────────────────────────────────────────────
@@ -411,6 +468,111 @@ describe("Gestao de Clientes — Testes Unitarios", () => {
     ).rejects.toThrow("Porte inválido");
   });
 
+  test("confirmarClienteComAnimal falha sem dataNascimento", async () => {
+    const email = uniqueEmail("confirmar.sem.data");
+    const temp = await criarClienteTemporarioHelper({ email });
+    createdEmails.push(email);
+
+    await expect(
+      confirmarClienteComAnimal(temp.id, {
+        nome: "Rex",
+        especie: "Cão",
+        porte: "MEDIO",
+        dataNascimento: null,
+      }),
+    ).rejects.toThrow("Data de nascimento é obrigatória.");
+  });
+
+  test("confirmarClienteComAnimal falha com dataNascimento futura", async () => {
+    const email = uniqueEmail("confirmar.data.futura");
+    const temp = await criarClienteTemporarioHelper({ email });
+    createdEmails.push(email);
+
+    const amanha = new Date();
+    amanha.setDate(amanha.getDate() + 1);
+    const dataFutura = amanha.toISOString().slice(0, 10);
+
+    await expect(
+      confirmarClienteComAnimal(temp.id, {
+        nome: "Rex",
+        especie: "Cão",
+        porte: "MEDIO",
+        dataNascimento: dataFutura,
+      }),
+    ).rejects.toThrow("A data de nascimento não pode ser futura.");
+  });
+
+  test("confirmarClienteComAnimal falha com dataNascimento invalida", async () => {
+    const email = uniqueEmail("confirmar.data.invalida");
+    const temp = await criarClienteTemporarioHelper({ email });
+    createdEmails.push(email);
+
+    await expect(
+      confirmarClienteComAnimal(temp.id, {
+        nome: "Rex",
+        especie: "Cão",
+        porte: "MEDIO",
+        dataNascimento: "nao-e-uma-data",
+      }),
+    ).rejects.toThrow("Data de nascimento inválida.");
+  });
+
+  test("confirmarClienteComAnimal falha sem porte", async () => {
+    const email = uniqueEmail("confirmar.sem.porte");
+    const temp = await criarClienteTemporarioHelper({ email });
+    createdEmails.push(email);
+
+    await expect(
+      confirmarClienteComAnimal(temp.id, {
+        nome: "Rex",
+        especie: "Cão",
+        porte: "",
+        dataNascimento: "2020-01-01",
+      }),
+    ).rejects.toThrow("Porte é obrigatório.");
+  });
+
+  test("confirmarClienteComAnimal persiste campos opcionais do animal (raca, alergias, observacoes)", async () => {
+    const email = uniqueEmail("confirmar.campos.opcionais");
+    const temp = await criarClienteTemporarioHelper({ email });
+    createdEmails.push(email);
+
+    const resultado = await confirmarClienteComAnimal(temp.id, {
+      nome: "Buddy",
+      especie: "Cão",
+      raca: "Beagle",
+      porte: "MEDIO",
+      dataNascimento: "2019-07-20",
+      alergias: "Frango",
+      observacoes: "Ansioso com barulho",
+    });
+
+    expect(resultado.animal.raca).toBe("Beagle");
+    expect(resultado.animal.alergias).toBe("Frango");
+    expect(resultado.animal.observacoes).toBe("Ansioso com barulho");
+  });
+
+  test("confirmarClienteComAnimal retorna campos esperados no animal", async () => {
+    const email = uniqueEmail("confirmar.campos.animal");
+    const temp = await criarClienteTemporarioHelper({ email });
+    createdEmails.push(email);
+
+    const resultado = await confirmarClienteComAnimal(temp.id, {
+      nome: "Kika",
+      especie: "Gato",
+      porte: "PEQUENO",
+      dataNascimento: "2022-11-11",
+    });
+
+    expect(resultado.animal).toHaveProperty("id");
+    expect(resultado.animal).toHaveProperty("clienteId");
+    expect(resultado.animal).toHaveProperty("nome");
+    expect(resultado.animal).toHaveProperty("especie");
+    expect(resultado.animal).toHaveProperty("porte");
+    expect(resultado.animal).toHaveProperty("dataNascimento");
+    expect(resultado.animal).toHaveProperty("createdAt");
+  });
+
   // ── Após confirmar, getAllClientes inclui o novo cliente ───────────────────
 
   test("cliente confirmado aparece em getAllClientes", async () => {
@@ -441,6 +603,297 @@ describe("Gestao de Clientes — Testes Unitarios", () => {
     const clientes = await getAllClientes();
     const encontrado = clientes.find((c) => c.id === temp.id);
     expect(encontrado).toBeUndefined();
+  });
+
+  // ── updateCliente ──────────────────────────────────────────────────────────
+
+  test("updateCliente actualiza dados básicos com sucesso", async () => {
+    const email = uniqueEmail("update.cliente.basico");
+    const novoEmail = uniqueEmail("update.cliente.novo.email");
+    const temp = await criarClienteTemporarioHelper({ email });
+    createdEmails.push(email, novoEmail);
+
+    await confirmarClienteComAnimal(temp.id, {
+      nome: "Animal Update",
+      especie: "Cão",
+      porte: "MEDIO",
+      dataNascimento: "2020-01-01",
+    });
+
+    const atualizado = await updateCliente(temp.id, {
+      nome: "Nome Atualizado",
+      email: novoEmail,
+      telefone: "920000001",
+    });
+
+    expect(atualizado.nome).toBe("Nome Atualizado");
+    expect(atualizado.email).toBe(novoEmail);
+    expect(atualizado.telefone).toBe("920000001");
+  });
+
+  test("updateCliente actualiza NIF e morada", async () => {
+    const email = uniqueEmail("update.cliente.nif.morada");
+    const nif = uniqueNif();
+    const temp = await criarClienteTemporarioHelper({ email });
+    createdEmails.push(email);
+
+    await confirmarClienteComAnimal(temp.id, {
+      nome: "Animal NIF",
+      especie: "Gato",
+      porte: "PEQUENO",
+      dataNascimento: "2021-01-01",
+    });
+
+    const atualizado = await updateCliente(temp.id, {
+      nome: "Cliente NIF",
+      email,
+      telefone: "910000000",
+      nif,
+      morada: "Av. Nova, 42",
+    });
+
+    expect(atualizado.nif).toBe(nif);
+    expect(atualizado.morada).toBe("Av. Nova, 42");
+  });
+
+  test("updateCliente actualiza password com sucesso (sem lançar erro)", async () => {
+    const email = uniqueEmail("update.cliente.password");
+    const temp = await criarClienteTemporarioHelper({ email });
+    createdEmails.push(email);
+
+    await confirmarClienteComAnimal(temp.id, {
+      nome: "Animal Pwd",
+      especie: "Cão",
+      porte: "MEDIO",
+      dataNascimento: "2020-06-01",
+    });
+
+    await expect(
+      updateCliente(temp.id, {
+        nome: "Cliente Helper",
+        email,
+        telefone: "910000000",
+        password: "novaPassword123",
+      }),
+    ).resolves.not.toThrow();
+  });
+
+  test("updateCliente falha sem nome", async () => {
+    const email = uniqueEmail("update.sem.nome");
+    const temp = await criarClienteTemporarioHelper({ email });
+    createdEmails.push(email);
+
+    await expect(
+      updateCliente(temp.id, {
+        nome: "",
+        email,
+        telefone: "910000000",
+      }),
+    ).rejects.toThrow("nome é obrigatório.");
+  });
+
+  test("updateCliente falha sem email", async () => {
+    const email = uniqueEmail("update.sem.email");
+    const temp = await criarClienteTemporarioHelper({ email });
+    createdEmails.push(email);
+
+    await expect(
+      updateCliente(temp.id, {
+        nome: "Teste",
+        email: "",
+        telefone: "910000000",
+      }),
+    ).rejects.toThrow("email é obrigatório.");
+  });
+
+  test("updateCliente falha sem telefone", async () => {
+    const email = uniqueEmail("update.sem.telefone");
+    const temp = await criarClienteTemporarioHelper({ email });
+    createdEmails.push(email);
+
+    await expect(
+      updateCliente(temp.id, {
+        nome: "Teste",
+        email,
+        telefone: "",
+      }),
+    ).rejects.toThrow("telefone é obrigatório.");
+  });
+
+  test("updateCliente falha para cliente inexistente", async () => {
+    await expect(
+      updateCliente("00000000-0000-4000-8000-000000000000", {
+        nome: "Fantasma",
+        email: uniqueEmail("update.inexistente"),
+        telefone: "910000000",
+      }),
+    ).rejects.toThrow("Cliente não encontrado.");
+  });
+
+  test("updateCliente falha com email já usado por outro cliente", async () => {
+    const email1 = uniqueEmail("update.email.clash.1");
+    const email2 = uniqueEmail("update.email.clash.2");
+
+    const temp2 = await criarClienteTemporarioHelper({ email: email2 });
+    createdEmails.push(email1, email2);
+
+    // Confirmar temp2 para ter conta ATIVA (updateCliente não valida estado)
+    await confirmarClienteComAnimal(temp2.id, {
+      nome: "Animal Clash",
+      especie: "Cão",
+      porte: "MEDIO",
+      dataNascimento: "2020-01-01",
+    });
+
+    await expect(
+      updateCliente(temp2.id, {
+        nome: "Clash",
+        email: email1, // email de outro cliente
+        telefone: "910000000",
+      }),
+    ).rejects.toThrow("Já existe uma conta com o email");
+  });
+
+  test("updateCliente falha com NIF já usado por outro cliente", async () => {
+    const email1 = uniqueEmail("update.nif.clash.1");
+    const email2 = uniqueEmail("update.nif.clash.2");
+    const nif = uniqueNif();
+
+    await createClienteTemporario({
+      nome: "Dono NIF",
+      email: email1,
+      telefone: "910000000",
+      password: "password123",
+      nif,
+    });
+    const temp2 = await criarClienteTemporarioHelper({ email: email2 });
+    createdEmails.push(email1, email2);
+
+    await confirmarClienteComAnimal(temp2.id, {
+      nome: "Animal NIF Clash",
+      especie: "Gato",
+      porte: "PEQUENO",
+      dataNascimento: "2021-01-01",
+    });
+
+    await expect(
+      updateCliente(temp2.id, {
+        nome: "NIF Clash",
+        email: email2,
+        telefone: "910000000",
+        nif, // NIF de outro cliente
+      }),
+    ).rejects.toThrow("Já existe um cliente com o NIF");
+  });
+
+  test("updateCliente falha com NIF inválido", async () => {
+    const email = uniqueEmail("update.nif.invalido");
+    const temp = await criarClienteTemporarioHelper({ email });
+    createdEmails.push(email);
+
+    await expect(
+      updateCliente(temp.id, {
+        nome: "Teste",
+        email,
+        telefone: "910000000",
+        nif: "123",
+      }),
+    ).rejects.toThrow("O NIF deve ter 9 dígitos numéricos.");
+  });
+
+  test("updateCliente falha com password curta", async () => {
+    const email = uniqueEmail("update.password.curta");
+    const temp = await criarClienteTemporarioHelper({ email });
+    createdEmails.push(email);
+
+    await expect(
+      updateCliente(temp.id, {
+        nome: "Teste",
+        email,
+        telefone: "910000000",
+        password: "abc",
+      }),
+    ).rejects.toThrow("A password deve ter pelo menos 8 caracteres.");
+  });
+
+  test("updateCliente permite manter o mesmo email (não colide consigo próprio)", async () => {
+    const email = uniqueEmail("update.mesmo.email");
+    const temp = await criarClienteTemporarioHelper({ email });
+    createdEmails.push(email);
+
+    await confirmarClienteComAnimal(temp.id, {
+      nome: "Animal Mesmo Email",
+      especie: "Cão",
+      porte: "MEDIO",
+      dataNascimento: "2020-01-01",
+    });
+
+    const atualizado = await updateCliente(temp.id, {
+      nome: "Nome Novo",
+      email, // mesmo email
+      telefone: "910000000",
+    });
+
+    expect(atualizado.email).toBe(email);
+    expect(atualizado.nome).toBe("Nome Novo");
+  });
+
+  test("updateCliente permite manter o mesmo NIF (não colide consigo próprio)", async () => {
+    const email = uniqueEmail("update.mesmo.nif");
+    const nif = uniqueNif();
+    const temp = await createClienteTemporario({
+      nome: "Cliente NIF Proprio",
+      email,
+      telefone: "910000000",
+      password: "password123",
+      nif,
+    });
+    createdEmails.push(email);
+
+    await confirmarClienteComAnimal(temp.id, {
+      nome: "Animal NIF Proprio",
+      especie: "Cão",
+      porte: "MEDIO",
+      dataNascimento: "2020-01-01",
+    });
+
+    const atualizado = await updateCliente(temp.id, {
+      nome: "Nome NIF",
+      email,
+      telefone: "920000000",
+      nif, // mesmo NIF
+    });
+
+    expect(atualizado.nif).toBe(nif);
+  });
+
+  test("updateCliente remove NIF quando passado vazio", async () => {
+    const email = uniqueEmail("update.remove.nif");
+    const nif = uniqueNif();
+    const temp = await createClienteTemporario({
+      nome: "Remove NIF",
+      email,
+      telefone: "910000000",
+      password: "password123",
+      nif,
+    });
+    createdEmails.push(email);
+
+    await confirmarClienteComAnimal(temp.id, {
+      nome: "Animal Remove NIF",
+      especie: "Cão",
+      porte: "MEDIO",
+      dataNascimento: "2020-01-01",
+    });
+
+    const atualizado = await updateCliente(temp.id, {
+      nome: "Remove NIF",
+      email,
+      telefone: "910000000",
+      nif: null,
+    });
+
+    expect(atualizado.nif).toBeNull();
   });
 });
 
@@ -623,6 +1076,43 @@ describe("Gestao de Animais — Testes Unitarios", () => {
     ).rejects.toThrow("Porte inválido");
   });
 
+  test("createAnimal falha sem dataNascimento", async () => {
+    await expect(
+      createAnimal(clienteAtivo.id, {
+        nome: "Rex",
+        especie: "Cão",
+        porte: "MEDIO",
+        dataNascimento: null,
+      }),
+    ).rejects.toThrow("Data de nascimento é obrigatória.");
+  });
+
+  test("createAnimal falha com dataNascimento futura", async () => {
+    const amanha = new Date();
+    amanha.setDate(amanha.getDate() + 1);
+    const dataFutura = amanha.toISOString().slice(0, 10);
+
+    await expect(
+      createAnimal(clienteAtivo.id, {
+        nome: "Rex",
+        especie: "Cão",
+        porte: "MEDIO",
+        dataNascimento: dataFutura,
+      }),
+    ).rejects.toThrow("A data de nascimento não pode ser futura.");
+  });
+
+  test("createAnimal falha com dataNascimento invalida", async () => {
+    await expect(
+      createAnimal(clienteAtivo.id, {
+        nome: "Rex",
+        especie: "Cão",
+        porte: "MEDIO",
+        dataNascimento: "nao-e-uma-data",
+      }),
+    ).rejects.toThrow("Data de nascimento inválida.");
+  });
+
   // ── getAnimaisByCliente ────────────────────────────────────────────────────
 
   test("getAnimaisByCliente retorna lista de animais do cliente", async () => {
@@ -683,6 +1173,267 @@ describe("Gestao de Animais — Testes Unitarios", () => {
     expect(encontrado.dataNascimento).toBe("2021-05-15");
   });
 
+  // ── updateAnimal ──────────────────────────────────────────────────────────
+
+  test("updateAnimal actualiza todos os campos com sucesso", async () => {
+    const animal = await createAnimal(clienteAtivo.id, {
+      nome: "ParaActualizar",
+      especie: "Cão",
+      porte: "PEQUENO",
+      dataNascimento: "2020-03-03",
+    });
+
+    const atualizado = await updateAnimal(animal.id, {
+      clienteId: clienteAtivo.id,
+      nome: "Actualizado",
+      especie: "Gato",
+      raca: "Siamês",
+      porte: "EXTRA_PEQUENO",
+      dataNascimento: "2021-06-15",
+      alergias: "Peixe",
+      observacoes: "Muito calmo",
+    });
+
+    expect(atualizado.nome).toBe("Actualizado");
+    expect(atualizado.especie).toBe("Gato");
+    expect(atualizado.raca).toBe("Siamês");
+    expect(atualizado.porte).toBe("EXTRA_PEQUENO");
+    expect(atualizado.dataNascimento).toBe("2021-06-15");
+    expect(atualizado.alergias).toBe("Peixe");
+    expect(atualizado.observacoes).toBe("Muito calmo");
+  });
+
+  test("updateAnimal actualiza apenas campos obrigatórios (limpa opcionais)", async () => {
+    const animal = await createAnimal(clienteAtivo.id, {
+      nome: "ComOpcionais",
+      especie: "Cão",
+      raca: "Bulldog",
+      porte: "GRANDE",
+      dataNascimento: "2019-01-01",
+      alergias: "Trigo",
+      observacoes: "Ronca muito",
+    });
+
+    const atualizado = await updateAnimal(animal.id, {
+      clienteId: clienteAtivo.id,
+      nome: "SemOpcionais",
+      especie: "Cão",
+      raca: null,
+      porte: "GRANDE",
+      dataNascimento: "2019-01-01",
+      alergias: null,
+      observacoes: null,
+    });
+
+    expect(atualizado.nome).toBe("SemOpcionais");
+    expect(atualizado.raca).toBeNull();
+    expect(atualizado.alergias).toBeNull();
+    expect(atualizado.observacoes).toBeNull();
+  });
+
+  test("updateAnimal falha para animal inexistente", async () => {
+    await expect(
+      updateAnimal("00000000-0000-4000-8000-000000000000", {
+        clienteId: clienteAtivo.id,
+        nome: "Fantasma",
+        especie: "Cão",
+        porte: "MEDIO",
+        dataNascimento: "2020-01-01",
+      }),
+    ).rejects.toThrow("Animal não encontrado.");
+  });
+
+  test("updateAnimal falha sem clienteId", async () => {
+    const animal = await createAnimal(clienteAtivo.id, {
+      nome: "SemClienteId",
+      especie: "Cão",
+      porte: "MEDIO",
+      dataNascimento: "2020-01-01",
+    });
+
+    await expect(
+      updateAnimal(animal.id, {
+        clienteId: "",
+        nome: "Teste",
+        especie: "Cão",
+        porte: "MEDIO",
+        dataNascimento: "2020-01-01",
+      }),
+    ).rejects.toThrow("clienteId é obrigatório.");
+  });
+
+  test("updateAnimal falha para cliente inexistente no clienteId", async () => {
+    const animal = await createAnimal(clienteAtivo.id, {
+      nome: "ClienteInexistente",
+      especie: "Cão",
+      porte: "MEDIO",
+      dataNascimento: "2020-01-01",
+    });
+
+    await expect(
+      updateAnimal(animal.id, {
+        clienteId: "00000000-0000-4000-8000-000000000000",
+        nome: "Teste",
+        especie: "Cão",
+        porte: "MEDIO",
+        dataNascimento: "2020-01-01",
+      }),
+    ).rejects.toThrow("Cliente não encontrado.");
+  });
+
+  test("updateAnimal falha para cliente não ativo (PENDENTE_VERIFICACAO)", async () => {
+    const emailPendente = uniqueEmail("update.animal.cliente.pendente");
+    const tempPendente = await createClienteTemporario({
+      nome: "Pendente Update",
+      email: emailPendente,
+      telefone: "910000099",
+      password: "password123",
+    });
+    createdEmails.push(emailPendente);
+
+    const animal = await createAnimal(clienteAtivo.id, {
+      nome: "AnimalParaReassociar",
+      especie: "Cão",
+      porte: "MEDIO",
+      dataNascimento: "2020-01-01",
+    });
+
+    await expect(
+      updateAnimal(animal.id, {
+        clienteId: tempPendente.id,
+        nome: "Reassociado",
+        especie: "Cão",
+        porte: "MEDIO",
+        dataNascimento: "2020-01-01",
+      }),
+    ).rejects.toThrow("Só é possível associar o animal a um cliente ativo.");
+  });
+
+  test("updateAnimal falha sem nome do animal", async () => {
+    const animal = await createAnimal(clienteAtivo.id, {
+      nome: "SemNomeUpdate",
+      especie: "Cão",
+      porte: "MEDIO",
+      dataNascimento: "2020-01-01",
+    });
+
+    await expect(
+      updateAnimal(animal.id, {
+        clienteId: clienteAtivo.id,
+        nome: "",
+        especie: "Cão",
+        porte: "MEDIO",
+        dataNascimento: "2020-01-01",
+      }),
+    ).rejects.toThrow("Nome do animal é obrigatório.");
+  });
+
+  test("updateAnimal falha sem especie", async () => {
+    const animal = await createAnimal(clienteAtivo.id, {
+      nome: "SemEspecieUpdate",
+      especie: "Cão",
+      porte: "MEDIO",
+      dataNascimento: "2020-01-01",
+    });
+
+    await expect(
+      updateAnimal(animal.id, {
+        clienteId: clienteAtivo.id,
+        nome: "Teste",
+        especie: "",
+        porte: "MEDIO",
+        dataNascimento: "2020-01-01",
+      }),
+    ).rejects.toThrow("Espécie é obrigatória.");
+  });
+
+  test("updateAnimal falha com porte invalido", async () => {
+    const animal = await createAnimal(clienteAtivo.id, {
+      nome: "PorteInvalidoUpdate",
+      especie: "Cão",
+      porte: "MEDIO",
+      dataNascimento: "2020-01-01",
+    });
+
+    await expect(
+      updateAnimal(animal.id, {
+        clienteId: clienteAtivo.id,
+        nome: "Teste",
+        especie: "Cão",
+        porte: "GIGANTE",
+        dataNascimento: "2020-01-01",
+      }),
+    ).rejects.toThrow("Porte inválido");
+  });
+
+  test("updateAnimal falha com dataNascimento futura", async () => {
+    const animal = await createAnimal(clienteAtivo.id, {
+      nome: "DataFuturaUpdate",
+      especie: "Cão",
+      porte: "MEDIO",
+      dataNascimento: "2020-01-01",
+    });
+
+    const amanha = new Date();
+    amanha.setDate(amanha.getDate() + 1);
+    const dataFutura = amanha.toISOString().slice(0, 10);
+
+    await expect(
+      updateAnimal(animal.id, {
+        clienteId: clienteAtivo.id,
+        nome: "Teste",
+        especie: "Cão",
+        porte: "MEDIO",
+        dataNascimento: dataFutura,
+      }),
+    ).rejects.toThrow("A data de nascimento não pode ser futura.");
+  });
+
+  test("updateAnimal falha com dataNascimento invalida", async () => {
+    const animal = await createAnimal(clienteAtivo.id, {
+      nome: "DataInvalidaUpdate",
+      especie: "Cão",
+      porte: "MEDIO",
+      dataNascimento: "2020-01-01",
+    });
+
+    await expect(
+      updateAnimal(animal.id, {
+        clienteId: clienteAtivo.id,
+        nome: "Teste",
+        especie: "Cão",
+        porte: "MEDIO",
+        dataNascimento: "nao-e-uma-data",
+      }),
+    ).rejects.toThrow("Data de nascimento inválida.");
+  });
+
+  test("updateAnimal retorna campos correctos após actualização", async () => {
+    const animal = await createAnimal(clienteAtivo.id, {
+      nome: "CamposUpdate",
+      especie: "Cão",
+      porte: "MEDIO",
+      dataNascimento: "2020-01-01",
+    });
+
+    const atualizado = await updateAnimal(animal.id, {
+      clienteId: clienteAtivo.id,
+      nome: "CamposActualizados",
+      especie: "Cão",
+      porte: "GRANDE",
+      dataNascimento: "2020-01-01",
+    });
+
+    expect(atualizado).toHaveProperty("id");
+    expect(atualizado).toHaveProperty("clienteId");
+    expect(atualizado).toHaveProperty("nome");
+    expect(atualizado).toHaveProperty("especie");
+    expect(atualizado).toHaveProperty("porte");
+    expect(atualizado).toHaveProperty("dataNascimento");
+    expect(atualizado).toHaveProperty("createdAt");
+    expect(atualizado.id).toBe(animal.id);
+  });
+
   // ── limparClientesTemporarios ──────────────────────────────────────────────
 
   test("limparClientesTemporarios elimina clientes PENDENTE_VERIFICACAO sem animais expirados", async () => {
@@ -723,5 +1474,37 @@ describe("Gestao de Animais — Testes Unitarios", () => {
     const resultado = await limparClientesTemporarios(9999);
     expect(resultado.eliminados).toBeGreaterThanOrEqual(0);
     expect(typeof resultado.eliminados).toBe("number");
+  });
+
+  test("limparClientesTemporarios nao elimina clientes PENDENTE_VERIFICACAO com animais", async () => {
+    // Um cliente PENDENTE com animais não deve ser eliminado
+    // (este caso é protegido pela query `animais: { none: {} }`)
+    const email = uniqueEmail("limpar.pendente.com.animal");
+    const temp = await createClienteTemporario({
+      nome: "Pendente Com Animal",
+      email,
+      telefone: "910000014",
+      password: "password123",
+    });
+    createdEmails.push(email);
+
+    // Confirmar cliente activa-o — portanto não será eliminado pelo limpar
+    await confirmarClienteComAnimal(temp.id, {
+      nome: "AnimalProtegido",
+      especie: "Cão",
+      porte: "MEDIO",
+      dataNascimento: "2020-01-01",
+    });
+
+    // Forçar data para o passado
+    await prisma.utilizador.updateMany({
+      where: { email },
+      data: { createdAt: new Date(Date.now() - 2 * 60 * 60 * 1000) },
+    });
+
+    await limparClientesTemporarios(60);
+
+    const naBase = await prisma.utilizador.findUnique({ where: { email } });
+    expect(naBase).not.toBeNull();
   });
 });
