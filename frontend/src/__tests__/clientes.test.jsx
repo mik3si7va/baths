@@ -163,6 +163,20 @@ async function chegarAoPasso3() {
   await screen.findByText(/Registo concluído/i);
 }
 
+// Helper para expandir animais e abrir o diálogo de confirmar eliminação
+async function chegarAoDialogEliminarAnimal() {
+  mockGetClientes();
+  renderClientes();
+
+  await screen.findByText("João Silva");
+  await userEvent.click(screen.getByTitle(/Ver animais/i));
+  await screen.findByText("Rex");
+  await userEvent.click(screen.getByTitle(/Eliminar animal/i));
+
+  // Aguardar o diálogo de confirmação aparecer
+  await screen.findByText(/Eliminar Animal/i);
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe("Client page", () => {
@@ -842,12 +856,12 @@ describe("Client page", () => {
     const segundoAnimal = { ...ANIMAL_MOCK, id: "anim-2", nome: "Luna" };
 
     global.fetch
-      .mockImplementationOnce(() => mockJsonResponse([]))
-      .mockImplementationOnce(() => mockJsonResponse(CLIENTE_TEMPORARIO_MOCK))
-      .mockImplementationOnce(() => mockJsonResponse(CONFIRMAR_RESULT_MOCK))
-      .mockImplementationOnce(() => mockJsonResponse([CLIENTE_ATIVO_MOCK]))
-      .mockImplementationOnce(() => mockJsonResponse(segundoAnimal))
-      .mockImplementationOnce(() => mockJsonResponse([CLIENTE_ATIVO_MOCK]));
+      .mockImplementationOnce(() => mockJsonResponse([])) // GET mount
+      .mockImplementationOnce(() => mockJsonResponse(CLIENTE_TEMPORARIO_MOCK)) // POST /clientes
+      .mockImplementationOnce(() => mockJsonResponse(CONFIRMAR_RESULT_MOCK)) // POST confirmar
+      .mockImplementationOnce(() => mockJsonResponse([CLIENTE_ATIVO_MOCK])) // GET reload
+      .mockImplementationOnce(() => mockJsonResponse(segundoAnimal)) // POST /animais
+      .mockImplementationOnce(() => mockJsonResponse([CLIENTE_ATIVO_MOCK])); // GET reload
 
     renderClientes();
     await screen.findByText("Dados do Cliente");
@@ -892,10 +906,6 @@ describe("Client page", () => {
     expect(JSON.parse(postAnimalCall[1].body).nome).toBe("Luna");
   });
 
-  // FIX: "cancelar no passo animal_extra volta ao passo 3"
-  // Ao entrar no passo animal_extra, mensagemSucesso é limpa (setMensagemSucesso("")).
-  // Ao cancelar, volta ao estado "concluido" mas a mensagem continua vazia.
-  // Verificamos que os botões característicos do passo 3 voltam a estar visíveis.
   test("cancelar no passo animal_extra volta ao passo 3", async () => {
     await chegarAoPasso3();
 
@@ -906,14 +916,12 @@ describe("Client page", () => {
 
     await userEvent.click(screen.getByRole("button", { name: /Cancelar/i }));
 
-    // Ao voltar ao passo 3, os dois botões característicos devem estar presentes
     expect(
       await screen.findByRole("button", { name: /Adicionar Outro Animal/i }),
     ).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: /Novo Registo de Cliente/i }),
     ).toBeInTheDocument();
-    // O formulário de animal extra já não deve estar visível
     expect(
       screen.queryByRole("heading", { name: /Adicionar Animal/i }),
     ).not.toBeInTheDocument();
@@ -1088,11 +1096,6 @@ describe("Client page", () => {
     expect(screen.getByText(/Labrador/i)).toBeInTheDocument();
   });
 
-  // FIX: "clicar novamente no icone de expandir oculta os animais"
-  // "Rex" pode aparecer noutros sítios da página (ex.: resumo do passo 3).
-  // Verificamos que o elemento específico dentro do Collapse desaparece
-  // usando o data-testid do card expandido, ou verificamos que o título
-  // "Ocultar animais" desaparece (o que implica que o collapse fechou).
   test("clicar novamente no icone de expandir oculta os animais", async () => {
     mockGetClientes();
     renderClientes();
@@ -1101,17 +1104,13 @@ describe("Client page", () => {
     const expandBtn = screen.getByTitle(/Ver animais/i);
 
     await userEvent.click(expandBtn);
-    // Após expandir, "Rex" deve estar visível dentro da secção de animais
     expect(await screen.findByText("Rex")).toBeInTheDocument();
 
-    // Clicar de novo para colapsar
     await userEvent.click(screen.getByTitle(/Ocultar animais/i));
 
-    // O botão "Ocultar animais" deve desaparecer, voltando a "Ver animais"
     await waitFor(() => {
       expect(screen.queryByTitle(/Ocultar animais/i)).not.toBeInTheDocument();
     });
-    // E o botão "Ver animais" deve voltar a aparecer
     expect(screen.getByTitle(/Ver animais/i)).toBeInTheDocument();
   });
 
@@ -1214,8 +1213,6 @@ describe("Client page", () => {
     fireEvent.focus(searchInput);
     await userEvent.type(searchInput, "João");
 
-    // FIX: usar getAllByText para evitar falha quando o nome aparece tanto no
-    // dropdown como no card da lista
     const matches = await screen.findAllByText(/joao.silva@email.com/i);
     expect(matches.length).toBeGreaterThan(0);
   });
@@ -1232,7 +1229,6 @@ describe("Client page", () => {
     fireEvent.focus(searchInput);
     await userEvent.type(searchInput, "joao.silva@email.com");
 
-    // FIX: usar getAllByText — o nome pode aparecer no dropdown e no card
     const matches = await screen.findAllByText(/João Silva/);
     expect(matches.length).toBeGreaterThan(0);
   });
@@ -1249,7 +1245,6 @@ describe("Client page", () => {
     fireEvent.focus(searchInput);
     await userEvent.type(searchInput, "910000001");
 
-    // FIX: usar getAllByText — o nome pode aparecer no dropdown e no card
     const matches = await screen.findAllByText(/João Silva/);
     expect(matches.length).toBeGreaterThan(0);
   });
@@ -1271,12 +1266,6 @@ describe("Client page", () => {
     ).toBeInTheDocument();
   });
 
-  // FIX: "pesquisa nao mostra dropdown quando query esta vazia"
-  // Qualquer texto do ClienteCard (email, nome, chip "1 animal") existe na página
-  // independentemente do dropdown. A única coisa exclusiva do dropdown quando
-  // aberto sem resultados é "Nenhum cliente encontrado". Com query vazia, o
-  // dropdown simplesmente não renderiza — basta confirmar que essa mensagem
-  // exclusiva não está presente.
   test("pesquisa nao mostra dropdown quando query esta vazia", async () => {
     mockGetClientes([CLIENTE_ATIVO_MOCK]);
     renderClientes();
@@ -1288,8 +1277,6 @@ describe("Client page", () => {
     );
     fireEvent.focus(searchInput);
 
-    // Com query vazia, o dropdown não renderiza — não deve aparecer a mensagem
-    // exclusiva do dropdown vazio nem o botão de limpar
     expect(
       screen.queryByText(/Nenhum cliente encontrado para/i),
     ).not.toBeInTheDocument();
@@ -1308,8 +1295,6 @@ describe("Client page", () => {
     fireEvent.focus(searchInput);
     await userEvent.type(searchInput, "João");
 
-    // FIX: pode haver múltiplos elementos com o email; usar findAllByText e
-    // clicar no primeiro resultado do dropdown (o que está dentro do Paper)
     const emailMatches = await screen.findAllByText(/joao.silva@email.com/i);
     const clienteNoDropdown = emailMatches[0];
     fireEvent.mouseDown(
@@ -1323,10 +1308,6 @@ describe("Client page", () => {
     ).toBeInTheDocument();
   });
 
-  // FIX: "botao X limpa o campo de pesquisa"
-  // O IconButton de limpar não tem aria-label, por isso não pode ser encontrado
-  // por getByRole com name. Usamos o data-testid do input para localizar o
-  // container e depois o botão dentro dele via querySelector.
   test("botao X limpa o campo de pesquisa", async () => {
     mockGetClientes([CLIENTE_ATIVO_MOCK]);
     renderClientes();
@@ -1341,7 +1322,6 @@ describe("Client page", () => {
 
     expect(searchInput.value).toBe("João");
 
-    // Localizar o botão de limpar pelo ícone ClearIcon dentro do container de pesquisa
     const clearBtn = screen.getByTestId("ClearIcon").closest("button");
     expect(clearBtn).not.toBeNull();
     await userEvent.click(clearBtn);
@@ -1426,8 +1406,6 @@ describe("Client page", () => {
 
     await screen.findByText(/Editar Cliente — João Silva/i);
 
-    // FIX: usar getAllByLabelText e verificar que pelo menos um input tem o
-    // valor correcto — o form de edição é renderizado por cima do form do passo 1
     const nomeInputs = screen.getAllByLabelText(/Nome completo/i);
     expect(nomeInputs.some((input) => input.value === "João Silva")).toBe(true);
 
@@ -1457,10 +1435,6 @@ describe("Client page", () => {
     expect(global.fetch).toHaveBeenCalledTimes(1);
   });
 
-  // FIX: "guardar edicao chama PUT /clientes/:id com payload correcto"
-  // O form de edição é renderizado ACIMA do form do passo 1, por isso o input
-  // do form de edição é o PRIMEIRO no DOM (índice 0), não o último.
-  // Usamos getAllByLabelText e filtramos pelo form de edição via closest('form').
   test("guardar edicao chama PUT /clientes/:id com payload correcto", async () => {
     const clienteAtualizado = {
       ...CLIENTE_ATIVO_MOCK,
@@ -1478,9 +1452,6 @@ describe("Client page", () => {
     await userEvent.click(screen.getByTitle(/Editar cliente/i));
     await screen.findByText(/Editar Cliente — João Silva/i);
 
-    // O form de edição está dentro do Paper com o título "Editar Cliente —"
-    // Apanhar todos os inputs de "Nome completo" e escolher o que pertence
-    // ao form de edição (que tem valor pré-preenchido "João Silva")
     const nomeInputs = screen.getAllByLabelText(/Nome completo/i);
     const nomeEditInput = nomeInputs.find(
       (input) => input.value === "João Silva",
@@ -1507,11 +1478,6 @@ describe("Client page", () => {
     expect(payload.nome).toBe("João Silva Atualizado");
   });
 
-  // FIX: "formulario de edicao valida nome obrigatorio"
-  // O mock do fetch para o GET inicial estava em falta nos testes de validação
-  // do form de edição, causando "Cannot read properties of undefined (reading 'json')".
-  // Adicionado mockGetClientes() correctamente + mock para o PUT que não deve
-  // ser chamado (mas o fetch não é invocado de todo na validação local).
   test("formulario de edicao valida nome obrigatorio", async () => {
     mockGetClientes();
     renderClientes();
@@ -1520,7 +1486,6 @@ describe("Client page", () => {
     await userEvent.click(screen.getByTitle(/Editar cliente/i));
     await screen.findByText(/Editar Cliente — João Silva/i);
 
-    // Limpar o input de nome do form de edição (o que tem valor pré-preenchido)
     const nomeInputs = screen.getAllByLabelText(/Nome completo/i);
     const nomeEditInput = nomeInputs.find(
       (input) => input.value === "João Silva",
@@ -1533,7 +1498,6 @@ describe("Client page", () => {
     );
 
     expect(await screen.findByText("Nome é obrigatório.")).toBeInTheDocument();
-    // FIX: apenas o GET inicial deve ter sido chamado (sem PUT)
     expect(global.fetch).toHaveBeenCalledTimes(1);
   });
 
@@ -1582,8 +1546,6 @@ describe("Client page", () => {
     ).toBeInTheDocument();
   });
 
-  // FIX: "formulario de edicao valida NIF invalido"
-  // Mesmo problema: mock em falta + editar o NIF correcto (o do form de edição).
   test("formulario de edicao valida NIF invalido", async () => {
     mockGetClientes();
     renderClientes();
@@ -1592,7 +1554,6 @@ describe("Client page", () => {
     await userEvent.click(screen.getByTitle(/Editar cliente/i));
     await screen.findByText(/Editar Cliente — João Silva/i);
 
-    // O form de edição pré-preenche o NIF com "123456789". Encontramos esse input.
     const nifInputs = screen.getAllByLabelText(/NIF/i);
     const nifEditInput = nifInputs.find((input) => input.value === "123456789");
     expect(nifEditInput).toBeTruthy();
@@ -1882,6 +1843,298 @@ describe("Client page", () => {
       (c) => c[0] === "http://localhost:5000/clientes",
     );
     expect(getCalls.length).toBeGreaterThanOrEqual(2);
+  });
+
+  // ── ELIMINAR ANIMAL ───────────────────────────────────────────────────────
+
+  test("icone de eliminar animal esta presente quando os animais estao expandidos", async () => {
+    mockGetClientes();
+    renderClientes();
+
+    await screen.findByText("João Silva");
+    await userEvent.click(screen.getByTitle(/Ver animais/i));
+    await screen.findByText("Rex");
+
+    expect(screen.getByTitle(/Eliminar animal/i)).toBeInTheDocument();
+  });
+
+  test("clicar em eliminar animal abre dialogo de confirmacao", async () => {
+    await chegarAoDialogEliminarAnimal();
+
+    // O ConfirmDialog deve estar visível com o título e a mensagem correctos
+    expect(screen.getByText("Eliminar Animal")).toBeInTheDocument();
+    expect(
+      screen.getByText(/Tem a certeza que deseja eliminar o animal "Rex"/i),
+    ).toBeInTheDocument();
+  });
+
+  test("dialogo de confirmacao tem botao Eliminar e botao de cancelar", async () => {
+    await chegarAoDialogEliminarAnimal();
+
+    expect(
+      screen.getByRole("button", { name: /^Eliminar$/i }),
+    ).toBeInTheDocument();
+    // O ConfirmDialog normalmente tem um botão de fechar/cancelar
+    expect(
+      screen.getByRole("button", { name: /Cancelar/i }),
+    ).toBeInTheDocument();
+  });
+
+  test("cancelar no dialogo de eliminacao fecha o dialogo sem chamar a API", async () => {
+    await chegarAoDialogEliminarAnimal();
+
+    await userEvent.click(screen.getByRole("button", { name: /Cancelar/i }));
+
+    await waitFor(() => {
+      expect(
+        screen.queryByText(/Tem a certeza que deseja eliminar/i),
+      ).not.toBeInTheDocument();
+    });
+
+    // Apenas o GET inicial deve ter sido chamado (sem DELETE)
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+  });
+
+  test("confirmar eliminacao chama DELETE /animais/:id", async () => {
+    global.fetch
+      .mockImplementationOnce(() => mockJsonResponse([CLIENTE_ATIVO_MOCK])) // GET mount
+      .mockImplementationOnce(() => mockJsonResponse({}, true, 204)) // DELETE
+      .mockImplementationOnce(() =>
+        mockJsonResponse([{ ...CLIENTE_ATIVO_MOCK, animais: [] }]),
+      ); // GET reload
+
+    renderClientes();
+    await screen.findByText("João Silva");
+    await userEvent.click(screen.getByTitle(/Ver animais/i));
+    await screen.findByText("Rex");
+    await userEvent.click(screen.getByTitle(/Eliminar animal/i));
+    await screen.findByText(
+      /Tem a certeza que deseja eliminar o animal "Rex"/i,
+    );
+
+    await userEvent.click(screen.getByRole("button", { name: /^Eliminar$/i }));
+
+    await screen.findByText(/Animal "Rex" eliminado com sucesso!/i);
+
+    const deleteCall = global.fetch.mock.calls[1];
+    expect(deleteCall[0]).toContain(`/animais/${ANIMAL_MOCK.id}`);
+    expect(deleteCall[1].method).toBe("DELETE");
+  });
+
+  test("eliminacao bem sucedida mostra mensagem de sucesso", async () => {
+    global.fetch
+      .mockImplementationOnce(() => mockJsonResponse([CLIENTE_ATIVO_MOCK]))
+      .mockImplementationOnce(() => mockJsonResponse({}, true, 204))
+      .mockImplementationOnce(() =>
+        mockJsonResponse([{ ...CLIENTE_ATIVO_MOCK, animais: [] }]),
+      );
+
+    renderClientes();
+    await screen.findByText("João Silva");
+    await userEvent.click(screen.getByTitle(/Ver animais/i));
+    await screen.findByText("Rex");
+    await userEvent.click(screen.getByTitle(/Eliminar animal/i));
+    await screen.findByText(
+      /Tem a certeza que deseja eliminar o animal "Rex"/i,
+    );
+
+    await userEvent.click(screen.getByRole("button", { name: /^Eliminar$/i }));
+
+    expect(
+      await screen.findByText(/Animal "Rex" eliminado com sucesso!/i),
+    ).toBeInTheDocument();
+  });
+
+  test("eliminacao bem sucedida recarrega a lista de clientes", async () => {
+    global.fetch
+      .mockImplementationOnce(() => mockJsonResponse([CLIENTE_ATIVO_MOCK]))
+      .mockImplementationOnce(() => mockJsonResponse({}, true, 204))
+      .mockImplementationOnce(() =>
+        mockJsonResponse([{ ...CLIENTE_ATIVO_MOCK, animais: [] }]),
+      );
+
+    renderClientes();
+    await screen.findByText("João Silva");
+    await userEvent.click(screen.getByTitle(/Ver animais/i));
+    await screen.findByText("Rex");
+    await userEvent.click(screen.getByTitle(/Eliminar animal/i));
+    await screen.findByText(
+      /Tem a certeza que deseja eliminar o animal "Rex"/i,
+    );
+
+    await userEvent.click(screen.getByRole("button", { name: /^Eliminar$/i }));
+
+    await screen.findByText(/Animal "Rex" eliminado com sucesso!/i);
+
+    const getCalls = global.fetch.mock.calls.filter(
+      (c) => c[0] === "http://localhost:5000/clientes",
+    );
+    expect(getCalls.length).toBeGreaterThanOrEqual(2);
+  });
+
+  test("erro 409 ao eliminar animal com agendamentos futuros mostra mensagem descritiva", async () => {
+    global.fetch
+      .mockImplementationOnce(() => mockJsonResponse([CLIENTE_ATIVO_MOCK]))
+      .mockImplementationOnce(() =>
+        mockJsonResponse(
+          {
+            error:
+              "Não é possível eliminar o animal porque tem agendamentos futuros associados.",
+          },
+          false,
+          409,
+        ),
+      );
+
+    renderClientes();
+    await screen.findByText("João Silva");
+    await userEvent.click(screen.getByTitle(/Ver animais/i));
+    await screen.findByText("Rex");
+    await userEvent.click(screen.getByTitle(/Eliminar animal/i));
+    await screen.findByText(
+      /Tem a certeza que deseja eliminar o animal "Rex"/i,
+    );
+
+    await userEvent.click(screen.getByRole("button", { name: /^Eliminar$/i }));
+
+    expect(
+      await screen.findByText(
+        /Não é possível eliminar o animal porque tem agendamentos futuros associados/i,
+      ),
+    ).toBeInTheDocument();
+  });
+
+  test("erro 409 sem mensagem da API usa mensagem de fallback", async () => {
+    global.fetch
+      .mockImplementationOnce(() => mockJsonResponse([CLIENTE_ATIVO_MOCK]))
+      .mockImplementationOnce(() =>
+        Promise.resolve({
+          ok: false,
+          status: 409,
+          json: async () => ({}), // sem campo error
+        }),
+      );
+
+    renderClientes();
+    await screen.findByText("João Silva");
+    await userEvent.click(screen.getByTitle(/Ver animais/i));
+    await screen.findByText("Rex");
+    await userEvent.click(screen.getByTitle(/Eliminar animal/i));
+    await screen.findByText(
+      /Tem a certeza que deseja eliminar o animal "Rex"/i,
+    );
+
+    await userEvent.click(screen.getByRole("button", { name: /^Eliminar$/i }));
+
+    expect(
+      await screen.findByText(
+        /Não é possível eliminar o animal porque tem agendamentos futuros associados/i,
+      ),
+    ).toBeInTheDocument();
+  });
+
+  test("erro generico ao eliminar animal mostra mensagem de erro", async () => {
+    global.fetch
+      .mockImplementationOnce(() => mockJsonResponse([CLIENTE_ATIVO_MOCK]))
+      .mockImplementationOnce(() =>
+        mockJsonResponse({ error: "Erro interno do servidor." }, false, 500),
+      );
+
+    renderClientes();
+    await screen.findByText("João Silva");
+    await userEvent.click(screen.getByTitle(/Ver animais/i));
+    await screen.findByText("Rex");
+    await userEvent.click(screen.getByTitle(/Eliminar animal/i));
+    await screen.findByText(
+      /Tem a certeza que deseja eliminar o animal "Rex"/i,
+    );
+
+    await userEvent.click(screen.getByRole("button", { name: /^Eliminar$/i }));
+
+    expect(
+      await screen.findByText(/Erro interno do servidor/i),
+    ).toBeInTheDocument();
+  });
+
+  test("erro de rede ao eliminar animal mostra mensagem de erro", async () => {
+    global.fetch
+      .mockImplementationOnce(() => mockJsonResponse([CLIENTE_ATIVO_MOCK]))
+      .mockImplementationOnce(() => Promise.reject(new Error("Network error")));
+
+    renderClientes();
+    await screen.findByText("João Silva");
+    await userEvent.click(screen.getByTitle(/Ver animais/i));
+    await screen.findByText("Rex");
+    await userEvent.click(screen.getByTitle(/Eliminar animal/i));
+    await screen.findByText(
+      /Tem a certeza que deseja eliminar o animal "Rex"/i,
+    );
+
+    await userEvent.click(screen.getByRole("button", { name: /^Eliminar$/i }));
+
+    expect(await screen.findByText(/Network error/i)).toBeInTheDocument();
+  });
+
+  test("mensagem de erro de eliminacao pode ser fechada", async () => {
+    global.fetch
+      .mockImplementationOnce(() => mockJsonResponse([CLIENTE_ATIVO_MOCK]))
+      .mockImplementationOnce(() =>
+        mockJsonResponse({ error: "Erro ao eliminar animal." }, false, 500),
+      );
+
+    renderClientes();
+    await screen.findByText("João Silva");
+    await userEvent.click(screen.getByTitle(/Ver animais/i));
+    await screen.findByText("Rex");
+    await userEvent.click(screen.getByTitle(/Eliminar animal/i));
+    await screen.findByText(
+      /Tem a certeza que deseja eliminar o animal "Rex"/i,
+    );
+
+    await userEvent.click(screen.getByRole("button", { name: /^Eliminar$/i }));
+
+    const erroAlert = await screen.findByText(/Erro ao eliminar animal/i);
+    expect(erroAlert).toBeInTheDocument();
+
+    // Fechar o Alert de erro (botão × do MUI Alert)
+    const closeBtn = erroAlert
+      .closest(".MuiAlert-root")
+      ?.querySelector("[aria-label='Close']");
+    if (closeBtn) {
+      await userEvent.click(closeBtn);
+      await waitFor(() => {
+        expect(
+          screen.queryByText(/Erro ao eliminar animal/i),
+        ).not.toBeInTheDocument();
+      });
+    }
+  });
+
+  test("dialogo de eliminacao fecha apos confirmar independentemente do resultado", async () => {
+    global.fetch
+      .mockImplementationOnce(() => mockJsonResponse([CLIENTE_ATIVO_MOCK]))
+      .mockImplementationOnce(() => mockJsonResponse({}, true, 204))
+      .mockImplementationOnce(() =>
+        mockJsonResponse([{ ...CLIENTE_ATIVO_MOCK, animais: [] }]),
+      );
+
+    renderClientes();
+    await screen.findByText("João Silva");
+    await userEvent.click(screen.getByTitle(/Ver animais/i));
+    await screen.findByText("Rex");
+    await userEvent.click(screen.getByTitle(/Eliminar animal/i));
+    await screen.findByText(
+      /Tem a certeza que deseja eliminar o animal "Rex"/i,
+    );
+
+    await userEvent.click(screen.getByRole("button", { name: /^Eliminar$/i }));
+
+    // O diálogo de confirmação deve fechar imediatamente após confirmar
+    await waitFor(() => {
+      expect(
+        screen.queryByText(/Tem a certeza que deseja eliminar o animal "Rex"/i),
+      ).not.toBeInTheDocument();
+    });
   });
 
   // ── NIF — CAMPOS DE ENTRADA ───────────────────────────────────────────────

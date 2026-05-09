@@ -105,7 +105,8 @@ export default function Pesquisa() {
     futuros: [],
     historico: [],
   });
-  const [animalAgendamentosLoading, setAnimalAgendamentosLoading] = useState(false);
+  const [animalAgendamentosLoading, setAnimalAgendamentosLoading] =
+    useState(false);
   const [animalAgendamentosError, setAnimalAgendamentosError] = useState(null);
 
   const showClientes = filterMode !== "animals";
@@ -353,10 +354,7 @@ export default function Pesquisa() {
             <PetsIcon sx={{ color: colors.primary }} />
             <Typography variant="h2">Ficha do Animal</Typography>
           </Box>
-          <Button
-            variant="contained"
-            sx={{ whiteSpace: "nowrap" }}
-          >
+          <Button variant="contained" sx={{ whiteSpace: "nowrap" }}>
             Novo Agendamento
           </Button>
         </Box>
@@ -407,7 +405,10 @@ export default function Pesquisa() {
             />
           </Box>
         ) : (
-          <Typography variant="body2" sx={{ color: colors.textSecondary, mb: 3 }}>
+          <Typography
+            variant="body2"
+            sx={{ color: colors.textSecondary, mb: 3 }}
+          >
             Cliente não disponível.
           </Typography>
         )}
@@ -432,13 +433,20 @@ export default function Pesquisa() {
               {animalAgendamentos.futuros.map((agendamento) => (
                 <Paper
                   key={agendamento.id}
-                  sx={{ p: 2, borderRadius: 2, backgroundColor: "action.hover" }}
+                  sx={{
+                    p: 2,
+                    borderRadius: 2,
+                    backgroundColor: "action.hover",
+                  }}
                   elevation={0}
                 >
                   <Typography variant="body2" sx={{ fontWeight: 700 }}>
                     {formatDateTime(agendamento.dataHoraInicio)}
                   </Typography>
-                  <Typography variant="caption" sx={{ color: colors.textSecondary }}>
+                  <Typography
+                    variant="caption"
+                    sx={{ color: colors.textSecondary }}
+                  >
                     {agendamento.servicos
                       .map((servico) => servico.tipoServico)
                       .join(", ")}
@@ -474,8 +482,12 @@ export default function Pesquisa() {
                   >
                     {formatDateTime(servico.dataHoraInicio)}
                   </Typography>
-                  <Typography variant="caption" sx={{ color: colors.textSecondary }}>
-                    {servico.precoNoMomento.toFixed(2)}€ · {servico.duracaoNoMomento} min
+                  <Typography
+                    variant="caption"
+                    sx={{ color: colors.textSecondary }}
+                  >
+                    {servico.precoNoMomento.toFixed(2)}€ ·{" "}
+                    {servico.duracaoNoMomento} min
                   </Typography>
                 </Paper>
               ))}

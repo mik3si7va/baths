@@ -1,0 +1,3 @@
+-- AlterTable
+ALTER TABLE "animal" ADD COLUMN "ativo" BOOLEAN NOT NULL DEFAULT true,
+ADD COLUMN "deleted_at" TIMESTAMPTZ(6);

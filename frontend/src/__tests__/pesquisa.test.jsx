@@ -87,6 +87,36 @@ const CLIENTE_SEM_ANIMAIS = {
   animais: [],
 };
 
+const AGENDAMENTO_FUTURO_MOCK = {
+  id: "agt-1",
+  dataHoraInicio: "2026-06-01T10:00:00Z",
+  dataHoraFim: "2026-06-01T11:00:00Z",
+  estado: "CONFIRMADO",
+  servicos: [
+    {
+      id: "svc-1",
+      tipoServico: "BANHO",
+      precoNoMomento: 25.0,
+      duracaoNoMomento: 60,
+    },
+  ],
+};
+
+const AGENDAMENTO_HISTORICO_MOCK = {
+  id: "agt-2",
+  dataHoraInicio: "2026-01-10T14:30:00Z",
+  dataHoraFim: "2026-01-10T15:30:00Z",
+  estado: "CONCLUIDO",
+  servicos: [
+    {
+      id: "svc-2",
+      tipoServico: "TOSQUIA_COMPLETA",
+      precoNoMomento: 65.0,
+      duracaoNoMomento: 90,
+    },
+  ],
+};
+
 function mockGetClientes(
   lista = [CLIENTE_MOCK_1, CLIENTE_MOCK_2],
   schedule = { agendamentosFuturos: [], historico: [] },
@@ -534,7 +564,6 @@ describe("Pesquisa page", () => {
     fireEvent.mouseDown(screen.getAllByText("Rex")[0]);
 
     await screen.findByText("Ficha do Animal");
-    // Data 2020-03-15 formatada em pt-PT: 15/03/2020
     expect(screen.getByText(/15\/03\/2020/i)).toBeInTheDocument();
   });
 
@@ -583,82 +612,10 @@ describe("Pesquisa page", () => {
 
     await screen.findByText("Ficha do Animal");
 
-    // Clicar no card do cliente proprietário dentro da ficha do animal
     const clienteCards = screen.getAllByText("João Silva");
     fireEvent.mouseDown(clienteCards[clienteCards.length - 1]);
 
     expect(await screen.findByText("Ficha do Cliente")).toBeInTheDocument();
-  });
-
-  test("botao Novo Agendamento aparece na ficha do animal", async () => {
-    mockGetClientes();
-    renderPesquisa();
-
-    await screen.findByText("Rex");
-    fireEvent.mouseDown(screen.getAllByText("Rex")[0]);
-
-    expect(await screen.findByRole("button", { name: /Novo Agendamento/i })).toBeInTheDocument();
-  });
-
-  test("mostra agendamentos futuros na ficha do animal", async () => {
-    mockGetClientes([CLIENTE_MOCK_1], {
-      agendamentosFuturos: [
-        {
-          id: "agt-1",
-          dataHoraInicio: "2026-06-01T10:00:00Z",
-          dataHoraFim: "2026-06-01T11:00:00Z",
-          estado: "CONFIRMADO",
-          servicos: [
-            {
-              id: "svc-1",
-              tipoServico: "BANHO",
-              precoNoMomento: 25.0,
-              duracaoNoMomento: 60,
-            },
-          ],
-        },
-      ],
-      historico: [],
-    });
-
-    renderPesquisa();
-
-    await screen.findByText("Rex");
-    fireEvent.mouseDown(screen.getAllByText("Rex")[0]);
-
-    expect(await screen.findByText(/Agendamentos Futuros/i)).toBeInTheDocument();
-    expect(await screen.findByText(/BANHO/i)).toBeInTheDocument();
-  });
-
-  test("mostra histórico de serviços na ficha do animal", async () => {
-    mockGetClientes([CLIENTE_MOCK_1], {
-      agendamentosFuturos: [],
-      historico: [
-        {
-          id: "agt-2",
-          dataHoraInicio: "2026-01-10T14:30:00Z",
-          dataHoraFim: "2026-01-10T15:30:00Z",
-          estado: "CONCLUIDO",
-          servicos: [
-            {
-              id: "svc-2",
-              tipoServico: "TOSQUIA_COMPLETA",
-              precoNoMomento: 65.0,
-              duracaoNoMomento: 90,
-            },
-          ],
-        },
-      ],
-    });
-
-    renderPesquisa();
-
-    await screen.findByText("Rex");
-    fireEvent.mouseDown(screen.getAllByText("Rex")[0]);
-
-    expect(await screen.findByText(/Histórico de Serviços/i)).toBeInTheDocument();
-    expect(await screen.findByText(/TOSQUIA_COMPLETA/i)).toBeInTheDocument();
-    expect(await screen.findByText(/90 min/i)).toBeInTheDocument();
   });
 
   test("botao Limpar selecao na ficha do animal fecha a ficha", async () => {
@@ -681,6 +638,461 @@ describe("Pesquisa page", () => {
     ).toBeInTheDocument();
   });
 
+  // ── BOTÃO NOVO AGENDAMENTO ────────────────────────────────────────────────
+
+  test("botao Novo Agendamento aparece na ficha do animal", async () => {
+    mockGetClientes();
+    renderPesquisa();
+
+    await screen.findByText("Rex");
+    fireEvent.mouseDown(screen.getAllByText("Rex")[0]);
+
+    expect(
+      await screen.findByRole("button", { name: /Novo Agendamento/i }),
+    ).toBeInTheDocument();
+  });
+
+  test("botao Novo Agendamento nao aparece na ficha do cliente", async () => {
+    mockGetClientes();
+    renderPesquisa();
+
+    await screen.findByText("João Silva");
+    fireEvent.mouseDown(screen.getAllByText("João Silva")[0]);
+
+    await screen.findByText("Ficha do Cliente");
+    expect(
+      screen.queryByRole("button", { name: /Novo Agendamento/i }),
+    ).not.toBeInTheDocument();
+  });
+
+  test("botao Novo Agendamento aparece ao mudar de animal seleccionado", async () => {
+    mockGetClientes();
+    renderPesquisa();
+
+    await screen.findByText("Rex");
+    fireEvent.mouseDown(screen.getAllByText("Rex")[0]);
+    expect(
+      await screen.findByRole("button", { name: /Novo Agendamento/i }),
+    ).toBeInTheDocument();
+
+    fireEvent.mouseDown(screen.getAllByText("Mimi")[0]);
+    expect(
+      await screen.findByRole("button", { name: /Novo Agendamento/i }),
+    ).toBeInTheDocument();
+    expect(await screen.findByText(/Espécie: Gato/i)).toBeInTheDocument();
+  });
+
+  // ── AGENDAMENTOS FUTUROS ──────────────────────────────────────────────────
+
+  test("mostra secção Agendamentos Futuros na ficha do animal", async () => {
+    mockGetClientes();
+    renderPesquisa();
+
+    await screen.findByText("Rex");
+    fireEvent.mouseDown(screen.getAllByText("Rex")[0]);
+
+    expect(
+      await screen.findByText(/Agendamentos Futuros/i),
+    ).toBeInTheDocument();
+  });
+
+  test("chama GET /animais/:id/agendamentos ao seleccionar animal", async () => {
+    mockGetClientes();
+    renderPesquisa();
+
+    await screen.findByText("Rex");
+    fireEvent.mouseDown(screen.getAllByText("Rex")[0]);
+
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledWith(
+        expect.stringContaining("/animais/anim-1/agendamentos"),
+      );
+    });
+  });
+
+  test("mostra agendamentos futuros com tipo de servico", async () => {
+    mockGetClientes([CLIENTE_MOCK_1], {
+      agendamentosFuturos: [AGENDAMENTO_FUTURO_MOCK],
+      historico: [],
+    });
+    renderPesquisa();
+
+    await screen.findByText("Rex");
+    fireEvent.mouseDown(screen.getAllByText("Rex")[0]);
+
+    expect(await screen.findByText(/BANHO/i)).toBeInTheDocument();
+  });
+
+  test("mostra data formatada nos agendamentos futuros", async () => {
+    mockGetClientes([CLIENTE_MOCK_1], {
+      agendamentosFuturos: [AGENDAMENTO_FUTURO_MOCK],
+      historico: [],
+    });
+    renderPesquisa();
+
+    await screen.findByText("Rex");
+    fireEvent.mouseDown(screen.getAllByText("Rex")[0]);
+
+    // 2026-06-01T10:00:00Z formatado em pt-PT: 01/06/2026, 10:00 (ou 11:00 dependendo do timezone)
+    expect(await screen.findByText(/01\/06\/2026/i)).toBeInTheDocument();
+  });
+
+  test("mostra varios agendamentos futuros quando existem multiplos", async () => {
+    const segundoAgendamento = {
+      id: "agt-3",
+      dataHoraInicio: "2026-07-15T09:00:00Z",
+      dataHoraFim: "2026-07-15T10:00:00Z",
+      estado: "CONFIRMADO",
+      servicos: [
+        {
+          id: "svc-3",
+          tipoServico: "CORTE_UNHAS",
+          precoNoMomento: 10.0,
+          duracaoNoMomento: 15,
+        },
+      ],
+    };
+    mockGetClientes([CLIENTE_MOCK_1], {
+      agendamentosFuturos: [AGENDAMENTO_FUTURO_MOCK, segundoAgendamento],
+      historico: [],
+    });
+    renderPesquisa();
+
+    await screen.findByText("Rex");
+    fireEvent.mouseDown(screen.getAllByText("Rex")[0]);
+
+    expect(await screen.findByText(/BANHO/i)).toBeInTheDocument();
+    expect(await screen.findByText(/CORTE_UNHAS/i)).toBeInTheDocument();
+  });
+
+  test("mostra mensagem quando nao ha agendamentos futuros", async () => {
+    mockGetClientes([CLIENTE_MOCK_1], {
+      agendamentosFuturos: [],
+      historico: [],
+    });
+    renderPesquisa();
+
+    await screen.findByText("Rex");
+    fireEvent.mouseDown(screen.getAllByText("Rex")[0]);
+
+    expect(
+      await screen.findByText(
+        /Não existem agendamentos futuros para este animal/i,
+      ),
+    ).toBeInTheDocument();
+  });
+
+  test("agendamento futuro com multiplos servicos mostra todos separados por virgula", async () => {
+    const agendamentoMultiServico = {
+      id: "agt-multi",
+      dataHoraInicio: "2026-08-01T10:00:00Z",
+      dataHoraFim: "2026-08-01T12:00:00Z",
+      estado: "CONFIRMADO",
+      servicos: [
+        {
+          id: "svc-a",
+          tipoServico: "BANHO",
+          precoNoMomento: 25.0,
+          duracaoNoMomento: 60,
+        },
+        {
+          id: "svc-b",
+          tipoServico: "TOSQUIA_COMPLETA",
+          precoNoMomento: 65.0,
+          duracaoNoMomento: 90,
+        },
+      ],
+    };
+    mockGetClientes([CLIENTE_MOCK_1], {
+      agendamentosFuturos: [agendamentoMultiServico],
+      historico: [],
+    });
+    renderPesquisa();
+
+    await screen.findByText("Rex");
+    fireEvent.mouseDown(screen.getAllByText("Rex")[0]);
+
+    expect(
+      await screen.findByText(
+        /BANHO.*TOSQUIA_COMPLETA|TOSQUIA_COMPLETA.*BANHO/i,
+      ),
+    ).toBeInTheDocument();
+  });
+
+  // ── HISTÓRICO DE SERVIÇOS ─────────────────────────────────────────────────
+
+  test("mostra secção Histórico de Serviços na ficha do animal", async () => {
+    mockGetClientes();
+    renderPesquisa();
+
+    await screen.findByText("Rex");
+    fireEvent.mouseDown(screen.getAllByText("Rex")[0]);
+
+    expect(
+      await screen.findByText(/Histórico de Serviços/i),
+    ).toBeInTheDocument();
+  });
+
+  test("mostra servico do historico com tipo, preco e duracao", async () => {
+    mockGetClientes([CLIENTE_MOCK_1], {
+      agendamentosFuturos: [],
+      historico: [AGENDAMENTO_HISTORICO_MOCK],
+    });
+    renderPesquisa();
+
+    await screen.findByText("Rex");
+    fireEvent.mouseDown(screen.getAllByText("Rex")[0]);
+
+    expect(await screen.findByText(/TOSQUIA_COMPLETA/i)).toBeInTheDocument();
+    expect(await screen.findByText(/65,00€|65\.00€/i)).toBeInTheDocument();
+    expect(await screen.findByText(/90 min/i)).toBeInTheDocument();
+  });
+
+  test("mostra data formatada no historico de servicos", async () => {
+    mockGetClientes([CLIENTE_MOCK_1], {
+      agendamentosFuturos: [],
+      historico: [AGENDAMENTO_HISTORICO_MOCK],
+    });
+    renderPesquisa();
+
+    await screen.findByText("Rex");
+    fireEvent.mouseDown(screen.getAllByText("Rex")[0]);
+
+    expect(await screen.findByText(/10\/01\/2026/i)).toBeInTheDocument();
+  });
+
+  test("mostra mensagem quando historico de servicos esta vazio", async () => {
+    mockGetClientes([CLIENTE_MOCK_1], {
+      agendamentosFuturos: [],
+      historico: [],
+    });
+    renderPesquisa();
+
+    await screen.findByText("Rex");
+    fireEvent.mouseDown(screen.getAllByText("Rex")[0]);
+
+    expect(
+      await screen.findByText(
+        /Ainda não há serviços registados para este animal/i,
+      ),
+    ).toBeInTheDocument();
+  });
+
+  test("mostra multiplos servicos do historico quando existem", async () => {
+    const segundoHistorico = {
+      id: "agt-4",
+      dataHoraInicio: "2025-11-05T10:00:00Z",
+      dataHoraFim: "2025-11-05T11:00:00Z",
+      estado: "CONCLUIDO",
+      servicos: [
+        {
+          id: "svc-4",
+          tipoServico: "BANHO",
+          precoNoMomento: 25.0,
+          duracaoNoMomento: 60,
+        },
+      ],
+    };
+    mockGetClientes([CLIENTE_MOCK_1], {
+      agendamentosFuturos: [],
+      historico: [AGENDAMENTO_HISTORICO_MOCK, segundoHistorico],
+    });
+    renderPesquisa();
+
+    await screen.findByText("Rex");
+    fireEvent.mouseDown(screen.getAllByText("Rex")[0]);
+
+    expect(await screen.findByText(/TOSQUIA_COMPLETA/i)).toBeInTheDocument();
+    expect(await screen.findByText(/BANHO/i)).toBeInTheDocument();
+  });
+
+  test("agendamento no historico com multiplos servicos expande todos como entradas individuais", async () => {
+    const agendamentoComDoisServicos = {
+      id: "agt-duplo",
+      dataHoraInicio: "2025-10-01T09:00:00Z",
+      dataHoraFim: "2025-10-01T11:00:00Z",
+      estado: "CONCLUIDO",
+      servicos: [
+        {
+          id: "svc-x",
+          tipoServico: "BANHO",
+          precoNoMomento: 25.0,
+          duracaoNoMomento: 60,
+        },
+        {
+          id: "svc-y",
+          tipoServico: "CORTE_UNHAS",
+          precoNoMomento: 10.0,
+          duracaoNoMomento: 15,
+        },
+      ],
+    };
+    mockGetClientes([CLIENTE_MOCK_1], {
+      agendamentosFuturos: [],
+      historico: [agendamentoComDoisServicos],
+    });
+    renderPesquisa();
+
+    await screen.findByText("Rex");
+    fireEvent.mouseDown(screen.getAllByText("Rex")[0]);
+
+    expect(await screen.findByText(/BANHO/i)).toBeInTheDocument();
+    expect(await screen.findByText(/CORTE_UNHAS/i)).toBeInTheDocument();
+  });
+
+  // ── ESTADO DE LOADING DOS AGENDAMENTOS ───────────────────────────────────
+
+  test("mostra mensagem de carregamento enquanto agendamentos carregam", async () => {
+    let resolveAgendamentos;
+    global.fetch = jest.fn((url) => {
+      if (url.includes("/animais/") && url.includes("/agendamentos")) {
+        return new Promise((resolve) => {
+          resolveAgendamentos = () =>
+            resolve(
+              mockJsonResponse({ agendamentosFuturos: [], historico: [] }),
+            );
+        });
+      }
+      if (url.includes("/clientes")) {
+        return mockJsonResponse([CLIENTE_MOCK_1]);
+      }
+      return Promise.reject(new Error(`Unexpected fetch url: ${url}`));
+    });
+
+    renderPesquisa();
+
+    await screen.findByText("Rex");
+    fireEvent.mouseDown(screen.getAllByText("Rex")[0]);
+
+    await screen.findByText("Ficha do Animal");
+    expect(screen.getByText(/A carregar agendamentos/i)).toBeInTheDocument();
+
+    resolveAgendamentos();
+
+    await waitFor(() => {
+      expect(
+        screen.queryByText(/A carregar agendamentos/i),
+      ).not.toBeInTheDocument();
+    });
+  });
+
+  // ── ERRO AO CARREGAR AGENDAMENTOS ────────────────────────────────────────
+
+  test("mostra mensagem de erro quando fetch de agendamentos falha", async () => {
+    global.fetch = jest.fn((url) => {
+      if (url.includes("/animais/") && url.includes("/agendamentos")) {
+        return Promise.resolve({
+          ok: false,
+          status: 500,
+          json: async () => ({}),
+        });
+      }
+      if (url.includes("/clientes")) {
+        return mockJsonResponse([CLIENTE_MOCK_1]);
+      }
+      return Promise.reject(new Error(`Unexpected fetch url: ${url}`));
+    });
+
+    renderPesquisa();
+
+    await screen.findByText("Rex");
+    fireEvent.mouseDown(screen.getAllByText("Rex")[0]);
+
+    expect(
+      await screen.findByText(
+        /Não foi possível carregar os agendamentos do animal/i,
+      ),
+    ).toBeInTheDocument();
+  });
+
+  test("mostra mensagem de erro quando fetch de agendamentos rejeita com network error", async () => {
+    global.fetch = jest.fn((url) => {
+      if (url.includes("/animais/") && url.includes("/agendamentos")) {
+        return Promise.reject(new Error("Network error"));
+      }
+      if (url.includes("/clientes")) {
+        return mockJsonResponse([CLIENTE_MOCK_1]);
+      }
+      return Promise.reject(new Error(`Unexpected fetch url: ${url}`));
+    });
+
+    renderPesquisa();
+
+    await screen.findByText("Rex");
+    fireEvent.mouseDown(screen.getAllByText("Rex")[0]);
+
+    expect(
+      await screen.findByText(
+        /Não foi possível carregar os agendamentos do animal/i,
+      ),
+    ).toBeInTheDocument();
+  });
+
+  test("erro de agendamentos limpa ao seleccionar outro animal", async () => {
+    global.fetch = jest.fn((url) => {
+      if (url.includes("/animais/anim-1/agendamentos")) {
+        return Promise.resolve({
+          ok: false,
+          status: 500,
+          json: async () => ({}),
+        });
+      }
+      if (url.includes("/animais/anim-2/agendamentos")) {
+        return mockJsonResponse({ agendamentosFuturos: [], historico: [] });
+      }
+      if (url.includes("/clientes")) {
+        return mockJsonResponse([CLIENTE_MOCK_1, CLIENTE_MOCK_2]);
+      }
+      return Promise.reject(new Error(`Unexpected fetch url: ${url}`));
+    });
+
+    renderPesquisa();
+
+    await screen.findByText("Rex");
+    fireEvent.mouseDown(screen.getAllByText("Rex")[0]);
+
+    expect(
+      await screen.findByText(
+        /Não foi possível carregar os agendamentos do animal/i,
+      ),
+    ).toBeInTheDocument();
+
+    fireEvent.mouseDown(screen.getAllByText("Mimi")[0]);
+
+    await waitFor(() => {
+      expect(
+        screen.queryByText(
+          /Não foi possível carregar os agendamentos do animal/i,
+        ),
+      ).not.toBeInTheDocument();
+    });
+  });
+
+  test("agendamentos sao recarregados ao mudar de animal", async () => {
+    mockGetClientes([CLIENTE_MOCK_1, CLIENTE_MOCK_2], {
+      agendamentosFuturos: [],
+      historico: [],
+    });
+    renderPesquisa();
+
+    await screen.findByText("Rex");
+    fireEvent.mouseDown(screen.getAllByText("Rex")[0]);
+
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledWith(
+        expect.stringContaining("/animais/anim-1/agendamentos"),
+      );
+    });
+
+    fireEvent.mouseDown(screen.getAllByText("Mimi")[0]);
+
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledWith(
+        expect.stringContaining("/animais/anim-2/agendamentos"),
+      );
+    });
+  });
+
   // ── NAVEGAÇÃO CLIENTE → ANIMAL NA FICHA ──────────────────────────────────
 
   test("clicar num animal na ficha do cliente abre ficha do animal", async () => {
@@ -692,7 +1104,6 @@ describe("Pesquisa page", () => {
 
     await screen.findByText("Ficha do Cliente");
 
-    // Clicar no card do animal dentro da ficha do cliente
     const rexItems = screen.getAllByText("Rex");
     fireEvent.mouseDown(rexItems[rexItems.length - 1]);
 
@@ -708,7 +1119,6 @@ describe("Pesquisa page", () => {
 
     await screen.findByText("João Silva");
 
-    // 2 clientes + 2 animais = 4 total
     expect(
       screen.getByRole("button", { name: /Ambos 4/i }),
     ).toBeInTheDocument();
@@ -727,7 +1137,6 @@ describe("Pesquisa page", () => {
     await screen.findByText("João Silva");
     await userEvent.type(screen.getByTestId("pesquisa-input"), "João");
 
-    // Após filtrar por "João": 1 cliente, 0 animais = 1 total
     await waitFor(() => {
       expect(
         screen.getByRole("button", { name: /Clientes 1/i }),
@@ -781,7 +1190,6 @@ describe("Pesquisa page", () => {
     renderPesquisa();
 
     await screen.findByText(/Pesquisa de Clientes e Animais/i);
-    // Não deve lançar erro; lista fica vazia
     expect(
       screen.getByText(/Nenhum resultado encontrado/i),
     ).toBeInTheDocument();
@@ -793,7 +1201,6 @@ describe("Pesquisa page", () => {
       nome: "Ana Ferreira",
       email: "ana@email.com",
       telefone: "940000004",
-      // animais omitido intencionalmente
     };
     mockGetClientes([clienteSemAnimais]);
     renderPesquisa();

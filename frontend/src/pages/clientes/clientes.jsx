@@ -31,7 +31,9 @@ import WarningAmberIcon from "@mui/icons-material/WarningAmber";
 import SearchIcon from "@mui/icons-material/Search";
 import ClearIcon from "@mui/icons-material/Clear";
 import EditIcon from "@mui/icons-material/Edit";
+import DeleteIcon from "@mui/icons-material/Delete";
 import { useThemeContext } from "../../contexts/ThemeContext";
+import { ConfirmDialog } from "../../components";
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || "http://localhost:5000";
 
@@ -1010,7 +1012,13 @@ function AnimalEditDialog({
 
 // ─── Card de cliente na lista ─────────────────────────────────────────────────
 
-function ClienteCard({ cliente, onAddAnimal, onEditCliente, onEditAnimal }) {
+function ClienteCard({
+  cliente,
+  onAddAnimal,
+  onEditCliente,
+  onEditAnimal,
+  onDeleteAnimal,
+}) {
   const { colors } = useThemeContext();
   const [expanded, setExpanded] = useState(false);
 
@@ -1165,6 +1173,14 @@ function ClienteCard({ cliente, onAddAnimal, onEditCliente, onEditAnimal }) {
               >
                 <EditIcon fontSize="small" />
               </IconButton>
+              <IconButton
+                size="small"
+                onClick={() => onDeleteAnimal(a)}
+                sx={{ color: "error.main" }}
+                title="Eliminar animal"
+              >
+                <DeleteIcon fontSize="small" />
+              </IconButton>
             </Box>
           ))}
         </Box>
@@ -1191,6 +1207,10 @@ export default function Client() {
   const [editingAnimal, setEditingAnimal] = useState(null);
   const [editingAnimalError, setEditingAnimalError] = useState("");
   const [editingAnimalLoading, setEditingAnimalLoading] = useState(false);
+  const [deleteAnimalDialogOpen, setDeleteAnimalDialogOpen] = useState(false);
+  const [animalToDelete, setAnimalToDelete] = useState(null);
+  const [deleteAnimalError, setDeleteAnimalError] = useState("");
+  const [deleteAnimalLoading, setDeleteAnimalLoading] = useState(false);
 
   const carregarClientes = useCallback(async () => {
     setLoadingClientes(true);
@@ -1346,6 +1366,51 @@ export default function Client() {
     }
   };
 
+  const handleDeleteAnimalClick = (animal) => {
+    setAnimalToDelete(animal);
+    setDeleteAnimalDialogOpen(true);
+    setDeleteAnimalError("");
+  };
+
+  const handleConfirmDeleteAnimal = async () => {
+    if (!animalToDelete) return;
+
+    setDeleteAnimalDialogOpen(false);
+    setDeleteAnimalLoading(true);
+    setDeleteAnimalError("");
+    setMensagemSucesso("");
+
+    try {
+      const res = await fetch(`${API_BASE_URL}/animais/${animalToDelete.id}`, {
+        method: "DELETE",
+      });
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+
+        if (res.status === 409) {
+          // Agendamentos futuros — mensagem descritiva vinda do servidor
+          throw new Error(
+            errData.error ||
+              "Não é possível eliminar o animal porque tem agendamentos futuros associados.",
+          );
+        }
+
+        throw new Error(errData.error || "Erro ao eliminar animal.");
+      }
+
+      setMensagemSucesso(
+        `Animal "${animalToDelete.nome}" eliminado com sucesso!`,
+      );
+      setAnimalToDelete(null);
+      await carregarClientes();
+    } catch (err) {
+      setDeleteAnimalError(err.message);
+    } finally {
+      setDeleteAnimalLoading(false);
+    }
+  };
+
   return (
     <Box>
       <Typography variant="h1" sx={{ mb: 1, color: colors.text }}>
@@ -1384,6 +1449,34 @@ export default function Client() {
         loading={editingAnimalLoading}
         error={editingAnimalError}
       />
+
+      <ConfirmDialog
+        open={deleteAnimalDialogOpen}
+        title="Eliminar Animal"
+        message={
+          animalToDelete
+            ? `Tem a certeza que deseja eliminar o animal "${animalToDelete.nome}"?`
+            : ""
+        }
+        confirmLabel="Eliminar"
+        confirmColor="error"
+        onConfirm={handleConfirmDeleteAnimal}
+        onClose={() => {
+          setDeleteAnimalDialogOpen(false);
+          setAnimalToDelete(null);
+          setDeleteAnimalError("");
+        }}
+      />
+
+      {deleteAnimalError && (
+        <Alert
+          severity="error"
+          sx={{ mb: 2 }}
+          onClose={() => setDeleteAnimalError("")}
+        >
+          {deleteAnimalError}
+        </Alert>
+      )}
 
       {/* ── Painel: adicionar animal a cliente existente (BET-126 + BET-127) ── */}
       {clienteParaAnimal && (
@@ -1633,6 +1726,7 @@ export default function Client() {
               onAddAnimal={handleAddAnimalAClienteExistente}
               onEditCliente={handleEditClienteClick}
               onEditAnimal={handleEditAnimalClick}
+              onDeleteAnimal={handleDeleteAnimalClick}
             />
           ))}
         </Box>

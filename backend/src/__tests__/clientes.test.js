@@ -9,10 +9,13 @@ const {
   cancelarClienteTemporario,
   confirmarClienteComAnimal,
   createAnimal,
+  getAnimalById,
   getAnimaisByCliente,
+  getAgendamentosByAnimalId,
   updateCliente,
   updateAnimal,
   limparClientesTemporarios,
+  deleteAnimal,
 } = require("../repositories/repositorioClientes");
 const { prisma } = require("../db/prismaClient");
 
@@ -42,7 +45,9 @@ describe("Gestao de Clientes — Testes Unitarios", () => {
 
   afterEach(async () => {
     if (createdEmails.length > 0) {
-      const emails = createdEmails.splice(0).map((e) => String(e).trim().toLowerCase());
+      const emails = createdEmails
+        .splice(0)
+        .map((e) => String(e).trim().toLowerCase());
       await prisma.animal.deleteMany({
         where: { cliente: { utilizador: { email: { in: emails } } } },
       });
@@ -1149,6 +1154,109 @@ describe("Gestao de Animais — Testes Unitarios", () => {
     expect(encontrado.dataNascimento).toBe("2021-05-15");
   });
 
+  // ── getAnimalById ─────────────────────────────────────────────────────────
+
+  test("getAnimalById retorna null para ID inexistente", async () => {
+    const animal = await getAnimalById("00000000-0000-4000-8000-000000000000");
+    expect(animal).toBeNull();
+  });
+
+  test("getAnimalById retorna animal existente com campos correctos", async () => {
+    const criado = await createAnimal(clienteAtivo.id, {
+      nome: "GetById",
+      especie: "Gato",
+      raca: "Persa",
+      porte: "PEQUENO",
+      dataNascimento: "2021-03-10",
+      alergias: "Frango",
+      observacoes: "Muito calmo",
+    });
+
+    const encontrado = await getAnimalById(criado.id);
+
+    expect(encontrado).not.toBeNull();
+    expect(encontrado.id).toBe(criado.id);
+    expect(encontrado.nome).toBe("GetById");
+    expect(encontrado.especie).toBe("Gato");
+    expect(encontrado.raca).toBe("Persa");
+    expect(encontrado.porte).toBe("PEQUENO");
+    expect(encontrado.dataNascimento).toBe("2021-03-10");
+    expect(encontrado.alergias).toBe("Frango");
+    expect(encontrado.observacoes).toBe("Muito calmo");
+    expect(encontrado.clienteId).toBe(clienteAtivo.id);
+  });
+
+  test("getAnimalById inclui dados do cliente no resultado", async () => {
+    const criado = await createAnimal(clienteAtivo.id, {
+      nome: "ComCliente",
+      especie: "Cão",
+      porte: "MEDIO",
+      dataNascimento: "2020-05-05",
+    });
+
+    const encontrado = await getAnimalById(criado.id);
+
+    expect(encontrado).toHaveProperty("cliente");
+    expect(encontrado.cliente).not.toBeNull();
+    expect(encontrado.cliente).toHaveProperty("id");
+    expect(encontrado.cliente).toHaveProperty("nome");
+    expect(encontrado.cliente).toHaveProperty("email");
+    expect(encontrado.cliente).toHaveProperty("telefone");
+    expect(encontrado.cliente.id).toBe(clienteAtivo.id);
+  });
+
+  test("getAnimalById retorna todos os campos esperados no animal", async () => {
+    const criado = await createAnimal(clienteAtivo.id, {
+      nome: "TodosCampos",
+      especie: "Cão",
+      porte: "GRANDE",
+      dataNascimento: "2019-12-01",
+    });
+
+    const encontrado = await getAnimalById(criado.id);
+
+    expect(encontrado).toHaveProperty("id");
+    expect(encontrado).toHaveProperty("clienteId");
+    expect(encontrado).toHaveProperty("nome");
+    expect(encontrado).toHaveProperty("especie");
+    expect(encontrado).toHaveProperty("porte");
+    expect(encontrado).toHaveProperty("dataNascimento");
+    expect(encontrado).toHaveProperty("ativo");
+    expect(encontrado).toHaveProperty("createdAt");
+    expect(encontrado).toHaveProperty("cliente");
+  });
+
+  // ── getAgendamentosByAnimalId ──────────────────────────────────────────────
+
+  test("getAgendamentosByAnimalId retorna estrutura correcta para animal sem agendamentos", async () => {
+    const animal = await createAnimal(clienteAtivo.id, {
+      nome: "SemAgendamentos",
+      especie: "Cão",
+      porte: "MEDIO",
+      dataNascimento: "2021-01-01",
+    });
+
+    const resultado = await getAgendamentosByAnimalId(animal.id);
+
+    expect(resultado).toHaveProperty("agendamentosFuturos");
+    expect(resultado).toHaveProperty("historico");
+    expect(Array.isArray(resultado.agendamentosFuturos)).toBe(true);
+    expect(Array.isArray(resultado.historico)).toBe(true);
+    expect(resultado.agendamentosFuturos.length).toBe(0);
+    expect(resultado.historico.length).toBe(0);
+  });
+
+  test("getAgendamentosByAnimalId retorna listas vazias para ID inexistente", async () => {
+    const resultado = await getAgendamentosByAnimalId(
+      "00000000-0000-4000-8000-000000000000",
+    );
+
+    expect(resultado).toHaveProperty("agendamentosFuturos");
+    expect(resultado).toHaveProperty("historico");
+    expect(resultado.agendamentosFuturos.length).toBe(0);
+    expect(resultado.historico.length).toBe(0);
+  });
+
   // ── updateAnimal ──────────────────────────────────────────────────────────
 
   test("updateAnimal actualiza todos os campos com sucesso", async () => {
@@ -1408,6 +1516,101 @@ describe("Gestao de Animais — Testes Unitarios", () => {
     expect(atualizado).toHaveProperty("dataNascimento");
     expect(atualizado).toHaveProperty("createdAt");
     expect(atualizado.id).toBe(animal.id);
+  });
+
+  // ── deleteAnimal ──────────────────────────────────────────────────────────
+
+  test("deleteAnimal retorna null para ID inexistente", async () => {
+    const resultado = await deleteAnimal(
+      "00000000-0000-4000-8000-000000000000",
+    );
+    expect(resultado).toBeNull();
+  });
+
+  test("deleteAnimal faz soft delete de animal sem agendamentos futuros", async () => {
+    const animal = await createAnimal(clienteAtivo.id, {
+      nome: "ParaEliminar",
+      especie: "Cão",
+      porte: "MEDIO",
+      dataNascimento: "2020-01-01",
+    });
+
+    const resultado = await deleteAnimal(animal.id);
+
+    expect(resultado).not.toBeNull();
+    expect(resultado.removed).toBe(true);
+    expect(resultado.id).toBe(animal.id);
+  });
+
+  test("deleteAnimal marca animal como inativo (ativo = false) na base de dados", async () => {
+    const animal = await createAnimal(clienteAtivo.id, {
+      nome: "MarcarInativo",
+      especie: "Gato",
+      porte: "PEQUENO",
+      dataNascimento: "2021-06-01",
+    });
+
+    await deleteAnimal(animal.id);
+
+    const naBase = await prisma.animal.findUnique({ where: { id: animal.id } });
+    expect(naBase).not.toBeNull();
+    expect(naBase.ativo).toBe(false);
+    expect(naBase.deletedAt).not.toBeNull();
+  });
+
+  test("deleteAnimal não remove o registo fisicamente da base de dados", async () => {
+    const animal = await createAnimal(clienteAtivo.id, {
+      nome: "NaoRemover",
+      especie: "Cão",
+      porte: "GRANDE",
+      dataNascimento: "2019-03-03",
+    });
+
+    await deleteAnimal(animal.id);
+
+    const naBase = await prisma.animal.findUnique({ where: { id: animal.id } });
+    expect(naBase).not.toBeNull();
+  });
+
+  test("deleteAnimal define deletedAt após eliminação", async () => {
+    const animal = await createAnimal(clienteAtivo.id, {
+      nome: "ComDeletedAt",
+      especie: "Cão",
+      porte: "MEDIO",
+      dataNascimento: "2020-07-07",
+    });
+
+    const antes = new Date();
+    await deleteAnimal(animal.id);
+    const depois = new Date();
+
+    const naBase = await prisma.animal.findUnique({ where: { id: animal.id } });
+    expect(naBase.deletedAt).not.toBeNull();
+    expect(new Date(naBase.deletedAt).getTime()).toBeGreaterThanOrEqual(
+      antes.getTime(),
+    );
+    expect(new Date(naBase.deletedAt).getTime()).toBeLessThanOrEqual(
+      depois.getTime(),
+    );
+  });
+
+  test("deleteAnimal remove animal da lista devolvida por getAnimaisByCliente", async () => {
+    const animal = await createAnimal(clienteAtivo.id, {
+      nome: "SairDaLista",
+      especie: "Gato",
+      porte: "EXTRA_PEQUENO",
+      dataNascimento: "2022-09-09",
+    });
+
+    // Confirmar que está na lista antes
+    const antes = await getAnimaisByCliente(clienteAtivo.id);
+    expect(antes.some((a) => a.id === animal.id)).toBe(true);
+
+    await deleteAnimal(animal.id);
+
+    // Não deve aparecer na lista após eliminação (getAnimaisByCliente filtra ativo: true)
+    const depois = await getAnimaisByCliente(clienteAtivo.id);
+    expect(depois.some((a) => a.id === animal.id)).toBe(false);
   });
 
   // ── limparClientesTemporarios ──────────────────────────────────────────────
