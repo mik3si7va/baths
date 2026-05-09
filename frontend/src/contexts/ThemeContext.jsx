@@ -15,6 +15,7 @@ export function ThemeProvider({ children }) {
             textSecondary: '#666666',
             white: '#FFFFFF',
             black: '#000000',
+            error: '#d32f2f',
             headerOverlay: 'linear-gradient(to bottom, rgba(0,0,0,0.4), transparent)'
         },
 

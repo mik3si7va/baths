@@ -41,9 +41,12 @@ const {
   cancelarClienteTemporario,
   confirmarClienteComAnimal,
   createAnimal,
+  getAnimalById,
+  getAgendamentosByAnimalId,
   updateCliente,
   updateAnimal,
   getAnimaisByCliente,
+  deleteAnimal,
 } = require("./repositories/repositorioClientes");
 
 const app = express();
@@ -362,6 +365,82 @@ app.put("/animais/:id", async (req, res) => {
 
 /**
  * @swagger
+ * /animais/{id}:
+ *   delete:
+ *     summary: Inativa (soft delete) um animal - marca como eliminado
+ *     tags: [Clientes]
+ *     description: >
+ *       Elimina (soft delete) a ficha de um animal. O registo é mantido na base de dados
+ *       para fins de auditoria e faturação, mas o animal é marcado como inativo.
+ *
+ *       Validações:
+ *       - Apenas animais sem agendamentos futuros podem ser eliminados
+ *       - Histórico de serviços passados é mantido
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: ID do animal
+ *     responses:
+ *       200:
+ *         description: Animal inativado com sucesso
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 removed:
+ *                   type: boolean
+ *                   example: true
+ *                 id:
+ *                   type: string
+ *                   format: uuid
+ *       404:
+ *         description: Animal não encontrado
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       409:
+ *         description: Animal tem agendamentos futuros associados
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   example: "Não é possível eliminar o animal \"Rex\" porque tem 1 agendamento(s) futuro(s) associado(s). Cancele os agendamentos antes de eliminar o animal."
+ *       500:
+ *         description: Erro interno
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ */
+app.delete("/animais/:id", async (req, res) => {
+  try {
+    const result = await deleteAnimal(req.params.id);
+
+    if (!result) {
+      return res.status(404).json({ error: "Animal não encontrado." });
+    }
+
+    return res.json(result);
+  } catch (error) {
+    console.error("Failed to delete animal:", error);
+    if (error.message && error.message.includes("agendamento(s) futuro(s)")) {
+      return res.status(409).json({ error: error.message });
+    }
+    return res.status(400).json({ error: error.message });
+  }
+});
+
+/**
+ * @swagger
  * /clientes:
  *   post:
  *     summary: >
@@ -601,6 +680,29 @@ app.get("/clientes/:id/animais", async (req, res) => {
   } catch (error) {
     console.error("Failed to fetch animais:", error);
     return res.status(500).json({ error: "Failed to fetch animais" });
+  }
+});
+
+app.get("/animais/:id", async (req, res) => {
+  try {
+    const animal = await getAnimalById(req.params.id);
+    if (!animal) {
+      return res.status(404).json({ error: "Animal não encontrado" });
+    }
+    return res.json(animal);
+  } catch (error) {
+    console.error("Failed to fetch animal:", error);
+    return res.status(500).json({ error: "Failed to fetch animal" });
+  }
+});
+
+app.get("/animais/:id/agendamentos", async (req, res) => {
+  try {
+    const data = await getAgendamentosByAnimalId(req.params.id);
+    return res.json(data);
+  } catch (error) {
+    console.error("Failed to fetch agendamentos:", error);
+    return res.status(500).json({ error: "Failed to fetch agendamentos" });
   }
 });
 

@@ -32,6 +32,7 @@ function mapAnimalRow(a) {
       : null,
     alergias: a.alergias || null,
     observacoes: a.observacoes || null,
+    ativo: a.ativo,
     createdAt: a.createdAt,
   };
 }
@@ -53,7 +54,7 @@ function mapClienteRow(row) {
 
 const INCLUDE_FULL = {
   utilizador: true,
-  animais: { orderBy: { createdAt: "asc" } },
+  animais: { where: { ativo: true }, orderBy: { createdAt: "asc" } },
 };
 
 // ─── validação de animal ───────────────────────────────────────────────────────
@@ -310,10 +311,91 @@ async function createAnimal(
 
 async function getAnimaisByCliente(clienteId) {
   const animais = await prisma.animal.findMany({
-    where: { clienteId },
+    where: { clienteId, ativo: true },
     orderBy: { createdAt: "asc" },
   });
   return animais.map(mapAnimalRow);
+}
+
+async function getAnimalById(animalId) {
+  const animal = await prisma.animal.findUnique({
+    where: { id: animalId },
+    include: {
+      cliente: {
+        include: {
+          utilizador: true,
+        },
+      },
+    },
+  });
+
+  if (!animal) return null;
+
+  return {
+    ...mapAnimalRow(animal),
+    cliente: animal.cliente
+      ? {
+          id: animal.cliente.id,
+          nome: animal.cliente.utilizador?.nome || null,
+          email: animal.cliente.utilizador?.email || null,
+          telefone: animal.cliente.telefone || null,
+        }
+      : null,
+  };
+}
+
+function mapServicoRow(servico) {
+  return {
+    id: servico.id,
+    tipoServico: servico.tipoServico?.tipo || "Desconhecido",
+    precoNoMomento: Number(servico.precoNoMomento),
+    duracaoNoMomento: servico.duracaoNoMomento,
+    funcionario: servico.funcionario?.nome || null,
+    sala: servico.sala?.nome || null,
+  };
+}
+
+async function getAgendamentosByAnimalId(animalId) {
+  const agora = new Date();
+
+  const agendamentos = await prisma.agendamento.findMany({
+    where: { animalId },
+    include: {
+      servicos: {
+        include: {
+          tipoServico: true,
+          funcionario: true,
+          sala: true,
+        },
+      },
+    },
+    orderBy: { dataHoraInicio: "desc" },
+  });
+
+  const agendamentosFuturos = [];
+  const historico = [];
+
+  for (const agendamento of agendamentos) {
+    const item = {
+      id: agendamento.id,
+      dataHoraInicio: agendamento.dataHoraInicio.toISOString(),
+      dataHoraFim: agendamento.dataHoraFim.toISOString(),
+      estado: agendamento.estado,
+      servicos: (agendamento.servicos || []).map(mapServicoRow),
+    };
+
+    const isFuturo =
+      agendamento.dataHoraInicio > agora &&
+      ["CONFIRMADO", "EM_ATENDIMENTO"].includes(agendamento.estado);
+
+    if (isFuturo) {
+      agendamentosFuturos.push(item);
+    } else {
+      historico.push(item);
+    }
+  }
+
+  return { agendamentosFuturos, historico };
 }
 
 async function updateCliente(
@@ -463,6 +545,61 @@ async function limparClientesTemporarios(minutosAntigos = 60) {
   return { eliminados: ids.length };
 }
 
+// ─── animal deletion (soft delete) ─────────────────────────────────────────────
+
+/**
+ * Conta os agendamentos futuros activos associados a um animal.
+ */
+async function countAgendamentosFuturosByAnimalId(animalId) {
+  const agora = new Date();
+
+  const count = await prisma.agendamento.count({
+    where: {
+      animalId,
+      dataHoraInicio: { gt: agora },
+      estado: { in: ["CONFIRMADO", "EM_ATENDIMENTO"] },
+    },
+  });
+
+  return count;
+}
+
+/**
+ * Inativa um animal existente (soft delete).
+ * Não remove o registo da base de dados; apenas define `ativo = false` e `deletedAt`.
+ * Retorna `null` se o animal não existir.
+ *
+ * Validações:
+ * - Não é possível inativar se há agendamentos futuros
+ * - Histórico de agendamentos é mantido para faturação
+ */
+async function deleteAnimal(animalId) {
+  const existingAnimal = await prisma.animal.findUnique({
+    where: { id: animalId },
+    select: { id: true, ativo: true, nome: true, clienteId: true },
+  });
+
+  if (!existingAnimal) {
+    return null;
+  }
+
+  // Garante que não existem agendamentos futuros ainda dependentes deste animal
+  const totalFuturos = await countAgendamentosFuturosByAnimalId(animalId);
+
+  if (totalFuturos > 0) {
+    throw new Error(
+      `Não é possível eliminar o animal "${existingAnimal.nome}" porque tem ${totalFuturos} agendamento(s) futuro(s) associado(s). Cancele os agendamentos antes de eliminar o animal.`,
+    );
+  }
+
+  await prisma.animal.update({
+    where: { id: animalId },
+    data: { ativo: false, deletedAt: new Date() },
+  });
+
+  return { removed: true, id: animalId };
+}
+
 module.exports = {
   getAllClientes,
   getClienteById,
@@ -470,8 +607,11 @@ module.exports = {
   cancelarClienteTemporario,
   confirmarClienteComAnimal,
   createAnimal,
+  getAnimalById,
+  getAgendamentosByAnimalId,
   updateCliente,
   updateAnimal,
   getAnimaisByCliente,
   limparClientesTemporarios,
+  deleteAnimal,
 };

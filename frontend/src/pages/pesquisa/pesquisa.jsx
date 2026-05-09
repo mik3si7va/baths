@@ -101,6 +101,13 @@ export default function Pesquisa() {
   const [selectedCliente, setSelectedCliente] = useState(null);
   const [selectedAnimal, setSelectedAnimal] = useState(null);
   const [filterMode, setFilterMode] = useState("both");
+  const [animalAgendamentos, setAnimalAgendamentos] = useState({
+    futuros: [],
+    historico: [],
+  });
+  const [animalAgendamentosLoading, setAnimalAgendamentosLoading] =
+    useState(false);
+  const [animalAgendamentosError, setAnimalAgendamentosError] = useState(null);
 
   const showClientes = filterMode !== "animals";
   const showAnimais = filterMode !== "clients";
@@ -121,6 +128,56 @@ export default function Pesquisa() {
   useEffect(() => {
     carregarClientes();
   }, [carregarClientes]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    if (!selectedAnimal) {
+      setAnimalAgendamentos({ futuros: [], historico: [] });
+      setAnimalAgendamentosError(null);
+      setAnimalAgendamentosLoading(false);
+      return;
+    }
+
+    const loadAgendamentos = async () => {
+      setAnimalAgendamentosLoading(true);
+      setAnimalAgendamentosError(null);
+
+      try {
+        const response = await fetch(
+          `${API_BASE_URL}/animais/${selectedAnimal.id}/agendamentos`,
+        );
+        if (!response.ok) {
+          throw new Error("Falha ao carregar agendamentos.");
+        }
+
+        const data = await response.json();
+        if (cancelled) return;
+
+        setAnimalAgendamentos({
+          futuros: Array.isArray(data.agendamentosFuturos)
+            ? data.agendamentosFuturos
+            : [],
+          historico: Array.isArray(data.historico) ? data.historico : [],
+        });
+      } catch (error) {
+        if (!cancelled) {
+          setAnimalAgendamentosError(
+            "Não foi possível carregar os agendamentos do animal.",
+          );
+          setAnimalAgendamentos({ futuros: [], historico: [] });
+        }
+      } finally {
+        if (!cancelled) setAnimalAgendamentosLoading(false);
+      }
+    };
+
+    loadAgendamentos();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedAnimal]);
 
   const animais = useMemo(
     () =>
@@ -173,6 +230,27 @@ export default function Pesquisa() {
     setSelectedCliente(null);
     setSelectedAnimal(null);
   };
+
+  const formatDateTime = (value) =>
+    new Date(value).toLocaleString("pt-PT", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+
+  const animalServiceHistory = useMemo(
+    () =>
+      animalAgendamentos.historico.flatMap((agendamento) =>
+        (agendamento.servicos || []).map((servico) => ({
+          ...servico,
+          agendamentoId: agendamento.id,
+          dataHoraInicio: agendamento.dataHoraInicio,
+        })),
+      ),
+    [animalAgendamentos.historico],
+  );
 
   const renderClienteDetails = () => {
     if (!selectedCliente) return null;
@@ -263,9 +341,22 @@ export default function Pesquisa() {
 
     return (
       <Paper elevation={2} sx={{ p: 3, borderRadius: 3, mb: 3 }}>
-        <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 2 }}>
-          <PetsIcon sx={{ color: colors.primary }} />
-          <Typography variant="h2">Ficha do Animal</Typography>
+        <Box
+          sx={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 2,
+            mb: 2,
+          }}
+        >
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+            <PetsIcon sx={{ color: colors.primary }} />
+            <Typography variant="h2">Ficha do Animal</Typography>
+          </Box>
+          <Button variant="contained" sx={{ whiteSpace: "nowrap" }}>
+            Novo Agendamento
+          </Button>
         </Box>
         <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 1 }}>
           {selectedAnimal.nome}
@@ -302,7 +393,7 @@ export default function Pesquisa() {
           Cliente proprietário
         </Typography>
         {selectedAnimal.cliente ? (
-          <Box sx={{ mt: 1 }}>
+          <Box sx={{ mt: 1, mb: 3 }}>
             <ResultCard
               label={selectedAnimal.cliente.nome}
               icon={PersonIcon}
@@ -314,10 +405,96 @@ export default function Pesquisa() {
             />
           </Box>
         ) : (
-          <Typography variant="body2" sx={{ color: colors.textSecondary }}>
+          <Typography
+            variant="body2"
+            sx={{ color: colors.textSecondary, mb: 3 }}
+          >
             Cliente não disponível.
           </Typography>
         )}
+        <Box sx={{ mb: 3 }}>
+          <Typography variant="subtitle2" sx={{ mb: 1 }}>
+            Agendamentos Futuros
+          </Typography>
+          {animalAgendamentosLoading ? (
+            <Typography variant="body2" sx={{ color: colors.textSecondary }}>
+              A carregar agendamentos...
+            </Typography>
+          ) : animalAgendamentosError ? (
+            <Typography variant="body2" sx={{ color: colors.error }}>
+              {animalAgendamentosError}
+            </Typography>
+          ) : animalAgendamentos.futuros.length === 0 ? (
+            <Typography variant="body2" sx={{ color: colors.textSecondary }}>
+              Não existem agendamentos futuros para este animal.
+            </Typography>
+          ) : (
+            <Box sx={{ display: "grid", gap: 1 }}>
+              {animalAgendamentos.futuros.map((agendamento) => (
+                <Paper
+                  key={agendamento.id}
+                  sx={{
+                    p: 2,
+                    borderRadius: 2,
+                    backgroundColor: "action.hover",
+                  }}
+                  elevation={0}
+                >
+                  <Typography variant="body2" sx={{ fontWeight: 700 }}>
+                    {formatDateTime(agendamento.dataHoraInicio)}
+                  </Typography>
+                  <Typography
+                    variant="caption"
+                    sx={{ color: colors.textSecondary }}
+                  >
+                    {agendamento.servicos
+                      .map((servico) => servico.tipoServico)
+                      .join(", ")}
+                  </Typography>
+                </Paper>
+              ))}
+            </Box>
+          )}
+        </Box>
+
+        <Box sx={{ mb: 3 }}>
+          <Typography variant="subtitle2" sx={{ mb: 1 }}>
+            Histórico de Serviços
+          </Typography>
+          {animalServiceHistory.length === 0 ? (
+            <Typography variant="body2" sx={{ color: colors.textSecondary }}>
+              Ainda não há serviços registados para este animal.
+            </Typography>
+          ) : (
+            <Box sx={{ display: "grid", gap: 1 }}>
+              {animalServiceHistory.map((servico) => (
+                <Paper
+                  key={`${servico.id}-${servico.agendamentoId}`}
+                  sx={{ p: 2, borderRadius: 2 }}
+                  elevation={0}
+                >
+                  <Typography variant="body2" sx={{ fontWeight: 700 }}>
+                    {servico.tipoServico}
+                  </Typography>
+                  <Typography
+                    variant="caption"
+                    sx={{ color: colors.textSecondary, display: "block" }}
+                  >
+                    {formatDateTime(servico.dataHoraInicio)}
+                  </Typography>
+                  <Typography
+                    variant="caption"
+                    sx={{ color: colors.textSecondary }}
+                  >
+                    {servico.precoNoMomento.toFixed(2)}€ ·{" "}
+                    {servico.duracaoNoMomento} min
+                  </Typography>
+                </Paper>
+              ))}
+            </Box>
+          )}
+        </Box>
+
         <Button sx={{ mt: 2 }} onClick={clearSelection}>
           Limpar seleção
         </Button>
