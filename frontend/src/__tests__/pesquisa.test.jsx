@@ -1,6 +1,7 @@
 import React from "react";
 import { render, screen, waitFor, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { MemoryRouter } from "react-router-dom";
 import Pesquisa from "../pages/pesquisa/pesquisa";
 import { ThemeProvider } from "../contexts/ThemeContext";
 
@@ -8,9 +9,11 @@ let consoleErrorSpy;
 
 function renderPesquisa() {
   return render(
-    <ThemeProvider>
-      <Pesquisa />
-    </ThemeProvider>,
+    <MemoryRouter>
+      <ThemeProvider>
+        <Pesquisa />
+      </ThemeProvider>
+    </MemoryRouter>,
   );
 }
 
@@ -84,8 +87,19 @@ const CLIENTE_SEM_ANIMAIS = {
   animais: [],
 };
 
-function mockGetClientes(lista = [CLIENTE_MOCK_1, CLIENTE_MOCK_2]) {
-  global.fetch.mockImplementationOnce(() => mockJsonResponse(lista));
+function mockGetClientes(
+  lista = [CLIENTE_MOCK_1, CLIENTE_MOCK_2],
+  schedule = { agendamentosFuturos: [], historico: [] },
+) {
+  global.fetch = jest.fn((url) => {
+    if (url.includes("/animais/") && url.includes("/agendamentos")) {
+      return mockJsonResponse(schedule);
+    }
+    if (url.includes("/clientes")) {
+      return mockJsonResponse(lista);
+    }
+    return Promise.reject(new Error(`Unexpected fetch url: ${url}`));
+  });
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -574,6 +588,77 @@ describe("Pesquisa page", () => {
     fireEvent.mouseDown(clienteCards[clienteCards.length - 1]);
 
     expect(await screen.findByText("Ficha do Cliente")).toBeInTheDocument();
+  });
+
+  test("botao Novo Agendamento aparece na ficha do animal", async () => {
+    mockGetClientes();
+    renderPesquisa();
+
+    await screen.findByText("Rex");
+    fireEvent.mouseDown(screen.getAllByText("Rex")[0]);
+
+    expect(await screen.findByRole("button", { name: /Novo Agendamento/i })).toBeInTheDocument();
+  });
+
+  test("mostra agendamentos futuros na ficha do animal", async () => {
+    mockGetClientes([CLIENTE_MOCK_1], {
+      agendamentosFuturos: [
+        {
+          id: "agt-1",
+          dataHoraInicio: "2026-06-01T10:00:00Z",
+          dataHoraFim: "2026-06-01T11:00:00Z",
+          estado: "CONFIRMADO",
+          servicos: [
+            {
+              id: "svc-1",
+              tipoServico: "BANHO",
+              precoNoMomento: 25.0,
+              duracaoNoMomento: 60,
+            },
+          ],
+        },
+      ],
+      historico: [],
+    });
+
+    renderPesquisa();
+
+    await screen.findByText("Rex");
+    fireEvent.mouseDown(screen.getAllByText("Rex")[0]);
+
+    expect(await screen.findByText(/Agendamentos Futuros/i)).toBeInTheDocument();
+    expect(await screen.findByText(/BANHO/i)).toBeInTheDocument();
+  });
+
+  test("mostra histórico de serviços na ficha do animal", async () => {
+    mockGetClientes([CLIENTE_MOCK_1], {
+      agendamentosFuturos: [],
+      historico: [
+        {
+          id: "agt-2",
+          dataHoraInicio: "2026-01-10T14:30:00Z",
+          dataHoraFim: "2026-01-10T15:30:00Z",
+          estado: "CONCLUIDO",
+          servicos: [
+            {
+              id: "svc-2",
+              tipoServico: "TOSQUIA_COMPLETA",
+              precoNoMomento: 65.0,
+              duracaoNoMomento: 90,
+            },
+          ],
+        },
+      ],
+    });
+
+    renderPesquisa();
+
+    await screen.findByText("Rex");
+    fireEvent.mouseDown(screen.getAllByText("Rex")[0]);
+
+    expect(await screen.findByText(/Histórico de Serviços/i)).toBeInTheDocument();
+    expect(await screen.findByText(/TOSQUIA_COMPLETA/i)).toBeInTheDocument();
+    expect(await screen.findByText(/90 min/i)).toBeInTheDocument();
   });
 
   test("botao Limpar selecao na ficha do animal fecha a ficha", async () => {

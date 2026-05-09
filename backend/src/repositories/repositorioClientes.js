@@ -316,6 +316,87 @@ async function getAnimaisByCliente(clienteId) {
   return animais.map(mapAnimalRow);
 }
 
+async function getAnimalById(animalId) {
+  const animal = await prisma.animal.findUnique({
+    where: { id: animalId },
+    include: {
+      cliente: {
+        include: {
+          utilizador: true,
+        },
+      },
+    },
+  });
+
+  if (!animal) return null;
+
+  return {
+    ...mapAnimalRow(animal),
+    cliente: animal.cliente
+      ? {
+          id: animal.cliente.id,
+          nome: animal.cliente.utilizador?.nome || null,
+          email: animal.cliente.utilizador?.email || null,
+          telefone: animal.cliente.telefone || null,
+        }
+      : null,
+  };
+}
+
+function mapServicoRow(servico) {
+  return {
+    id: servico.id,
+    tipoServico: servico.tipoServico?.tipo || "Desconhecido",
+    precoNoMomento: Number(servico.precoNoMomento),
+    duracaoNoMomento: servico.duracaoNoMomento,
+    funcionario: servico.funcionario?.nome || null,
+    sala: servico.sala?.nome || null,
+  };
+}
+
+async function getAgendamentosByAnimalId(animalId) {
+  const agora = new Date();
+
+  const agendamentos = await prisma.agendamento.findMany({
+    where: { animalId },
+    include: {
+      servicos: {
+        include: {
+          tipoServico: true,
+          funcionario: true,
+          sala: true,
+        },
+      },
+    },
+    orderBy: { dataHoraInicio: "desc" },
+  });
+
+  const agendamentosFuturos = [];
+  const historico = [];
+
+  for (const agendamento of agendamentos) {
+    const item = {
+      id: agendamento.id,
+      dataHoraInicio: agendamento.dataHoraInicio.toISOString(),
+      dataHoraFim: agendamento.dataHoraFim.toISOString(),
+      estado: agendamento.estado,
+      servicos: (agendamento.servicos || []).map(mapServicoRow),
+    };
+
+    const isFuturo =
+      agendamento.dataHoraInicio > agora &&
+      ["CONFIRMADO", "EM_ATENDIMENTO"].includes(agendamento.estado);
+
+    if (isFuturo) {
+      agendamentosFuturos.push(item);
+    } else {
+      historico.push(item);
+    }
+  }
+
+  return { agendamentosFuturos, historico };
+}
+
 async function updateCliente(
   clienteId,
   { nome, email, telefone, nif, morada, password },
@@ -470,6 +551,8 @@ module.exports = {
   cancelarClienteTemporario,
   confirmarClienteComAnimal,
   createAnimal,
+  getAnimalById,
+  getAgendamentosByAnimalId,
   updateCliente,
   updateAnimal,
   getAnimaisByCliente,

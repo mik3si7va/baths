@@ -41,6 +41,8 @@ const {
   cancelarClienteTemporario,
   confirmarClienteComAnimal,
   createAnimal,
+  getAnimalById,
+  getAgendamentosByAnimalId,
   updateCliente,
   updateAnimal,
   getAnimaisByCliente,
@@ -601,6 +603,29 @@ app.get("/clientes/:id/animais", async (req, res) => {
   } catch (error) {
     console.error("Failed to fetch animais:", error);
     return res.status(500).json({ error: "Failed to fetch animais" });
+  }
+});
+
+app.get("/animais/:id", async (req, res) => {
+  try {
+    const animal = await getAnimalById(req.params.id);
+    if (!animal) {
+      return res.status(404).json({ error: "Animal não encontrado" });
+    }
+    return res.json(animal);
+  } catch (error) {
+    console.error("Failed to fetch animal:", error);
+    return res.status(500).json({ error: "Failed to fetch animal" });
+  }
+});
+
+app.get("/animais/:id/agendamentos", async (req, res) => {
+  try {
+    const data = await getAgendamentosByAnimalId(req.params.id);
+    return res.json(data);
+  } catch (error) {
+    console.error("Failed to fetch agendamentos:", error);
+    return res.status(500).json({ error: "Failed to fetch agendamentos" });
   }
 });
 
