@@ -42,7 +42,7 @@ describe("Gestao de Clientes — Testes Unitarios", () => {
 
   afterEach(async () => {
     if (createdEmails.length > 0) {
-      const emails = createdEmails.splice(0);
+      const emails = createdEmails.splice(0).map((e) => String(e).trim().toLowerCase());
       await prisma.animal.deleteMany({
         where: { cliente: { utilizador: { email: { in: emails } } } },
       });
