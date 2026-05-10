@@ -46,6 +46,10 @@ export default function Sala() {
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
     const [salaToDelete, setSalaToDelete] = useState(null);
 
+    // Diálogo de erro modal (BET-180): quando o backend devolve 409 ao tentar inativar uma sala com agendamentos futuros
+    const [errorDialogOpen, setErrorDialogOpen] = useState(false);
+    const [errorDialogMessage, setErrorDialogMessage] = useState('');
+
     // Ref para timeout de sucesso
     const successTimeoutRef = useRef(null);
 
@@ -300,8 +304,19 @@ export default function Sala() {
             });
 
             if (!res.ok) {
-                const err = await res.json();
-                throw new Error(err.error || 'Erro ao eliminar sala');
+                const err = await res.json().catch(() => ({}));
+                const message = err.error || 'Erro ao eliminar sala';
+
+                // BET-180: 409 = sala tem agendamentos futuros
+                if (res.status === 409) {
+                    setDeleteDialogOpen(false);
+                    setSalaToDelete(null);
+                    setErrorDialogMessage(message);
+                    setErrorDialogOpen(true);
+                    return;
+                }
+
+                throw new Error(message);
             }
 
             // Se a sala que estava a ser editada for eliminada, limpar formulário
@@ -311,9 +326,10 @@ export default function Sala() {
 
             await carregarSalas();
             setSucesso(`Sala "${salaToDelete.nome}" inativada com sucesso!`);
+            setDeleteDialogOpen(false);
+            setSalaToDelete(null);
         } catch (err) {
             setErro(err.message);
-        } finally {
             setDeleteDialogOpen(false);
             setSalaToDelete(null);
         }
@@ -409,6 +425,8 @@ export default function Sala() {
                                 step: 0.01,
                             }}
                             placeholder="Ex: 10.50"
+                            // BET-460: avisar o admin que alterar o preço não retroage - reservas já existentes mantêm o preço com que foram criados.
+                            helperText={editMode ? 'Alterações ao preço só afetam novas reservas. Reservas já marcadas mantêm o preço original.' : ''}
                         />
                     </Box>
 
@@ -620,6 +638,22 @@ export default function Sala() {
                 confirmColor="warning"
                 onConfirm={handleConfirmDelete}
                 onClose={handleCloseDialog}
+            />
+
+            {/* BET-180: diálogo modal de erro quando o backend bloqueia a inativação
+                (sala com agendamentos futuros). Reutiliza o ConfirmDialog em modo
+                hideCancel — só botão "OK" fecha o diálogo. */}
+            <ConfirmDialog
+                open={errorDialogOpen}
+                title="Não é possível inativar"
+                message={
+                    <Typography>{errorDialogMessage}</Typography>
+                }
+                confirmLabel="OK"
+                confirmColor="primary"
+                hideCancel
+                onConfirm={() => { setErrorDialogOpen(false); setErrorDialogMessage(''); }}
+                onClose={() => { setErrorDialogOpen(false); setErrorDialogMessage(''); }}
             />
         </Box>
     );

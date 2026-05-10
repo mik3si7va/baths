@@ -39,7 +39,7 @@ describe('Gestão de Salas', () => {
       cy.get('textarea[name="equipamento"]').type('Equipamento Cypress Test')
       cy.contains('BANHO').click()
       cy.contains('Criar Sala').click()
-      cy.contains('Ja existe uma sala com o nome').should('exist')
+      cy.contains('Já existe uma sala com o nome').should('exist')
     })
   })
 
@@ -242,6 +242,18 @@ describe('Gestão de Salas', () => {
     cy.contains('Sala Cypress Detalhes').closest('.MuiPaper-outlined').scrollIntoView().click()
     cy.url().should('include', '/salas/')
     cy.contains('Disponibilidade').should('exist')
+  })
+
+  it('22. - mostra helperText do preço apenas em modo edição', () => {
+    cy.contains('Salas Registadas').should('exist')
+    // Em modo criação, helperText não aparece
+    cy.contains('Alterações ao preço só afetam novas reservas').should('not.exist')
+    // Entrar em modo edição
+    cy.get('[title="Editar sala"]').first().click()
+    cy.contains('Editar Sala').should('exist')
+    // Em modo edição, helperText aparece
+    cy.contains('Alterações ao preço só afetam novas reservas').should('exist')
+    cy.contains('Reservas já marcadas mantêm o preço original').should('exist')
   })
 
   // Limpa as salas criadas pelos testes

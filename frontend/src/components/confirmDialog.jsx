@@ -17,6 +17,8 @@ import {
  *   message      {node}     — corpo do diálogo (string ou JSX)
  *   confirmLabel {string}   — texto do botão de confirmação (default: "Confirmar")
  *   confirmColor {string}   — cor MUI do botão (default: "warning")
+ *   hideCancel   {boolean}  — esconde o botão "Cancelar" (default: false) -> mensagem
+ *                             com um único botão "OK").
  *   onConfirm    {function} — callback ao confirmar
  *   onClose      {function} — callback ao cancelar/fechar
  */
@@ -26,6 +28,7 @@ export default function ConfirmDialog({
   message,
   confirmLabel = 'Confirmar',
   confirmColor = 'warning',
+  hideCancel = false,
   onConfirm,
   onClose,
 }) {
@@ -42,9 +45,11 @@ export default function ConfirmDialog({
         </DialogContentText>
       </DialogContent>
       <DialogActions sx={{ p: 2, pt: 0 }}>
-        <Button onClick={onClose} variant="outlined">
-          Cancelar
-        </Button>
+        {!hideCancel && (
+          <Button onClick={onClose} variant="outlined">
+            Cancelar
+          </Button>
+        )}
         <Button onClick={onConfirm} variant="contained" color={confirmColor} autoFocus data-testid="confirm-dialog-confirm">
           {confirmLabel}
         </Button>

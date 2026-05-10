@@ -44,7 +44,7 @@ describe('API Salas - Testes de Endpoint', () => {
     const res = await request(app).get('/salas/00000000-0000-4000-8000-000000000000');
 
     expect(res.status).toBe(404);
-    expect(res.body.error).toBe('Sala nao encontrada');
+    expect(res.body.error).toBe('Sala não encontrada');
   });
 
   test('GET /salas/{id} devolve sala existente com 200', async () => {
@@ -86,11 +86,11 @@ describe('API Salas - Testes de Endpoint', () => {
     createdIds.push(res.body.id);
   });
 
-  test('POST /salas devolve 400 quando faltam campos obrigatorios', async () => {
+  test('POST /salas devolve 400 quando faltam campos obrigatórios', async () => {
     const res = await request(app).post('/salas').send({ nome: 'Incompleta' });
 
     expect(res.status).toBe(400);
-    expect(res.body.error).toContain('obrigatorios');
+    expect(res.body.error).toContain('obrigatório');
   });
 
   test('POST /salas devolve 400 sem tipoServicoIds', async () => {
@@ -106,7 +106,7 @@ describe('API Salas - Testes de Endpoint', () => {
     expect(res.body.error).toContain('tipoServicoIds');
   });
 
-  test('POST /salas devolve 400 com tipoServicoIds invalidos', async () => {
+  test('POST /salas devolve 400 com tipoServicoIds inválidos', async () => {
     const res = await request(app).post('/salas').send({
       nome: uniqueNome('api.sala.servico-invalido'),
       capacidade: 1,
@@ -116,7 +116,7 @@ describe('API Salas - Testes de Endpoint', () => {
     });
 
     expect(res.status).toBe(400);
-    expect(res.body.error).toContain('UUIDs validos');
+    expect(res.body.error).toContain('UUIDs válidos');
   });
 
   test('POST /salas devolve 409 para nome duplicado', async () => {
@@ -134,7 +134,7 @@ describe('API Salas - Testes de Endpoint', () => {
     });
 
     expect(second.status).toBe(409);
-    expect(second.body.error).toContain('Ja existe uma sala com o nome');
+    expect(second.body.error).toContain('Já existe uma sala com o nome');
   });
 
   // ─── PUT /salas/:id ───────────────────────────────────────────────────────
@@ -171,7 +171,7 @@ describe('API Salas - Testes de Endpoint', () => {
       .send({ nome: 'X', capacidade: 1, equipamento: 'Y', precoHora: 10, tipoServicoIds: [servicoId] });
 
     expect(res.status).toBe(404);
-    expect(res.body.error).toBe('Sala nao encontrada');
+    expect(res.body.error).toBe('Sala não encontrada');
   });
 
   test('PUT /salas/{id} devolve 400 sem tipoServicoIds', async () => {
@@ -213,7 +213,7 @@ describe('API Salas - Testes de Endpoint', () => {
     });
 
     expect(res.status).toBe(409);
-    expect(res.body.error).toContain('Ja existe uma sala com o nome');
+    expect(res.body.error).toContain('Já existe uma sala com o nome');
   });
 
   // ─── DELETE /salas/:id ────────────────────────────────────────────────────
@@ -276,7 +276,7 @@ describe('API Salas - Testes de Endpoint', () => {
     const res = await request(app).delete('/salas/00000000-0000-4000-8000-000000000000');
 
     expect(res.status).toBe(404);
-    expect(res.body.error).toBe('Sala nao encontrada');
+    expect(res.body.error).toBe('Sala não encontrada');
   });
 
   // ─── POST /salas/:id/servicos ─────────────────────────────────────────────
@@ -335,7 +335,7 @@ describe('API Salas - Testes de Endpoint', () => {
       .send({ tipoServicoId: servicoId });
 
     expect(res.status).toBe(409);
-    expect(res.body.error).toContain('Este servico ja esta associado');
+    expect(res.body.error).toContain('Este serviço já está associado');
   });
 
   // ─── GET /salas/:id/servicos ──────────────────────────────────────────────
@@ -394,6 +394,6 @@ describe('API Salas - Testes de Endpoint', () => {
     const res = await request(app).delete(`/salas/${criada.body.id}/servicos/${segundoServico.id}`);
 
     expect(res.status).toBe(404);
-    expect(res.body.error).toContain('Associacao nao encontrada');
+    expect(res.body.error).toContain('Associação não encontrada');
   });
 });

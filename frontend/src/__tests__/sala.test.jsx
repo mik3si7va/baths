@@ -447,6 +447,33 @@ describe("Salas page", () => {
     expect(global.fetch).toHaveBeenCalledTimes(2);
   });
 
+  test("helperText do precoHora aparece apenas em modo edição", async () => {
+    mockDefaultFetch();
+    renderSalas();
+
+    await screen.findByText("Sala de Banho 1");
+
+    // Em modo criação não há helperText
+    expect(
+      screen.queryByText(/Alterações ao preço só afetam novas reservas/i),
+    ).not.toBeInTheDocument();
+
+    // Entrar em modo edição
+    fireEvent.click(screen.getByTitle("Editar sala"));
+
+    await waitFor(() => {
+      expect(screen.getByText("Editar Sala")).toBeInTheDocument();
+    });
+
+    // Em modo edição o helperText aparece com a explicação
+    expect(
+      screen.getByText(/Alterações ao preço só afetam novas reservas/i),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/Reservas já marcadas mantêm o preço original/i),
+    ).toBeInTheDocument();
+  });
+
   // ─── INATIVAR SALA ────────────────────────────────────────────────────────
 
   test("clicar em inativar abre o dialogo de confirmação", async () => {
@@ -518,6 +545,47 @@ describe("Salas page", () => {
     await screen.findByText("Sala Inativa");
 
     expect(screen.queryByTitle("Inativar sala")).not.toBeInTheDocument();
+  });
+
+  test("mostra errorDialog quando backend bloqueia inativação", async () => {
+    global.fetch
+      .mockImplementationOnce(() => mockJsonResponse([SERVICO_MOCK]))
+      .mockImplementationOnce(() => mockJsonResponse([SALA_ATIVA_MOCK]))
+      .mockImplementationOnce(() =>
+        mockJsonResponse(
+          {
+            error:
+              "Não é possível inativar a sala: existem 2 agendamento(s) futuro(s).",
+          },
+          false,
+          409,
+        ),
+      );
+
+    renderSalas();
+    await screen.findByText("Sala de Banho 1");
+
+    // Abrir diálogo de confirmação e tentar inativar
+    fireEvent.click(screen.getByTitle("Inativar sala"));
+    expect(await screen.findByText("Inativar Sala")).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: /^Inativar$/ }));
+
+    // O diálogo de confirmação fecha
+    await waitFor(() => {
+      expect(screen.queryByText("Inativar Sala")).not.toBeInTheDocument();
+    });
+
+    // O diálogo de erro abre com a mensagem do backend
+    expect(
+      await screen.findByText("Não é possível inativar"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/existem 2 agendamento\(s\) futuro\(s\)/i),
+    ).toBeInTheDocument();
+
+    // Só tem botão OK (hideCancel)
+    expect(screen.getByRole("button", { name: /^OK$/ })).toBeInTheDocument();
   });
 
   // ─── REATIVAR SALA ───────────────────────────────────────────────────────

@@ -1148,8 +1148,8 @@ app.get("/salas", async (_req, res) => {
     const salas = await getAllSalas();
     return res.json(salas);
   } catch (error) {
-    console.error("Failed to fetch salas:", error);
-    return res.status(500).json({ error: "Failed to fetch salas" });
+    console.error("Erro ao obter as salas:", error);
+    return res.status(500).json({ error: "Erro ao obter as salas" });
   }
 });
 
@@ -1176,8 +1176,8 @@ app.get("/salas/todas", async (_req, res) => {
     const salas = await getAllSalasWithStatus();
     return res.json(salas);
   } catch (error) {
-    console.error("Failed to fetch all salas:", error);
-    return res.status(500).json({ error: "Failed to fetch all salas" });
+    console.error("Erro ao obter todas as salas:", error);
+    return res.status(500).json({ error: "Erro ao obter todas as salas" });
   }
 });
 
@@ -1185,7 +1185,7 @@ app.get("/salas/todas", async (_req, res) => {
  * @swagger
  * /salas/{id}:
  *   get:
- *     summary: Obtem uma sala por id
+ *     summary: Obtém uma sala por id
  *     tags: [Salas]
  *     parameters:
  *       - in: path
@@ -1203,7 +1203,7 @@ app.get("/salas/todas", async (_req, res) => {
  *             schema:
  *               $ref: '#/components/schemas/Sala'
  *       404:
- *         description: Sala nao encontrada
+ *         description: Sala não encontrada
  *         content:
  *           application/json:
  *             schema:
@@ -1212,7 +1212,7 @@ app.get("/salas/todas", async (_req, res) => {
  *               naoEncontrada:
  *                 summary: Sem resultado para o id
  *                 value:
- *                   error: Sala nao encontrada
+ *                   error: Sala não encontrada
  *       500:
  *         description: Erro interno
  *         content:
@@ -1226,13 +1226,13 @@ app.get("/salas/:id", async (req, res) => {
   try {
     const sala = await getSalaById(id);
     if (!sala) {
-      return res.status(404).json({ error: "Sala nao encontrada" });
+      return res.status(404).json({ error: "Sala não encontrada" });
     }
 
     return res.json(sala);
   } catch (error) {
-    console.error("Failed to fetch sala:", error);
-    return res.status(500).json({ error: "Failed to fetch sala" });
+    console.error("Erro ao obter a sala:", error);
+    return res.status(500).json({ error: "Erro ao obter a sala" });
   }
 });
 
@@ -1256,27 +1256,27 @@ app.get("/salas/:id", async (req, res) => {
  *             schema:
  *               $ref: '#/components/schemas/Sala'
  *       400:
- *         description: Dados invalidos
+ *         description: Dados inválidos
  *         content:
  *           application/json:
  *             schema:
  *               $ref: '#/components/schemas/Error'
  *             examples:
  *               camposObrigatorios:
- *                 summary: Campos obrigatorios em falta
+ *                 summary: Campos obrigatórios em falta
  *                 value:
- *                   error: 'nome, capacidade, equipamento e precoHora sao obrigatorios'
+ *                   error: 'O campo nome é obrigatório.'
  *       409:
- *         description: Nome ja existe
+ *         description: Nome já existe
  *         content:
  *           application/json:
  *             schema:
  *               $ref: '#/components/schemas/Error'
  *             examples:
  *               nomeDuplicado:
- *                 summary: Nome ja existente
+ *                 summary: Nome já existente
  *                 value:
- *                   error: 'Ja existe uma sala com o nome "Sala A".'
+ *                   error: 'Já existe uma sala com o nome "Sala A".'
  *       500:
  *         description: Erro interno
  *         content:
@@ -1297,9 +1297,9 @@ app.post("/salas", async (req, res) => {
     });
     return res.status(201).json(nova);
   } catch (error) {
-    console.error("Failed to create sala:", error);
+    console.error("Erro ao criar a sala:", error);
 
-    if (error.message?.startsWith("Ja existe uma sala com o nome")) {
+    if (error.message?.startsWith("Já existe uma sala com o nome")) {
       return res.status(409).json({ error: error.message });
     }
 
@@ -1335,18 +1335,18 @@ app.post("/salas", async (req, res) => {
  *             schema:
  *               $ref: '#/components/schemas/Sala'
  *       400:
- *         description: Dados invalidos
+ *         description: Dados inválidos
  *         content:
  *           application/json:
  *             schema:
  *               $ref: '#/components/schemas/Error'
  *             examples:
  *               camposObrigatorios:
- *                 summary: Campos obrigatorios em falta
+ *                 summary: Campos obrigatórios em falta
  *                 value:
- *                   error: 'nome, capacidade, equipamento e precoHora sao obrigatorios.'
+ *                   error: 'O campo nome é obrigatório.'
  *       404:
- *         description: Sala nao encontrada
+ *         description: Sala não encontrada
  *         content:
  *           application/json:
  *             schema:
@@ -1355,18 +1355,18 @@ app.post("/salas", async (req, res) => {
  *               naoEncontrada:
  *                 summary: Sem resultado para o id
  *                 value:
- *                   error: Sala nao encontrada
+ *                   error: Sala não encontrada
  *       409:
- *         description: Nome ja existe
+ *         description: Nome já existe
  *         content:
  *           application/json:
  *             schema:
  *               $ref: '#/components/schemas/Error'
  *             examples:
  *               nomeDuplicado:
- *                 summary: Nome ja existente
+ *                 summary: Nome já existente
  *                 value:
- *                   error: 'Ja existe uma sala com o nome "Sala A".'
+ *                   error: 'Já existe uma sala com o nome "Sala A".'
  *       500:
  *         description: Erro interno
  *         content:
@@ -1390,14 +1390,19 @@ app.put("/salas/:id", async (req, res) => {
     });
 
     if (!salaAtualizada) {
-      return res.status(404).json({ error: "Sala nao encontrada" });
+      return res.status(404).json({ error: "Sala não encontrada" });
     }
 
     return res.json(salaAtualizada);
   } catch (error) {
-    console.error("Failed to update sala:", error);
+    console.error("Erro ao atualizar a sala:", error);
 
-    if (error.message?.startsWith("Ja existe uma sala com o nome")) {
+    if (error.message?.startsWith("Já existe uma sala com o nome")) {
+      return res.status(409).json({ error: error.message });
+    }
+
+    // BET-485: 409 se algum dos serviços a desassociar tiver agendamentos futuros
+    if (error.code === "SERVICO_TEM_AGENDAMENTOS_FUTUROS") {
       return res.status(409).json({ error: error.message });
     }
 
@@ -1409,7 +1414,7 @@ app.put("/salas/:id", async (req, res) => {
  * @swagger
  * /salas/{id}:
  *   delete:
- *     summary: Remove (inativa) uma sala
+ *     summary: Elimina (inativa) uma sala (soft delete)
  *     tags: [Salas]
  *     parameters:
  *       - in: path
@@ -1434,7 +1439,7 @@ app.put("/salas/:id", async (req, res) => {
  *                   type: string
  *                   format: uuid
  *       404:
- *         description: Sala nao encontrada
+ *         description: Sala não encontrada
  *         content:
  *           application/json:
  *             schema:
@@ -1443,7 +1448,7 @@ app.put("/salas/:id", async (req, res) => {
  *               naoEncontrada:
  *                 summary: Sem resultado para o id
  *                 value:
- *                   error: Sala nao encontrada
+ *                   error: Sala não encontrada
  *       500:
  *         description: Erro interno
  *         content:
@@ -1457,21 +1462,42 @@ app.delete("/salas/:id", async (req, res) => {
   try {
     const result = await deleteSala(id);
     if (!result) {
-      return res.status(404).json({ error: "Sala nao encontrada" });
+      return res.status(404).json({ error: "Sala não encontrada" });
     }
 
     return res.json(result);
   } catch (error) {
-    console.error("Failed to delete sala:", error);
-    return res.status(500).json({ error: "Failed to delete sala" });
+    console.error("Erro ao eliminar a sala:", error);
+
+    // BET-180: 409 Conflict se a sala tiver agendamentos futuros
+    if (error.code === "SALA_TEM_AGENDAMENTOS_FUTUROS") {
+      return res.status(409).json({ error: error.message });
+    }
+
+    return res.status(500).json({ error: "Erro ao eliminar a sala" });
   }
 });
 
+// ════════════════════════════════════════════════════════════════════
+// Endpoints granulares de serviços por sala (POST / GET / DELETE)
+// ════════════════════════════════════════════════════════════════════
+//
+// Estas 3 rotas em /salas/:id/servicos gerem associações sala <-> serviço uma a uma (adicionar/remover/listar individualmente).
+//
+// No frontend optámos por gerir os serviços com checkboxes no próprio form de edição da sala — o admin marca/desmarca os serviços que quer
+// e clica "Atualizar Sala". Como a UI envia a lista COMPLETA do estado final, o caminho natural passou a ser o PUT /salas/:id (bulk), que
+// recebe todos os tipoServicoIds e faz deleteMany + createMany dentro de uma transação. Por isso, do ponto de vista da UI, estas rotas
+// granulares deixaram de fazer sentido — o form nunca precisa delas.
+//
+// Mantêm-se na API por estas razões:
+//  - testes de integração granulares (salas.api.test.js)
+//  - futuras UIs que precisem de gestão pontual (ex: botão "+ Serviço" que adicione apenas uma associação sem mexer nas outras)
+//  - implementam BET-484 (atualizar associações) e BET-483 (listar serviços associados a uma sala).
 /**
  * @swagger
  * /salas/{id}/servicos:
  *   post:
- *     summary: Associa um tipo de servico a uma sala
+ *     summary: Associa um tipo de serviço a uma sala
  *     tags: [Salas]
  *     parameters:
  *       - in: path
@@ -1495,41 +1521,41 @@ app.delete("/salas/:id", async (req, res) => {
  *                 example: '11111111-1111-1111-1111-111111111111'
  *     responses:
  *       201:
- *         description: Servico associado com sucesso
+ *         description: Serviço associado com sucesso
  *         content:
  *           application/json:
  *             schema:
  *               $ref: '#/components/schemas/SalaServico'
  *       400:
- *         description: Dados invalidos
+ *         description: Dados inválidos
  *         content:
  *           application/json:
  *             schema:
  *               $ref: '#/components/schemas/Error'
  *             examples:
  *               campoObrigatorio:
- *                 summary: Campo obrigatorio em falta
+ *                 summary: Campo obrigatório em falta
  *                 value:
- *                   error: 'tipoServicoId e obrigatorio'
+ *                   error: 'tipoServicoId é obrigatório'
  *               uuidInvalido:
- *                 summary: UUID invalido
+ *                 summary: UUID inválido
  *                 value:
- *                   error: 'tipoServicoId invalido. Deve ser um UUID valido.'
+ *                   error: 'tipoServicoId inválido. Deve ser um UUID valido.'
  *               naoEncontrado:
- *                 summary: Sala ou servico nao encontrado
+ *                 summary: Sala ou serviço não encontrado
  *                 value:
- *                   error: 'Sala nao encontrada.'
+ *                   error: 'Sala não encontrada.'
  *       409:
- *         description: Associacao ja existe
+ *         description: Associação já existe
  *         content:
  *           application/json:
  *             schema:
  *               $ref: '#/components/schemas/Error'
  *             examples:
  *               associacaoDuplicada:
- *                 summary: Servico ja associado
+ *                 summary: Serviço já associado
  *                 value:
- *                   error: 'Este servico ja esta associado a esta sala.'
+ *                   error: 'Este serviço já está associado a esta sala.'
  *       500:
  *         description: Erro interno
  *         content:
@@ -1541,15 +1567,15 @@ app.post("/salas/:id/servicos", async (req, res) => {
   const { id } = req.params;
   const { tipoServicoId } = req.body || {};
   if (!tipoServicoId) {
-    return res.status(400).json({ error: "tipoServicoId e obrigatorio" });
+    return res.status(400).json({ error: "tipoServicoId é obrigatório" });
   }
   try {
     const associacao = await addServicoToSala({ salaId: id, tipoServicoId });
     return res.status(201).json(associacao);
   } catch (error) {
-    console.error("Failed to add servico to sala:", error);
+    console.error("Erro ao associar serviço à sala:", error);
 
-    if (error.message?.startsWith("Este servico ja esta associado")) {
+    if (error.message?.startsWith("Este serviço já está associado")) {
       return res.status(409).json({ error: error.message });
     }
 
@@ -1561,7 +1587,7 @@ app.post("/salas/:id/servicos", async (req, res) => {
  * @swagger
  * /salas/{id}/servicos:
  *   get:
- *     summary: Lista os servicos associados a uma sala
+ *     summary: Lista os serviços associados a uma sala
  *     tags: [Salas]
  *     parameters:
  *       - in: path
@@ -1573,7 +1599,7 @@ app.post("/salas/:id/servicos", async (req, res) => {
  *         description: ID da sala
  *     responses:
  *       200:
- *         description: Lista de servicos da sala
+ *         description: Lista de serviços da sala
  *         content:
  *           application/json:
  *             schema:
@@ -1593,8 +1619,8 @@ app.get("/salas/:id/servicos", async (req, res) => {
     const servicos = await getServicosBySala(id);
     return res.json(servicos);
   } catch (error) {
-    console.error("Failed to fetch servicos da sala:", error);
-    return res.status(500).json({ error: "Failed to fetch servicos da sala" });
+    console.error("Erro ao obter os serviços da sala:", error);
+    return res.status(500).json({ error: "Erro ao obter os serviços da sala" });
   }
 });
 
@@ -1602,7 +1628,7 @@ app.get("/salas/:id/servicos", async (req, res) => {
  * @swagger
  * /salas/{id}/servicos/{servicoId}:
  *   delete:
- *     summary: Remove a associacao de um servico a uma sala
+ *     summary: Remove a associação de um serviço a uma sala
  *     tags: [Salas]
  *     parameters:
  *       - in: path
@@ -1618,10 +1644,10 @@ app.get("/salas/:id/servicos", async (req, res) => {
  *         schema:
  *           type: string
  *           format: uuid
- *         description: ID do tipo de servico
+ *         description: ID do tipo de serviço
  *     responses:
  *       200:
- *         description: Associacao removida com sucesso
+ *         description: Associação removida com sucesso
  *         content:
  *           application/json:
  *             schema:
@@ -1631,16 +1657,16 @@ app.get("/salas/:id/servicos", async (req, res) => {
  *                   type: boolean
  *                   example: true
  *       404:
- *         description: Associacao nao encontrada
+ *         description: Associaçõo não encontrada
  *         content:
  *           application/json:
  *             schema:
  *               $ref: '#/components/schemas/Error'
  *             examples:
  *               naoEncontrada:
- *                 summary: Associacao inexistente
+ *                 summary: Associação inexistente
  *                 value:
- *                   error: 'Associacao nao encontrada.'
+ *                   error: 'Associação não encontrada.'
  *       500:
  *         description: Erro interno
  *         content:
@@ -1657,9 +1683,13 @@ app.delete("/salas/:id/servicos/:servicoId", async (req, res) => {
     });
     return res.json(result);
   } catch (error) {
-    console.error("Failed to remove servico from sala:", error);
-    if (error.message?.startsWith("Associacao nao encontrada")) {
+    console.error("Erro ao remover serviço da sala:", error);
+    if (error.message?.startsWith("Associação não encontrada")) {
       return res.status(404).json({ error: error.message });
+    }
+    // BET-485: 409 se houver agendamentos futuros para esta combinação sala+serviço
+    if (error.code === "SERVICO_TEM_AGENDAMENTOS_FUTUROS") {
+      return res.status(409).json({ error: error.message });
     }
     return res.status(500).json({ error: error.message });
   }

@@ -146,8 +146,9 @@ const options = {
           required: ['nome', 'capacidade', 'equipamento', 'precoHora'],
           properties: {
             id: {
-              type: 'integer',
-              example: 1,
+              type: 'string',
+              format: 'uuid',
+              example: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
             },
             nome: {
               type: 'string',
@@ -180,6 +181,25 @@ const options = {
               format: 'date-time',
               example: '2025-01-15T10:00:00Z',
             },
+            servicos: {
+              type: 'array',
+              description: 'Tipos de serviço associados a esta sala (preenchido em todas as queries de sala).',
+              items: {
+                type: 'object',
+                properties: {
+                  tipoServicoId: {
+                    type: 'string',
+                    format: 'uuid',
+                  },
+                  tipo: {
+                    $ref: '#/components/schemas/TipoServicoEnum',
+                  },
+                  ativo: {
+                    type: 'boolean',
+                  },
+                },
+              },
+            },
           },
         },
 
@@ -210,11 +230,16 @@ const options = {
                 type: 'string',
                 format: 'uuid',
               },
-              description: 'IDs dos tipos de servico associados a esta sala. Obrigatorio ter pelo menos um.',
+              description: 'IDs dos tipos de serviço associados a esta sala. Obrigatório ter pelo menos um.',
               example: [
                 '11111111-1111-1111-1111-111111111111',
                 '22222222-2222-2222-2222-222222222222',
               ],
+            },
+            ativo: {
+              type: 'boolean',
+              description: 'Opcional, só relevante em PUT. Permite reativar uma sala inativa (ativo: true). Ignorado em POST.',
+              example: true,
             },
           },
         },
@@ -224,16 +249,19 @@ const options = {
           description: 'Associação entre uma sala e um tipo de serviço',
           properties: {
             id: {
-              type: 'integer',
-              example: 1,
+              type: 'string',
+              format: 'uuid',
+              example: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
             },
             salaId: {
-              type: 'integer',
-              example: 1,
+              type: 'string',
+              format: 'uuid',
+              example: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
             },
             tipoServicoId: {
-              type: 'integer',
-              example: 2,
+              type: 'string',
+              format: 'uuid',
+              example: '11111111-1111-1111-1111-111111111111',
             },
             dataAssociacao: {
               type: 'string',

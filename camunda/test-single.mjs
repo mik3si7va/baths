@@ -420,13 +420,13 @@ async function processarTasks(processInstanceId, dados) {
                     break;
 
                 case 'Funcionário indica data e hora preferida': {
-                    let dataPreferida = new Date('2026-04-29T17:00:00');
+                    let dataPreferida = new Date('2026-06-15T09:00:00');
                     while (dataPreferida.getDay() === 0) {
                         dataPreferida = addDays(dataPreferida, 1);
                     }
                     variables = {
                         dataPreferida: dataPreferida.toISOString(),
-                        horaPreferida: '17:00',
+                        horaPreferida: '09:00',
                         operacaoBemSucedida: true
                     };
                     console.log(`   → Definir data preferida: ${format(dataPreferida, 'dd/MM/yyyy HH:mm:ss')}`);
@@ -616,8 +616,8 @@ async function iniciarGestaoAgendamento(agendamentoId, dados) {
     const response = await request(`${CAMUNDA_API}/process-definition/key/gestao_agendamento/start`, 'POST', {
         variables: {
             agendamentoId: { value: agendamentoId, type: 'string' },
-            clienteEmail:  { value: dados.clienteEmail, type: 'string' },
-            nomeCliente:   { value: dados.nomeCliente, type: 'string' },
+            clienteEmail: { value: dados.clienteEmail, type: 'string' },
+            nomeCliente: { value: dados.nomeCliente, type: 'string' },
         }
     });
 
@@ -727,7 +727,7 @@ async function processarTasksGestao(processId) {
                     break;
 
                 case 'Funcionário indica data e hora preferida': {
-                    const dataReagendar = new Date('2026-04-30T17:00:00');
+                    const dataReagendar = new Date('2026-06-16T09:00:00');
                     variables = {
                         dataPreferida: dataReagendar.toISOString(),
                         horaPreferida: '17:00',
