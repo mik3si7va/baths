@@ -22,13 +22,34 @@ Pensa nisto como o chassis do projeto: rotas, autenticação fake, layout base e
 O projeto corre por defeito em:
 👉 http://localhost:3000
 
-## 🔐 Login (modo desenvolvimento)
+## Login (modo desenvolvimento)
 
-Este projeto usa autenticação temporária apenas para efeitos de desenvolvimento, com os seguintes credenciais:
-- Username: admin
-- Password: password
+Depois de correr o seed (`cd backend && npm run db:seed`), ficam disponiveis duas contas standard:
 
-Após login o utilizador é redirecionado para /home e o estado de autenticação é guardado em localStorage
+| Tipo | Email | Password |
+| --- | --- | --- |
+| Administrador | `admin@bet.com` | `Admin123!` |
+| Funcionario | `funcionario@bet.com` | `Funcionario123!` |
+
+Apos login o utilizador e redirecionado para `/home` e a sessao fica guardada em `localStorage`.
+
+## Email de convites
+
+Ao gerar um convite em `/contas`, o backend cria um token de definicao de palavra-passe e tenta enviar email ao funcionario.
+
+Configuracao no `backend/.env`:
+
+```env
+DISABLE_EMAILS=true
+MAIL_HOST=sandbox.smtp.mailtrap.io
+MAIL_PORT=2525
+MAIL_USER=...
+MAIL_PASS=...
+MAIL_FROM=noreply@bet.pt
+FRONTEND_BASE_URL=http://localhost:3000
+```
+
+Em desenvolvimento, se `DISABLE_EMAILS=true`, o email nao e enviado e o link continua a aparecer na pagina para testes. Para enviar pelo Mailtrap/SMTP, muda para `DISABLE_EMAILS=false` e reinicia o backend.
 
 ## 🧭 Estrutura geral do projeto
 ```

@@ -1,23 +1,46 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Box, Button, TextField, Typography, Link, Paper } from '@mui/material';
+import { Alert, Box, Button, CircularProgress, Link, Paper, TextField, Typography } from '@mui/material';
 import { useThemeContext } from '../../contexts/ThemeContext';
 import dogs from '../../assets/login_dogs.jpg';
 
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
 
 export default function LoginPage() {
     const { colors } = useThemeContext();
-    const [username, setUsername] = useState('');
+    const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
+    const [erro, setErro] = useState('');
+    const [loading, setLoading] = useState(false);
     const navigate = useNavigate();
 
-    const handleLogin = (e) => {
+    const handleLogin = async (e) => {
         e.preventDefault();
-        if (username === 'admin' && password === 'password') {
-            localStorage.setItem('usernameB&T', username);
+        setErro('');
+        setLoading(true);
+
+        try {
+            const response = await fetch(`${API_BASE_URL}/auth/login`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    email: email.trim().toLowerCase(),
+                    password,
+                }),
+            });
+
+            const body = await response.json();
+            if (!response.ok) {
+                throw new Error(body.error || 'Credenciais invalidas');
+            }
+
+            localStorage.setItem('btUser', JSON.stringify(body.user));
+            localStorage.setItem('usernameB&T', body.user.email);
             navigate('/home', { replace: true });
-        } else {
-            alert('Credenciais inválidas');
+        } catch (error) {
+            setErro(error.message || 'Credenciais invalidas');
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -35,11 +58,10 @@ export default function LoginPage() {
                 overflow: 'hidden',
                 backgroundColor: colors.background,
             }}>
-                {/* Cabeçalho com imagem */}
                 <Box sx={{ position: 'relative', height: 180, overflow: 'hidden' }}>
                     <img
                         src={dogs}
-                        alt="Cães"
+                        alt="Caes"
                         style={{
                             width: '100%',
                             height: '100%',
@@ -49,7 +71,6 @@ export default function LoginPage() {
                     />
                 </Box>
 
-                {/* Formulário */}
                 <Box
                     component="form"
                     onSubmit={handleLogin}
@@ -66,13 +87,16 @@ export default function LoginPage() {
                         color: colors.text,
                         fontFamily: '"Bubblegum Sans", cursive',
                     }}>
-                        O sucesso da B&T é escrito com o talento e dedicação de cada um de vocês.
+                        O sucesso da B&T e escrito com o talento e dedicacao de cada um de voces.
                     </Typography>
 
+                    {erro && <Alert severity="error">{erro}</Alert>}
+
                     <TextField
-                        label="Username"
-                        value={username}
-                        onChange={(e) => setUsername(e.target.value)}
+                        label="Email"
+                        type="email"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
                         required
                         fullWidth
                         sx={{ backgroundColor: colors.white, borderRadius: 1 }}
@@ -100,9 +124,10 @@ export default function LoginPage() {
                         type="submit"
                         variant="contained"
                         fullWidth
+                        disabled={loading}
                         sx={{ py: 1.5, fontSize: '15px', fontWeight: 600 }}
                     >
-                        Login
+                        {loading ? <CircularProgress size={24} sx={{ color: colors.white }} /> : 'Login'}
                     </Button>
                 </Box>
             </Paper>

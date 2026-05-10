@@ -13,11 +13,21 @@ import SearchIcon from "@mui/icons-material/Search";
 import PaymentIcon from "@mui/icons-material/Payment";
 import ContentCutIcon from "@mui/icons-material/ContentCut";
 import ShoppingCartIcon from "@mui/icons-material/ShoppingCart";
+import ManageAccountsIcon from "@mui/icons-material/ManageAccounts";
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || "http://localhost:5000";
 
+function getStoredUser() {
+  try {
+    return JSON.parse(localStorage.getItem("btUser") || "null");
+  } catch (_error) {
+    return null;
+  }
+}
+
 export default function Home() {
   const { colors } = useThemeContext();
+  const [user] = useState(() => getStoredUser());
   const [stats, setStats] = useState({
     totalClientes: 0,
     totalAnimais: 0,
@@ -25,6 +35,7 @@ export default function Home() {
     totalSalas: 0,
   });
   const [loading, setLoading] = useState(true);
+  const isAdmin = user?.tipoConta === "ADMIN";
 
   useEffect(() => {
     const fetchStats = async () => {
@@ -134,6 +145,16 @@ export default function Home() {
       width: 328,
     },
     {
+      title: "Contas",
+      description: "Ativar, desativar e preparar acessos ao backoffice.",
+      icon: ManageAccountsIcon,
+      buttonText: "Gerir",
+      buttonIcon: ManageAccountsIcon,
+      href: "/contas",
+      height: 180,
+      width: 328,
+    },
+    {
       title: "Salas",
       description: "Criar e gerir salas, equipamentos, serviços e preço.",
       icon: MeetingRoomIcon,
@@ -144,6 +165,11 @@ export default function Home() {
       width: 328,
     },
   ];
+  const visibleQuickAcessCardsData = isAdmin
+    ? quickAcessCardsData
+    : quickAcessCardsData.filter(
+        (card) => !["/servicos", "/funcionarios", "/contas", "/salas"].includes(card.href),
+      );
 
   return (
     <>
@@ -186,7 +212,7 @@ export default function Home() {
           justifyContent: "flex-start",
         }}
       >
-        {quickAcessCardsData.map((card, index) => (
+        {visibleQuickAcessCardsData.map((card, index) => (
           <QuickAcessCard
             key={index}
             title={card.title}

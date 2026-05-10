@@ -421,7 +421,7 @@ async function deleteFuncionario(id) {
     });
   } catch (error) {
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2003') {
-      throw new Error('Nao e possivel eliminar este funcionario porque existem registos associados.');
+      throw new Error('Nao e possivel eliminar este funcionario porque existem registos associados.', { cause: error });
     }
 
     throw error;
@@ -441,13 +441,14 @@ async function setFuncionarioAtivo(id, ativo) {
   }
 
   const funcionario = await prisma.$transaction(async (tx) => {
-    await tx.utilizador.update({
-      where: { id },
-      data: {
-        ativo,
-        estadoConta: ativo ? 'ATIVA' : 'INATIVA',
-      },
-    });
+      await tx.utilizador.update({
+        where: { id },
+        data: {
+          ativo,
+          estadoConta: ativo ? 'ATIVA' : 'INATIVA',
+          ...(ativo ? {} : { passwordHash: null }),
+        },
+      });
 
     await tx.horarioTrabalho.updateMany({
       where: { funcionarioId: id },

@@ -207,9 +207,20 @@ describe('API Funcionarios - Testes de Endpoint', () => {
     expect(created.status).toBe(201);
     createdEmails.push(email);
 
+    await prisma.utilizador.update({
+      where: { id: created.body.id },
+      data: { passwordHash: 'hash-teste' },
+    });
+
     const disabled = await request(app).patch(`/funcionarios/${created.body.id}/ativo`).send({ ativo: false });
     expect(disabled.status).toBe(200);
     expect(disabled.body.ativo).toBe(false);
+
+    const utilizadorDesativado = await prisma.utilizador.findUnique({
+      where: { id: created.body.id },
+      select: { passwordHash: true },
+    });
+    expect(utilizadorDesativado.passwordHash).toBeNull();
 
     const enabled = await request(app).patch(`/funcionarios/${created.body.id}/ativo`).send({ ativo: true });
     expect(enabled.status).toBe(200);
