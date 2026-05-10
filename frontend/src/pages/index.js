@@ -3,5 +3,5 @@ export { default as Login } from './login/login';
 export { default as Calendar } from './calendar/calendar';
 export { default as Salas } from './salas/salas';
 export { default as SalaDetalhes } from './salas/salaDetalhes';
-export { default as Users } from './admin/manageUsers/users';
+export { default as Funcionarios } from './admin/manageUsers/funcionarios';
 export { default as Pesquisa } from './pesquisa/pesquisa';

@@ -9,7 +9,7 @@ import {
   Login,
   Salas,
   SalaDetalhes,
-  Users,
+  Funcionarios,
   Pesquisa,
 } from "./pages";
 import App from "./App";
@@ -119,7 +119,7 @@ export default function AppRoutes() {
             <PrivateRoute
               element={
                 <CompactLayout>
-                  <Users />
+                  <Funcionarios />
                 </CompactLayout>
               }
             />

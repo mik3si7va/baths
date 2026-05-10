@@ -33,7 +33,11 @@ const {
   createFuncionario,
   updateFuncionario,
   deleteFuncionario,
+  setFuncionarioAtivo,
 } = require("./repositories/repositorioFuncionarios");
+const TipoFuncionarioEnum = require("./domain/enums/TipoFuncionarioEnum");
+const PorteEnum = require("./domain/enums/PorteEnum");
+const DiaSemanaEnum = require("./domain/enums/DiaSemanaEnum");
 const {
   getAllClientes,
   getClienteById,
@@ -1727,6 +1731,14 @@ app.get("/funcionarios", async (_req, res) => {
   }
 });
 
+app.get("/funcionarios/opcoes", (_req, res) => {
+  return res.json({
+    cargos: Object.values(TipoFuncionarioEnum),
+    portes: Object.values(PorteEnum),
+    diasSemana: Object.values(DiaSemanaEnum),
+  });
+});
+
 /**
  * @swagger
  * /funcionarios/{id}:
@@ -1994,6 +2006,28 @@ app.put("/funcionarios/:id", async (req, res) => {
   }
 });
 
+app.patch("/funcionarios/:id/ativo", async (req, res) => {
+  const { id } = req.params;
+  const { ativo } = req.body || {};
+
+  if (typeof ativo !== "boolean") {
+    return res.status(400).json({ error: "ativo deve ser booleano" });
+  }
+
+  try {
+    const funcionarioAtualizado = await setFuncionarioAtivo(id, ativo);
+
+    if (!funcionarioAtualizado) {
+      return res.status(404).json({ error: "Funcionario nao encontrado" });
+    }
+
+    return res.json(funcionarioAtualizado);
+  } catch (error) {
+    console.error("Failed to update funcionario active status:", error);
+    return res.status(400).json({ error: error.message });
+  }
+});
+
 /**
  * @swagger
  * /funcionarios/{id}:
@@ -2052,7 +2086,7 @@ app.delete("/funcionarios/:id", async (req, res) => {
     return res.json(result);
   } catch (error) {
     console.error("Failed to delete funcionario:", error);
-    return res.status(500).json({ error: "Failed to delete funcionario" });
+    return res.status(400).json({ error: error.message || "Failed to delete funcionario" });
   }
 });
 
