@@ -118,6 +118,52 @@ describe("API Auth", () => {
     expect(res.body.error).toBe("Conta inativa ou sem acesso.");
   });
 
+  test("POST /auth/recuperar-password gera token para funcionario ativo", async () => {
+    const email = uniqueEmail("auth.recuperar.password");
+    createdEmails.push(email);
+    const funcionario = await createFuncionario(email);
+
+    await prisma.utilizador.update({
+      where: { id: funcionario.id },
+      data: {
+        estadoConta: "ATIVA",
+        ativo: true,
+        passwordHash: await bcrypt.hash("Password123", 10),
+      },
+    });
+
+    const res = await request(app)
+      .post("/auth/recuperar-password")
+      .send({ email: email.toUpperCase() });
+
+    expect(res.status).toBe(200);
+    expect(res.body.requested).toBe(true);
+    expect(res.body.definirPasswordUrl).toContain("/definir-password?token=");
+    expect(res.body.email).toEqual(
+      expect.objectContaining({
+        sent: false,
+        skipped: true,
+      }),
+    );
+
+    const tokens = await prisma.passwordResetToken.findMany({
+      where: { utilizadorId: funcionario.id, usedAt: null },
+    });
+    expect(tokens).toHaveLength(1);
+  });
+
+  test("POST /auth/recuperar-password nao revela email inexistente", async () => {
+    const res = await request(app)
+      .post("/auth/recuperar-password")
+      .send({ email: uniqueEmail("auth.recuperar.inexistente") });
+
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({
+      requested: true,
+      emailSent: false,
+    });
+  });
+
   test("POST /auth/definir-password define password com token valido", async () => {
     const email = uniqueEmail("auth.definir.password");
     createdEmails.push(email);

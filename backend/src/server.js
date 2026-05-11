@@ -59,6 +59,7 @@ const {
 } = require("./repositories/repositorioContas");
 const {
   loginUtilizador,
+  solicitarRecuperacaoPassword,
   definirPasswordComToken,
 } = require("./repositories/repositorioAuth");
 const {
@@ -93,6 +94,15 @@ app.post("/auth/login", async (req, res) => {
 
     console.error("Failed to login:", error);
     return res.status(500).json({ error: "Failed to login" });
+  }
+});
+
+app.post("/auth/recuperar-password", async (req, res) => {
+  try {
+    const result = await solicitarRecuperacaoPassword(req.body || {});
+    return res.json(result);
+  } catch (error) {
+    return res.status(400).json({ error: error.message });
   }
 });
 

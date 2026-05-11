@@ -1,8 +1,10 @@
 const bcrypt = require("bcrypt");
-const { createHash } = require("node:crypto");
+const { createHash, randomBytes } = require("node:crypto");
 const { prisma } = require("../db/prismaClient");
+const { enviarRecuperacaoPassword } = require("../services/emailService");
 
 const BCRYPT_ROUNDS = 10;
+const TOKEN_TTL_HOURS = 24;
 
 function tipoContaFromFuncionario(funcionario) {
   return funcionario?.cargo === "ADMINISTRACAO" ? "ADMIN" : "FUNCIONARIO";
@@ -10,6 +12,11 @@ function tipoContaFromFuncionario(funcionario) {
 
 function hashToken(token) {
   return createHash("sha256").update(token).digest("hex");
+}
+
+function buildDefinirPasswordUrl(token) {
+  const frontendBaseUrl = process.env.FRONTEND_BASE_URL || "http://localhost:3000";
+  return `${frontendBaseUrl.replace(/\/$/, "")}/definir-password?token=${encodeURIComponent(token)}`;
 }
 
 async function loginUtilizador({ email, password }) {
@@ -46,6 +53,66 @@ async function loginUtilizador({ email, password }) {
     estadoConta: utilizador.estadoConta,
     tipoConta: utilizador.funcionario ? tipoContaFromFuncionario(utilizador.funcionario) : "CLIENTE",
     cargo: utilizador.funcionario?.cargo || null,
+  };
+}
+
+async function solicitarRecuperacaoPassword({ email }) {
+  if (!email || !String(email).trim()) {
+    throw new Error("Email e obrigatorio.");
+  }
+
+  const normalizedEmail = String(email).trim().toLowerCase();
+  const utilizador = await prisma.utilizador.findUnique({
+    where: { email: normalizedEmail },
+    include: { funcionario: true },
+  });
+
+  if (!utilizador || !utilizador.funcionario || !utilizador.ativo || utilizador.estadoConta !== "ATIVA") {
+    return {
+      requested: true,
+      emailSent: false,
+    };
+  }
+
+  const token = randomBytes(32).toString("base64url");
+  const expiresAt = new Date(Date.now() + TOKEN_TTL_HOURS * 60 * 60 * 1000);
+
+  await prisma.$transaction(async (tx) => {
+    await tx.passwordResetToken.updateMany({
+      where: {
+        utilizadorId: utilizador.id,
+        usedAt: null,
+      },
+      data: { usedAt: new Date() },
+    });
+
+    await tx.passwordResetToken.create({
+      data: {
+        utilizadorId: utilizador.id,
+        tokenHash: hashToken(token),
+        expiresAt,
+      },
+    });
+  });
+
+  const definirPasswordUrl = buildDefinirPasswordUrl(token);
+  const emailResult = await enviarRecuperacaoPassword({
+    to: utilizador.email,
+    nome: utilizador.nome,
+    definirPasswordUrl,
+    expiresAt,
+  });
+
+  return {
+    requested: true,
+    emailSent: Boolean(emailResult.sent),
+    expiresAt,
+    ...(process.env.NODE_ENV === "test"
+      ? {
+          definirPasswordUrl,
+          email: emailResult,
+        }
+      : {}),
   };
 }
 
@@ -108,5 +175,6 @@ async function definirPasswordComToken({ token, novaPassword, confirmarPassword 
 
 module.exports = {
   loginUtilizador,
+  solicitarRecuperacaoPassword,
   definirPasswordComToken,
 };

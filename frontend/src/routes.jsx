@@ -7,6 +7,7 @@ import {
   Home,
   Calendar,
   Login,
+  RecuperarPassword,
   DefinirPassword,
   Salas,
   SalaDetalhes,
@@ -171,6 +172,7 @@ export default function AppRoutes() {
           }
         />
         <Route path="/login" element={<PublicLoginRoute />} />
+        <Route path="/recuperar-password" element={<RecuperarPassword />} />
         <Route path="/definir-password" element={<DefinirPassword />} />
       </Routes>
     </BrowserRouter>
