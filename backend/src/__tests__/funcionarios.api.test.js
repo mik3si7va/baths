@@ -122,6 +122,27 @@ describe('API Funcionarios - Testes de Endpoint', () => {
     expect(Array.isArray(res.body)).toBe(true);
   });
 
+  test('GET /funcionarios/opcoes devolve cargos, portes e dias da semana', async () => {
+    const res = await request(app).get('/funcionarios/opcoes');
+
+    expect(res.status).toBe(200);
+    expect(res.body.cargos).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ value: 'BANHISTA' }),
+      ]),
+    );
+    expect(res.body.portes).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ value: 'MEDIO' }),
+      ]),
+    );
+    expect(res.body.diasSemana).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ value: 'TERCA' }),
+      ]),
+    );
+  });
+
   test('PUT /funcionarios/{id} atualiza funcionario com 200', async () => {
     const email = uniqueEmail('api.funcionario.update.base');
     const novoEmail = uniqueEmail('api.funcionario.update.novo');
@@ -165,7 +186,48 @@ describe('API Funcionarios - Testes de Endpoint', () => {
     expect(updated.body.email).toBe(novoEmail);
   });
 
-  test('DELETE /funcionarios/{id} faz soft delete com 200', async () => {
+  test('PATCH /funcionarios/{id}/ativo ativa e desativa funcionario com 200', async () => {
+    const email = uniqueEmail('api.funcionario.ativo');
+
+    const createPayload = {
+      nomeCompleto: 'API Funcionario Para Ativo',
+      cargo: 'BANHISTA',
+      telefone: '955555556',
+      email,
+      porteAnimais: ['MEDIO'],
+      tipoServicoIds: [],
+      horario: {
+        diasSemana: ['SEGUNDA', 'TERCA'],
+        horaInicio: '09:00',
+        horaFim: '18:00',
+      },
+    };
+
+    const created = await request(app).post('/funcionarios').send(createPayload);
+    expect(created.status).toBe(201);
+    createdEmails.push(email);
+
+    await prisma.utilizador.update({
+      where: { id: created.body.id },
+      data: { passwordHash: 'hash-teste' },
+    });
+
+    const disabled = await request(app).patch(`/funcionarios/${created.body.id}/ativo`).send({ ativo: false });
+    expect(disabled.status).toBe(200);
+    expect(disabled.body.ativo).toBe(false);
+
+    const utilizadorDesativado = await prisma.utilizador.findUnique({
+      where: { id: created.body.id },
+      select: { passwordHash: true },
+    });
+    expect(utilizadorDesativado.passwordHash).toBeNull();
+
+    const enabled = await request(app).patch(`/funcionarios/${created.body.id}/ativo`).send({ ativo: true });
+    expect(enabled.status).toBe(200);
+    expect(enabled.body.ativo).toBe(true);
+  });
+
+  test('DELETE /funcionarios/{id} elimina funcionario com 200', async () => {
     const email = uniqueEmail('api.funcionario.delete');
 
     const createPayload = {
@@ -191,7 +253,6 @@ describe('API Funcionarios - Testes de Endpoint', () => {
     expect(deleted.body.removed).toBe(true);
 
     const fetched = await request(app).get(`/funcionarios/${created.body.id}`);
-    expect(fetched.status).toBe(200);
-    expect(fetched.body.ativo).toBe(false);
+    expect(fetched.status).toBe(404);
   });
 });

@@ -91,6 +91,22 @@ const useMatch = () => null;
 const useSearchParams = () => [new URLSearchParams(), jest.fn()];
 
 // Components
+const BrowserRouter = ({ children }) =>
+    React.createElement(MemoryRouter, {
+        initialEntries: [window.location.pathname + window.location.search],
+        children,
+    });
+
+const Navigate = ({ to }) => {
+    React.useEffect(() => {
+        if (setCurrentPath) {
+            currentPath = to;
+            setCurrentPath(to);
+        }
+    }, [to]);
+    return null;
+};
+
 const Link = ({ children, to }) =>
     React.createElement('a', { href: to }, children);
 
@@ -101,9 +117,11 @@ const Outlet = () => null;
 
 // Export
 module.exports = {
+    BrowserRouter,
     MemoryRouter,
     Routes,
     Route,
+    Navigate,
     Link,
     NavLink,
     Outlet,
