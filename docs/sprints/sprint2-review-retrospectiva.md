@@ -1,4 +1,4 @@
-# Sprint 2 — Review e Retrospectiva
+# Sprint 2 - Review e Retrospectiva
 **Data:** 11 março 2026
 **Participantes:** Ariadna, Gonçalo, Miguel, Catarina
 
@@ -13,10 +13,10 @@
 
 
 ### O que não foi 
-- BET-496 — Migração Prisma — movida para Sprint 3
-- BET-38 — Criar Funcionário — movida para Sprint 3
-- BET-422 — Associar Funcionários — movida para Sprint 3
-- BET-31 — Criar Cliente — movida para Sprint 3
+- BET-496 - Migração Prisma - movida para Sprint 3
+- BET-38 - Criar Funcionário - movida para Sprint 3
+- BET-422 - Associar Funcionários - movida para Sprint 3
+- BET-31 - Criar Cliente - movida para Sprint 3
 
 
 ### Velocidade do sprint
@@ -24,9 +24,9 @@
 - Concluído: US incompletas
 
 ### Demonstração
-- API de serviços testada com Postman — GET, POST funcionais
-- API de salas testada com Thunder Client — GET, POST funcionais
-- API de associação salas-serviços — GET, POST, DELETE funcionais
+- API de serviços testada com Postman - GET, POST funcionais
+- API de salas testada com Thunder Client - GET, POST funcionais
+- API de associação salas-serviços - GET, POST, DELETE funcionais
 
 ---
 
@@ -40,7 +40,7 @@
 - Sprint a incluir US com dependências
 - Branch criada a partir de outra branch em vez da main, como resultado de US dependentes distribuídas entre diferentes membros da equipa
 - Migração para Prisma identificada tarde
-- Frontend não iniciado — sem interface visual para demonstrar
+- Frontend não iniciado - sem interface visual para demonstrar
 
 ### O que vamos melhorar no Sprint 3
 - Migração Prisma como primeira prioridade
