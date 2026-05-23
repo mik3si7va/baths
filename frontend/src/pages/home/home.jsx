@@ -13,6 +13,10 @@ import SearchIcon from "@mui/icons-material/Search";
 import PaymentIcon from "@mui/icons-material/Payment";
 import ContentCutIcon from "@mui/icons-material/ContentCut";
 import ShoppingCartIcon from "@mui/icons-material/ShoppingCart";
+import EventAvailableIcon from "@mui/icons-material/EventAvailable";
+import HourglassBottomIcon from "@mui/icons-material/HourglassBottom";
+import TaskAltIcon from "@mui/icons-material/TaskAlt";
+import EventBusyIcon from "@mui/icons-material/EventBusy";
 import ManageAccountsIcon from "@mui/icons-material/ManageAccounts";
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || "http://localhost:5000";
@@ -33,6 +37,10 @@ export default function Home() {
     totalAnimais: 0,
     totalFuncionarios: 0,
     totalSalas: 0,
+    agendConfirmados: 0,
+    agendEmAtendimento: 0,
+    agendConcluidos: 0,
+    agendNaoCompareceuOuCancelados: 0,
   });
   const [loading, setLoading] = useState(true);
   const isAdmin = user?.tipoConta === "ADMIN";
@@ -40,29 +48,55 @@ export default function Home() {
   useEffect(() => {
     const fetchStats = async () => {
       try {
-        // Fetch clientes e contar animais
-        const clientesRes = await fetch(`${API_BASE_URL}/clientes`);
-        const clientes = await clientesRes.json();
+        // Janela do dia de hoje em ISO local (00:00 -> 23:59:59.999)
+        const inicioDia = new Date();
+        inicioDia.setHours(0, 0, 0, 0);
+        const fimDia = new Date();
+        fimDia.setHours(23, 59, 59, 999);
+
+        const [clientesRes, funcionariosRes, salasRes, agendamentosRes] = await Promise.all([
+          fetch(`${API_BASE_URL}/clientes`),
+          fetch(`${API_BASE_URL}/funcionarios`),
+          fetch(`${API_BASE_URL}/salas`),
+          fetch(
+            `${API_BASE_URL}/agendamentos?dataFrom=${inicioDia.toISOString()}&dataTo=${fimDia.toISOString()}`,
+          ),
+        ]);
+
+        const [clientes, funcionarios, salas, agendamentosHoje] = await Promise.all([
+          clientesRes.json(),
+          funcionariosRes.json(),
+          salasRes.json(),
+          agendamentosRes.json(),
+        ]);
+
         const totalClientes = Array.isArray(clientes) ? clientes.length : 0;
         const totalAnimais = Array.isArray(clientes)
           ? clientes.reduce((acc, cliente) => acc + (cliente.animais?.length || 0), 0)
           : 0;
 
-        // Fetch funcionarios
-        const funcionariosRes = await fetch(`${API_BASE_URL}/funcionarios`);
-        const funcionarios = await funcionariosRes.json();
-        const totalFuncionarios = Array.isArray(funcionarios) ? funcionarios.length : 0;
-
-        // Fetch salas
-        const salasRes = await fetch(`${API_BASE_URL}/salas`);
-        const salas = await salasRes.json();
+        // getAllFuncionarios não filtra por estado da conta — descartamos inactivos no cliente para ficar consistente com a contagem de Clientes/Salas (que já filtram no backend).
+        const totalFuncionarios = Array.isArray(funcionarios)
+          ? funcionarios.filter((f) => f.ativo).length
+          : 0;
         const totalSalas = Array.isArray(salas) ? salas.length : 0;
+
+        const lista = Array.isArray(agendamentosHoje) ? agendamentosHoje : [];
+        const porEstado = lista.reduce((acc, a) => {
+          acc[a.estado] = (acc[a.estado] || 0) + 1;
+          return acc;
+        }, {});
 
         setStats({
           totalClientes,
           totalAnimais,
           totalFuncionarios,
           totalSalas,
+          agendConfirmados: porEstado.CONFIRMADO || 0,
+          agendEmAtendimento: porEstado.EM_ATENDIMENTO || 0,
+          agendConcluidos: porEstado.CONCLUIDO || 0,
+          agendNaoCompareceuOuCancelados:
+            (porEstado.NAO_COMPARECEU || 0) + (porEstado.CANCELADO || 0),
         });
       } catch (error) {
         console.error("Erro ao buscar estatísticas:", error);
@@ -74,28 +108,37 @@ export default function Home() {
     fetchStats();
   }, []);
 
-  // Dados dos cards
+  // Cards da secção "Hoje" — agendamentos do dia agrupados por estado
+  const agendamentosHojeCards = [
+    { icon: EventAvailableIcon, label: "Confirmados", value: stats.agendConfirmados },
+    { icon: HourglassBottomIcon, label: "Em Atendimento", value: stats.agendEmAtendimento },
+    { icon: TaskAltIcon, label: "Concluídos", value: stats.agendConcluidos },
+    // Camcelados + Não comapreceu
+    { icon: EventBusyIcon, label: "Cancelados", value: stats.agendNaoCompareceuOuCancelados },
+  ];
+
+  // Cards da secção "Visão geral" — totais da clínica
   const cardData = [
-    { icon: PeopleIcon, label: "Clientes", height: 80, width: 238, value: stats.totalClientes },
-    { icon: PetsIcon, label: "Animais", height: 80, width: 238, value: stats.totalAnimais },
-    { icon: BadgeIcon, label: "Funcionários", height: 80, width: 238, value: stats.totalFuncionarios },
-    { icon: MeetingRoomIcon, label: "Salas", height: 80, width: 238, value: stats.totalSalas },
+    { icon: PeopleIcon, label: "Clientes", value: stats.totalClientes },
+    { icon: PetsIcon, label: "Animais", value: stats.totalAnimais },
+    { icon: BadgeIcon, label: "Funcionários", value: stats.totalFuncionarios },
+    { icon: MeetingRoomIcon, label: "Salas", value: stats.totalSalas },
   ];
 
   // Dados dos cards de acesso rápido (Quick Acess Cards)
   const quickAcessCardsData = [
     {
-      title: "Nova Consulta",
-      description: "Agendar uma nova consulta para um cliente.",
+      title: "Novo Agendamento",
+      description: "Registar um agendamento para um cliente novo.",
       icon: AddIcon,
       buttonText: "Agendar",
       buttonIcon: CalendarMonthIcon,
-      href: "/calendar/new",
+      href: "/agendamentos/novo",
       height: 180,
       width: 328,
     },
     {
-      title: "Pesquisar Clientes e Animais",
+      title: "Pesquisar Clientes",
       description: "Encontre clientes e animais registados no sistema.",
       icon: SearchIcon,
       buttonText: "Pesquisar",
@@ -106,7 +149,7 @@ export default function Home() {
     },
     {
       title: "Clientes",
-      description: "Gerir clientes e seus animais de forma rápida.",
+      description: "Criar fichas de clientes e dos seus animais.",
       icon: PeopleIcon,
       buttonText: "Gerir",
       buttonIcon: PeopleIcon,
@@ -175,30 +218,47 @@ export default function Home() {
     <>
       {/* Título */}
       <Typography variant="h1" sx={{ mb: 1, color: colors.text }}>
-        Bem-vindo
+        Bem-vindo à sua segunda casa!
       </Typography>
 
       {/* Subtítulo */}
       <Typography variant="body1" sx={{ mb: 4, color: colors.textSecondary }}>
-        Aqui tens um resumo do estado actual da clínica.
+        Vamos começar com um dia produtivo.
       </Typography>
 
-      {/* SECÇÃO 1: CARDS DE RESUMO */}
+      {/* SECÇÃO 1: AGENDAMENTOS DE HOJE */}
+      <Typography variant="h2" sx={{ mb: 2, color: colors.text }}>
+        Hoje
+      </Typography>
       <Grid container spacing={3} sx={{ mb: 4 }}>
-        {cardData.map((item, index) => (
+        {agendamentosHojeCards.map((item, index) => (
           <Grid item xs={12} sm={6} md={4} key={index}>
             <SummaryCard
               icon={item.icon}
               label={item.label}
-              height={item.height}
-              width={item.width}
               value={loading ? "..." : item.value}
             />
           </Grid>
         ))}
       </Grid>
 
-      {/* SECÇÃO 2: ACESSO RÁPIDO */}
+      {/* SECÇÃO 2: VISÃO GERAL DA CLÍNICA */}
+      <Typography variant="h2" sx={{ mb: 2, color: colors.text }}>
+        Visão geral
+      </Typography>
+      <Grid container spacing={3} sx={{ mb: 4 }}>
+        {cardData.map((item, index) => (
+          <Grid item xs={12} sm={6} md={4} key={index}>
+            <SummaryCard
+              icon={item.icon}
+              label={item.label}
+              value={loading ? "..." : item.value}
+            />
+          </Grid>
+        ))}
+      </Grid>
+
+      {/* SECÇÃO 3: ACESSO RÁPIDO */}
       <Typography variant="h2" sx={{ mb: 2, color: colors.text }}>
         Acesso Rápido
       </Typography>

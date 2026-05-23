@@ -9,3 +9,6 @@ export { default as Funcionarios } from './admin/manageUsers/funcionarios';
 export { default as Contas } from './contas/contas';
 export { default as Perfil } from './perfil/perfil';
 export { default as Pesquisa } from './pesquisa/pesquisa';
+export { default as AgendamentoNovo } from './agendamentos/agendamentoNovo';
+export { default as AgendamentoEditar } from './agendamentos/agendamentoEditar';
+export { default as FaturaDetalhe } from './faturas/faturaDetalhe';

@@ -22,6 +22,7 @@
     </startEvent>
     <userTask id="BP86" name="Funcionário indica data e hora preferida" implementation="##unspecified" camunda:assignee="funcionario">
       <incoming>BP94</incoming>
+      <incoming>Flow_0f6ehmf</incoming>
       <outgoing>BP95</outgoing>
     </userTask>
     <serviceTask id="BP87" name="Sistema gera soluções possíveis (topic: gerar-solucoes)" implementation="##WebService" camunda:type="external" camunda:topic="gerar-solucoes">
@@ -33,23 +34,31 @@
       <outgoing>BP97</outgoing>
       <outgoing>BP98</outgoing>
     </exclusiveGateway>
-    <serviceTask id="BP90" name="Informar erro (topic: notificar-erro-sistema)" implementation="##WebService" camunda:type="external" camunda:topic="notificar-erro-sistema">
-      <incoming>BP97</incoming>
+    <serviceTask id="BP90_sub2" name="Notificar erro técnico (termina) (topic: notificar-erro-sistema)" implementation="##WebService" camunda:type="external" camunda:topic="notificar-erro-sistema">
+      <extensionElements>
+        <camunda:inputOutput>
+          <camunda:inputParameter name="tipoErro">TECNICO</camunda:inputParameter>
+        </camunda:inputOutput>
+      </extensionElements>
+      <incoming>Flow_0v2u2j1</incoming>
+      <incoming>Flow_0tyt96z</incoming>
+      <incoming>Flow_0eav1ic</incoming>
+      <incoming>Flow_1f2xt5m</incoming>
       <outgoing>BP100</outgoing>
     </serviceTask>
-    <serviceTask id="BP91" name="Ordenar soluções por critérios (topic: ordenar-solucoes) " implementation="##WebService" camunda:type="external" camunda:topic="ordenar-solucoes">
+    <serviceTask id="BP91" name="Ordenar soluções por critérios (topic: ordenar-solucoes)" implementation="##WebService" camunda:type="external" camunda:topic="ordenar-solucoes">
       <incoming>BP98</incoming>
       <outgoing>BP99</outgoing>
     </serviceTask>
     <userTask id="BP93" name="Funcionário visualiza e seleciona opção" implementation="##unspecified" camunda:assignee="funcionario">
       <incoming>BP99</incoming>
       <incoming>BP111</incoming>
-      <outgoing>BP102</outgoing>
+      <outgoing>Flow_1wqth20</outgoing>
     </userTask>
     <sequenceFlow id="BP94" name="" sourceRef="BP85" targetRef="BP86" />
     <sequenceFlow id="BP95" name="" sourceRef="BP86" targetRef="BP87" />
     <sequenceFlow id="BP96" name="" sourceRef="BP87" targetRef="BP88" />
-    <sequenceFlow id="BP97" name="Não" sourceRef="BP88" targetRef="BP90">
+    <sequenceFlow id="BP97" name="Não" sourceRef="BP88" targetRef="Activity_1bqm7ho">
       <conditionExpression xsi:type="tFormalExpression">${operacaoBemSucedida == false}</conditionExpression>
     </sequenceFlow>
     <sequenceFlow id="BP98" name="Sim" sourceRef="BP88" targetRef="BP91">
@@ -57,174 +66,256 @@
     </sequenceFlow>
     <sequenceFlow id="BP99" name="" sourceRef="BP91" targetRef="BP93" />
     <serviceTask id="BP101" name="Criar reservas temporárias para todos os recursos (topic: criar-reservas-temporarias-opcao)" implementation="##WebService" camunda:type="external" camunda:topic="criar-reservas-temporarias-opcao">
-      <incoming>BP102</incoming>
-      <outgoing>BP104</outgoing>
-    </serviceTask>
-    <sequenceFlow id="BP102" name="" sourceRef="BP93" targetRef="BP101" />
-    <serviceTask id="BP103" name="Validar disponibilidade final (topic: validar-disponibilidade-final)" implementation="##WebService" camunda:type="external" camunda:topic="validar-disponibilidade-final">
-      <incoming>BP104</incoming>
-      <outgoing>BP107</outgoing>
-    </serviceTask>
-    <sequenceFlow id="BP104" name="" sourceRef="BP101" targetRef="BP103" />
-    <exclusiveGateway id="BP105" name="Todos os recursos disponíveis?">
-      <incoming>BP107</incoming>
-      <outgoing>BP108</outgoing>
-      <outgoing>BP114</outgoing>
-    </exclusiveGateway>
-    <serviceTask id="BP106" name="Libertar reservas temporárias desta opção (topic: libertar-reservas-opcao)" implementation="##WebService" camunda:type="external" camunda:topic="libertar-reservas-opcao">
-      <incoming>BP108</incoming>
-      <outgoing>BP110</outgoing>
-    </serviceTask>
-    <sequenceFlow id="BP107" name="" sourceRef="BP103" targetRef="BP105" />
-    <sequenceFlow id="BP108" name="Não" sourceRef="BP105" targetRef="BP106">
-      <conditionExpression xsi:type="tFormalExpression">${todosRecursosDisponiveis == false}</conditionExpression>
-    </sequenceFlow>
-    <serviceTask id="BP109" name="Informar indisponibilidade (topic: notificar-erro-sistema)" implementation="##WebService" camunda:type="external" camunda:topic="notificar-erro-sistema">
-      <incoming>BP110</incoming>
-      <outgoing>BP111</outgoing>
-    </serviceTask>
-    <sequenceFlow id="BP110" name="" sourceRef="BP106" targetRef="BP109" />
-    <sequenceFlow id="BP111" name="" sourceRef="BP109" targetRef="BP93" />
-    <sequenceFlow id="BP114" name="Sim" sourceRef="BP105" targetRef="BP112">
-      <conditionExpression xsi:type="tFormalExpression">${todosRecursosDisponiveis == true}</conditionExpression>
-    </sequenceFlow>
-    <endEvent id="BP112" name="Fim">
       <incoming>BP114</incoming>
+      <outgoing>Flow_1awhzep</outgoing>
+    </serviceTask>
+    <endEvent id="BP112" name="Fim">
+      <incoming>Flow_1awhzep</incoming>
     </endEvent>
     <endEvent id="BP92" name="Fim">
       <incoming>BP100</incoming>
       <terminateEventDefinition id="TerminateEventDefinition_18c5mms" />
     </endEvent>
-    <sequenceFlow id="BP100" name="" sourceRef="BP90" targetRef="BP92" />
+    <sequenceFlow id="BP100" name="" sourceRef="BP90_sub2" targetRef="BP92" />
+    <serviceTask id="BP109" name="Notificar slot indisponível (escolher outra opção) (topic: notificar-erro-sistema)" implementation="##WebService" camunda:type="external" camunda:topic="notificar-erro-sistema">
+      <extensionElements>
+        <camunda:inputOutput>
+          <camunda:inputParameter name="tipoErro">OPERACIONAL</camunda:inputParameter>
+        </camunda:inputOutput>
+      </extensionElements>
+      <incoming>BP108</incoming>
+      <outgoing>BP111</outgoing>
+    </serviceTask>
+    <sequenceFlow id="BP111" name="" sourceRef="BP109" targetRef="BP93" />
+    <exclusiveGateway id="BP105" name="Todos os recursos disponíveis?">
+      <incoming>Flow_15wrtf0</incoming>
+      <outgoing>BP114</outgoing>
+      <outgoing>BP108</outgoing>
+    </exclusiveGateway>
+    <sequenceFlow id="BP114" name="Sim" sourceRef="BP105" targetRef="BP101">
+      <conditionExpression xsi:type="tFormalExpression">${todosRecursosDisponiveis == true}</conditionExpression>
+    </sequenceFlow>
+    <sequenceFlow id="BP108" name="Não" sourceRef="BP105" targetRef="BP109">
+      <conditionExpression xsi:type="tFormalExpression">${todosRecursosDisponiveis == false}</conditionExpression>
+    </sequenceFlow>
+    <serviceTask id="BP103" name="Validar disponibilidade opcao (topic: validar-disponibilidade-opcao)" implementation="##WebService" camunda:type="external" camunda:topic="validar-disponibilidade-opcao">
+      <incoming>Flow_1wqth20</incoming>
+      <outgoing>Flow_15wrtf0</outgoing>
+    </serviceTask>
+    <sequenceFlow id="Flow_1wqth20" sourceRef="BP93" targetRef="BP103" />
+    <sequenceFlow id="Flow_15wrtf0" sourceRef="BP103" targetRef="BP105" />
+    <boundaryEvent id="Event_1epdszu" name="Falha técnica" attachedToRef="BP91">
+      <outgoing>Flow_0v2u2j1</outgoing>
+      <errorEventDefinition id="ErrorEventDefinition_1ejesxj" errorRef="Error_0qfulha" camunda:errorCodeVariable="ultimoErroCode" camunda:errorMessageVariable="ultimoErroMensagem" />
+    </boundaryEvent>
+    <boundaryEvent id="Event_10596u3" name="Falha técnica" attachedToRef="BP103">
+      <outgoing>Flow_0tyt96z</outgoing>
+      <errorEventDefinition id="ErrorEventDefinition_0ksltva" errorRef="Error_0qfulha" camunda:errorCodeVariable="ultimoErroCode" camunda:errorMessageVariable="ultimoErroMensagem" />
+    </boundaryEvent>
+    <sequenceFlow id="Flow_1awhzep" sourceRef="BP101" targetRef="BP112" />
+    <boundaryEvent id="Event_0xc64kv" name="Falha técnica" attachedToRef="BP101">
+      <outgoing>Flow_0eav1ic</outgoing>
+      <errorEventDefinition id="ErrorEventDefinition_1sgdyyc" errorRef="Error_0qfulha" camunda:errorCodeVariable="ultimoErroCode" camunda:errorMessageVariable="ultimoErroMensagem" />
+    </boundaryEvent>
+    <sequenceFlow id="Flow_0v2u2j1" sourceRef="Event_1epdszu" targetRef="BP90_sub2" />
+    <sequenceFlow id="Flow_0tyt96z" sourceRef="Event_10596u3" targetRef="BP90_sub2" />
+    <sequenceFlow id="Flow_0eav1ic" sourceRef="Event_0xc64kv" targetRef="BP90_sub2" />
+    <boundaryEvent id="Event_0llnwsm" name="Falha técnica" attachedToRef="BP87">
+      <outgoing>Flow_1f2xt5m</outgoing>
+      <errorEventDefinition id="ErrorEventDefinition_1myq1l7" errorRef="Error_0qfulha" camunda:errorCodeVariable="ultimoErroCode" camunda:errorMessageVariable="ultimoErroMensagem" />
+    </boundaryEvent>
+    <sequenceFlow id="Flow_1f2xt5m" sourceRef="Event_0llnwsm" targetRef="BP90_sub2" />
+    <serviceTask id="Activity_1bqm7ho" name="Notificar zero opções (escolher outra data) (topic: notificar-erro-sistema)" implementation="##WebService" camunda:type="external" camunda:topic="notificar-erro-sistema">
+      <extensionElements>
+        <camunda:inputOutput>
+          <camunda:inputParameter name="tipoErro">OPERACIONAL</camunda:inputParameter>
+        </camunda:inputOutput>
+      </extensionElements>
+      <incoming>BP97</incoming>
+      <outgoing>Flow_0f6ehmf</outgoing>
+    </serviceTask>
+    <sequenceFlow id="Flow_0f6ehmf" sourceRef="Activity_1bqm7ho" targetRef="BP86" />
   </process>
+  <error id="Error_0qfulha" name="Falha técnica" errorCode="FALHA_TECNICA" />
   <bpmndi:BPMNDiagram id="diagram-sub_gerar_selecionar_opcao" name="sub_gerar_selecionar_opcao">
     <bpmndi:BPMNPlane id="plane-sub_gerar_selecionar_opcao" bpmnElement="sub_gerar_selecionar_opcao">
       <bpmndi:BPMNShape id="ID_50671533_5053_4606_0052_000222200114" bpmnElement="BP85">
-        <omgdc:Bounds x="159" y="143" width="20" height="20" />
+        <omgdc:Bounds x="159" y="183" width="20" height="20" />
         <bpmndi:BPMNLabel>
-          <omgdc:Bounds x="156" y="163" width="27" height="14" />
+          <omgdc:Bounds x="156" y="203" width="27" height="14" />
         </bpmndi:BPMNLabel>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="ID_50671533_5053_4606_0052_000222200115" bpmnElement="BP86" bioc:stroke="#0d4372" bioc:fill="#bbdefb" color:background-color="#bbdefb" color:border-color="#0d4372">
-        <omgdc:Bounds x="221" y="133" width="168" height="40" />
+        <omgdc:Bounds x="221" y="173" width="168" height="40" />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="ID_50671533_5053_4606_0052_000222200116" bpmnElement="BP87" bioc:stroke="#205022" bioc:fill="#c8e6c9" color:background-color="#c8e6c9" color:border-color="#205022">
-        <omgdc:Bounds x="440" y="133" width="210" height="40" />
+        <omgdc:Bounds x="440" y="173" width="210" height="40" />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="ID_50671533_5053_4606_0052_000222200117" bpmnElement="BP88" isMarkerVisible="true" bioc:stroke="#6b3c00" bioc:fill="#ffe0b2" color:background-color="#ffe0b2" color:border-color="#6b3c00">
-        <omgdc:Bounds x="701" y="133" width="40" height="40" />
+        <omgdc:Bounds x="701" y="173" width="40" height="40" />
         <bpmndi:BPMNLabel>
-          <omgdc:Bounds x="684" y="186" width="74" height="27" />
+          <omgdc:Bounds x="633" y="146" width="73" height="27" />
         </bpmndi:BPMNLabel>
       </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="ID_50671533_5053_4606_0052_000222200120" bpmnElement="BP90" bioc:stroke="#205022" bioc:fill="#c8e6c9" color:background-color="#c8e6c9" color:border-color="#205022">
-        <omgdc:Bounds x="685" y="55" width="168" height="40" />
+      <bpmndi:BPMNShape id="ID_50671533_5053_4606_0052_000222200120" bpmnElement="BP90_sub2" bioc:stroke="#205022" bioc:fill="#c8e6c9" color:background-color="#c8e6c9" color:border-color="#205022">
+        <omgdc:Bounds x="1086" y="320" width="168" height="40" />
+        <bpmndi:BPMNLabel />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="ID_50671533_5053_4606_0052_000222200121" bpmnElement="BP91" bioc:stroke="#205022" bioc:fill="#c8e6c9" color:background-color="#c8e6c9" color:border-color="#205022">
-        <omgdc:Bounds x="792" y="133" width="168" height="40" />
+        <omgdc:Bounds x="792" y="173" width="168" height="40" />
+        <bpmndi:BPMNLabel />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="ID_50671533_5053_4606_0052_000222200123" bpmnElement="BP93" bioc:stroke="#0d4372" bioc:fill="#bbdefb" color:background-color="#bbdefb" color:border-color="#0d4372">
-        <omgdc:Bounds x="1011" y="133" width="168" height="40" />
+        <omgdc:Bounds x="1011" y="173" width="168" height="40" />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="ID_50671533_5053_4606_0052_000222200133" bpmnElement="BP101" bioc:stroke="#205022" bioc:fill="#c8e6c9" color:background-color="#c8e6c9" color:border-color="#205022">
-        <omgdc:Bounds x="1230" y="133" width="278" height="40" />
-      </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="ID_50671533_5053_4606_0052_000222200135" bpmnElement="BP103" bioc:stroke="#205022" bioc:fill="#c8e6c9" color:background-color="#c8e6c9" color:border-color="#205022">
-        <omgdc:Bounds x="1559" y="133" width="210" height="40" />
-      </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="ID_50671533_5053_4606_0052_000222200137" bpmnElement="BP105" isMarkerVisible="true" bioc:stroke="#6b3c00" bioc:fill="#ffe0b2" color:background-color="#ffe0b2" color:border-color="#6b3c00">
-        <omgdc:Bounds x="1820" y="133" width="40" height="40" />
-        <bpmndi:BPMNLabel>
-          <omgdc:Bounds x="1795" y="97" width="90" height="27" />
-        </bpmndi:BPMNLabel>
-      </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="ID_50671533_5053_4606_0052_000222200140" bpmnElement="BP106" bioc:stroke="#205022" bioc:fill="#c8e6c9" color:background-color="#c8e6c9" color:border-color="#205022">
-        <omgdc:Bounds x="1911" y="133" width="222" height="40" />
-      </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="ID_50671533_5053_4606_0052_000222200143" bpmnElement="BP109" bioc:stroke="#205022" bioc:fill="#c8e6c9" color:background-color="#c8e6c9" color:border-color="#205022">
-        <omgdc:Bounds x="2184" y="133" width="208" height="40" />
+        <omgdc:Bounds x="1591" y="173" width="278" height="40" />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="ID_52671533_5053_4606_0052_000222200146" bpmnElement="BP112" bioc:stroke="#831311" bioc:fill="#ffcdd2" color:background-color="#ffcdd2" color:border-color="#831311">
-        <omgdc:Bounds x="1830" y="215" width="19" height="19" />
+        <omgdc:Bounds x="1910" y="183" width="19" height="19" />
         <bpmndi:BPMNLabel>
-          <omgdc:Bounds x="1830" y="234" width="19" height="14" />
+          <omgdc:Bounds x="1940" y="186" width="19" height="14" />
         </bpmndi:BPMNLabel>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Event_18n2gnw_di" bpmnElement="BP92" bioc:stroke="#831311" bioc:fill="#ffcdd2" color:background-color="#ffcdd2" color:border-color="#831311">
-        <omgdc:Bounds x="900" y="65" width="20" height="20" />
+        <omgdc:Bounds x="1160" y="410" width="20" height="20" />
         <bpmndi:BPMNLabel>
-          <omgdc:Bounds x="901" y="85" width="19" height="14" />
+          <omgdc:Bounds x="1160" y="443" width="19" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="ID_50671533_5053_4606_0052_000222200143" bpmnElement="BP109" bioc:stroke="#205022" bioc:fill="#c8e6c9" color:background-color="#c8e6c9" color:border-color="#205022">
+        <omgdc:Bounds x="1416" y="77" width="208" height="40" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="ID_50671533_5053_4606_0052_000222200137" bpmnElement="BP105" isMarkerVisible="true" bioc:stroke="#6b3c00" bioc:fill="#ffe0b2" color:background-color="#ffe0b2" color:border-color="#6b3c00">
+        <omgdc:Bounds x="1500" y="173" width="40" height="40" />
+        <bpmndi:BPMNLabel>
+          <omgdc:Bounds x="1414.5" y="135.5" width="89" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="ID_50671533_5053_4606_0052_000222200135" bpmnElement="BP103" bioc:stroke="#205022" bioc:fill="#c8e6c9" color:background-color="#c8e6c9" color:border-color="#205022">
+        <omgdc:Bounds x="1235" y="173" width="210" height="40" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="BPMNShape_0f4806j" bpmnElement="Activity_1bqm7ho" bioc:stroke="#205022" bioc:fill="#c8e6c9" color:background-color="#c8e6c9" color:border-color="#205022">
+        <omgdc:Bounds x="617" y="90" width="208" height="40" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Event_0llnwsm_di" bpmnElement="Event_0llnwsm" bioc:stroke="#831311" bioc:fill="#ffcdd2" color:background-color="#ffcdd2" color:border-color="#831311">
+        <omgdc:Bounds x="632" y="195" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <omgdc:Bounds x="667" y="223" width="66" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Event_0xc64kv_di" bpmnElement="Event_0xc64kv" bioc:stroke="#831311" bioc:fill="#ffcdd2" color:background-color="#ffcdd2" color:border-color="#831311">
+        <omgdc:Bounds x="1851" y="195" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <omgdc:Bounds x="1777" y="223" width="66" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Event_10596u3_di" bpmnElement="Event_10596u3" bioc:stroke="#831311" bioc:fill="#ffcdd2" color:background-color="#ffcdd2" color:border-color="#831311">
+        <omgdc:Bounds x="1427" y="195" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <omgdc:Bounds x="1357" y="223" width="66" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Event_1epdszu_di" bpmnElement="Event_1epdszu" bioc:stroke="#831311" bioc:fill="#ffcdd2" color:background-color="#ffcdd2" color:border-color="#831311">
+        <omgdc:Bounds x="942" y="195" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <omgdc:Bounds x="977" y="223" width="66" height="14" />
         </bpmndi:BPMNLabel>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNEdge id="ID_50671533_5053_4606_0052_000222200124" bpmnElement="BP94">
-        <omgdi:waypoint x="179" y="152" />
-        <omgdi:waypoint x="220" y="152" />
+        <omgdi:waypoint x="179" y="192" />
+        <omgdi:waypoint x="220" y="192" />
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="ID_50671533_5053_4606_0052_000222200125" bpmnElement="BP95">
-        <omgdi:waypoint x="389" y="152" />
-        <omgdi:waypoint x="439" y="152" />
+        <omgdi:waypoint x="389" y="192" />
+        <omgdi:waypoint x="439" y="192" />
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="ID_50671533_5053_4606_0052_000222200126" bpmnElement="BP96">
-        <omgdi:waypoint x="650" y="152" />
-        <omgdi:waypoint x="701" y="152" />
+        <omgdi:waypoint x="650" y="192" />
+        <omgdi:waypoint x="701" y="192" />
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="ID_50671533_5053_4606_0052_000222200127" bpmnElement="BP97">
-        <omgdi:waypoint x="721" y="133" />
-        <omgdi:waypoint x="721" y="95" />
+        <omgdi:waypoint x="721" y="173" />
+        <omgdi:waypoint x="721" y="130" />
         <bpmndi:BPMNLabel>
-          <omgdc:Bounds x="726" y="104" width="21" height="14" />
+          <omgdc:Bounds x="729" y="143" width="21" height="14" />
         </bpmndi:BPMNLabel>
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="ID_50671533_5053_4606_0052_000222200130" bpmnElement="BP98">
-        <omgdi:waypoint x="741" y="153" />
-        <omgdi:waypoint x="791" y="153" />
+        <omgdi:waypoint x="741" y="193" />
+        <omgdi:waypoint x="791" y="193" />
         <bpmndi:BPMNLabel>
-          <omgdc:Bounds x="756" y="128" width="20" height="14" />
+          <omgdc:Bounds x="757" y="168" width="19" height="14" />
         </bpmndi:BPMNLabel>
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="ID_50671533_5053_4606_0052_000222200131" bpmnElement="BP99">
-        <omgdi:waypoint x="960" y="153" />
-        <omgdi:waypoint x="1010" y="153" />
-      </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="ID_50671533_5053_4606_0052_000222200134" bpmnElement="BP102">
-        <omgdi:waypoint x="1179" y="152" />
-        <omgdi:waypoint x="1229" y="152" />
-      </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="ID_50671533_5053_4606_0052_000222200136" bpmnElement="BP104">
-        <omgdi:waypoint x="1508" y="152" />
-        <omgdi:waypoint x="1558" y="152" />
-      </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="ID_50671533_5053_4606_0052_000222200141" bpmnElement="BP107">
-        <omgdi:waypoint x="1769" y="151" />
-        <omgdi:waypoint x="1822" y="151" />
-      </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="ID_50671533_5053_4606_0052_000222200142" bpmnElement="BP108">
-        <omgdi:waypoint x="1858" y="152" />
-        <omgdi:waypoint x="1911" y="152" />
-        <bpmndi:BPMNLabel>
-          <omgdc:Bounds x="1863" y="131" width="21" height="14" />
-        </bpmndi:BPMNLabel>
-      </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="ID_52671533_5053_4606_0052_000222200144" bpmnElement="BP110">
-        <omgdi:waypoint x="2133" y="152" />
-        <omgdi:waypoint x="2184" y="152" />
-      </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="ID_52671533_5053_4606_0052_000222200145" bpmnElement="BP111">
-        <omgdi:waypoint x="2288" y="133" />
-        <omgdi:waypoint x="2288" y="76" />
-        <omgdi:waypoint x="1092" y="76" />
-        <omgdi:waypoint x="1092" y="132" />
-      </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="ID_52671533_5053_4606_0052_000222200147" bpmnElement="BP114">
-        <omgdi:waypoint x="1838" y="172" />
-        <omgdi:waypoint x="1838" y="215" />
-        <bpmndi:BPMNLabel>
-          <omgdc:Bounds x="1843" y="184" width="20" height="14" />
-        </bpmndi:BPMNLabel>
+        <omgdi:waypoint x="960" y="193" />
+        <omgdi:waypoint x="1010" y="193" />
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="ID_50671533_5053_4606_0052_000222200132" bpmnElement="BP100">
-        <omgdi:waypoint x="853" y="75" />
-        <omgdi:waypoint x="900" y="75" />
+        <omgdi:waypoint x="1170" y="360" />
+        <omgdi:waypoint x="1170" y="410" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="ID_52671533_5053_4606_0052_000222200145" bpmnElement="BP111">
+        <omgdi:waypoint x="1416" y="97" />
+        <omgdi:waypoint x="1092" y="97" />
+        <omgdi:waypoint x="1092" y="173" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="ID_52671533_5053_4606_0052_000222200147" bpmnElement="BP114">
+        <omgdi:waypoint x="1540" y="193" />
+        <omgdi:waypoint x="1591" y="193" />
+        <bpmndi:BPMNLabel>
+          <omgdc:Bounds x="1569" y="172" width="19" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="ID_50671533_5053_4606_0052_000222200142" bpmnElement="BP108">
+        <omgdi:waypoint x="1520" y="173" />
+        <omgdi:waypoint x="1520" y="117" />
+        <bpmndi:BPMNLabel>
+          <omgdc:Bounds x="1529" y="138" width="21" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_1wqth20_di" bpmnElement="Flow_1wqth20">
+        <omgdi:waypoint x="1179" y="191" />
+        <omgdi:waypoint x="1235" y="190" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_15wrtf0_di" bpmnElement="Flow_15wrtf0">
+        <omgdi:waypoint x="1445" y="193" />
+        <omgdi:waypoint x="1500" y="193" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_1awhzep_di" bpmnElement="Flow_1awhzep">
+        <omgdi:waypoint x="1869" y="193" />
+        <omgdi:waypoint x="1910" y="193" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_0v2u2j1_di" bpmnElement="Flow_0v2u2j1">
+        <omgdi:waypoint x="960" y="231" />
+        <omgdi:waypoint x="960" y="277" />
+        <omgdi:waypoint x="1105" y="277" />
+        <omgdi:waypoint x="1105" y="320" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_0tyt96z_di" bpmnElement="Flow_0tyt96z">
+        <omgdi:waypoint x="1445" y="231" />
+        <omgdi:waypoint x="1445" y="270" />
+        <omgdi:waypoint x="1245" y="270" />
+        <omgdi:waypoint x="1245" y="320" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_0eav1ic_di" bpmnElement="Flow_0eav1ic">
+        <omgdi:waypoint x="1869" y="231" />
+        <omgdi:waypoint x="1869" y="340" />
+        <omgdi:waypoint x="1254" y="340" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_1f2xt5m_di" bpmnElement="Flow_1f2xt5m">
+        <omgdi:waypoint x="650" y="231" />
+        <omgdi:waypoint x="650" y="340" />
+        <omgdi:waypoint x="1086" y="340" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_0f6ehmf_di" bpmnElement="Flow_0f6ehmf">
+        <omgdi:waypoint x="617" y="110" />
+        <omgdi:waypoint x="305" y="110" />
+        <omgdi:waypoint x="305" y="173" />
       </bpmndi:BPMNEdge>
     </bpmndi:BPMNPlane>
   </bpmndi:BPMNDiagram>

@@ -110,6 +110,13 @@ async function carregarDadosTeste() {
     });
     if (!servicoAdicionar) throw new Error('Serviço APARAR_PELO_CARA não encontrado. Corre o seed!');
 
+    // Serviço a adicionar dentro de sub_faturar_servicos (caminho ATENDER) - entre
+    // check-out e pagamento, simula o funcionário a registar um serviço extra prestado.
+    const servicoFaturarAdicionar = await prisma.tipoServico.findFirst({
+        where: { ativo: true, tipo: 'CORTE_UNHAS' }
+    });
+    if (!servicoFaturarAdicionar) throw new Error('Serviço CORTE_UNHAS não encontrado. Corre o seed!');
+
     // Funcionário preferido
     const funcionario = await prisma.funcionario.findFirst({
         where: { utilizador: { nome: 'Sofia Ramalho' } },
@@ -138,6 +145,11 @@ async function carregarDadosTeste() {
             tipoServicoId: servicoAdicionar.id,
             nomeServico: servicoAdicionar.tipo,
         },
+        // Serviço a adicionar dentro de sub_faturar_servicos (caminho ATENDER)
+        servicoFaturarAdicionar: {
+            tipoServicoId: servicoFaturarAdicionar.id,
+            nomeServico: servicoFaturarAdicionar.tipo,
+        },
     };
 
     console.log('✅ Dados carregados:');
@@ -150,7 +162,8 @@ async function carregarDadosTeste() {
     }
     console.log(`   Serviços iniciais (${dados.servicos.length}): ${dados.servicos.map(s => s.nomeServico).join(', ')}`);
     console.log(`   Fluxo em sub_preparar_servicos: remover ANTI_QUEDA → adicionar APARAR_PELO_CARA → confirmar`);
-    console.log(`   Serviços esperados no agendamento: ${dados.servicos.length} (4 remove+add anula-se)\n`);
+    console.log(`   Serviços esperados no agendamento: ${dados.servicos.length} (4 remove+add anula-se)`);
+    console.log(`   Fluxo em sub_faturar_servicos (ATENDER): adicionar ${dados.servicoFaturarAdicionar.nomeServico} → confirmar (5 linhas na fatura)\n`);
 
     return dados;
 }
@@ -281,8 +294,19 @@ async function processarTasks(processInstanceId, dados) {
     let tentativas = 0;
     let tasksProcessadas = 0;
     let terminouComSucesso = false;
-    let indiceServico = 0;
-    let passagemConfirmar = 0; // conta as passagens em "Funcionário confirma ou altera serviços"
+
+    // No BPMN actual, "Selecionar serviço" (BP242) acontece UMA SÓ VEZ: adiciona
+    // o 1º serviço e entra logo em sub_preparar_servicos. Os restantes serviços
+    // iniciais e a manipulação do cenário (remover ANTI_QUEDA, adicionar
+    // APARAR_PELO_CARA, confirmar) acontecem em cadeia BP56->BP58 dentro do sub.
+    const acoesSub = [
+        ...dados.servicos.slice(1).map(s => ({ tipo: 'adicionar', servico: s })),
+        { tipo: 'remover', servicoId: dados.antiQuedaId, nome: 'ANTI_QUEDA' },
+        { tipo: 'adicionar', servico: dados.servicoAdicionar },
+        { tipo: 'confirmar' }
+    ];
+    let acaoIndex = 0;
+    let primeiraInvocacaoBP56 = true;
 
     console.log('🔄 Processar tasks automaticamente...\n');
 
@@ -347,7 +371,9 @@ async function processarTasks(processInstanceId, dados) {
                     break;
 
                 case 'Selecionar serviço': {
-                    const servico = dados.servicos[indiceServico];
+                    // BP242: invocado UMA SÓ VEZ - adiciona o 1º serviço da lista.
+                    // Os restantes são adicionados em cadeia BP56->BP58 dentro do sub.
+                    const servico = dados.servicos[0];
 
                     variables = {
                         tipoServicoId: servico.tipoServicoId,
@@ -355,15 +381,10 @@ async function processarTasks(processInstanceId, dados) {
                             tipoServicoId: servico.tipoServicoId,
                             nomeServico: servico.nomeServico
                         },
-                        operacaoBemSucedida: true,
-                        adicionarOutroServico: indiceServico < dados.servicos.length - 1
+                        operacaoBemSucedida: true
                     };
 
-                    console.log(
-                        `   → Selecionar serviço ${indiceServico + 1}/${dados.servicos.length}: ${servico.nomeServico} (adicionarOutroServico=${indiceServico < dados.servicos.length - 1})`
-                    );
-
-                    indiceServico++;
+                    console.log(`   → Selecionar 1º serviço: ${servico.nomeServico}`);
                     break;
                 }
 
@@ -373,60 +394,64 @@ async function processarTasks(processInstanceId, dados) {
                     console.log(`   → Funcionário confirma agendamento (${task.name})`);
                     break;
 
-                case 'Funcionário confirma ou altera serviços':
-                    passagemConfirmar++;
-                    if (passagemConfirmar === 1) {
-                        // 1ª passagem: remover ANTI_QUEDA
-                        variables = {
-                            servicosActualizados: dados.servicos,
-                            qtdServicos: dados.servicos.length,
-                            adicionarServico: false,
-                            removerServico: true
-                        };
-                        console.log(`   → Funcionário escolhe remover ANTI_QUEDA da lista`);
-                    } else if (passagemConfirmar === 2) {
-                        // 2ª passagem: adicionar APARAR_PELO_CARA
-                        variables = {
-                            adicionarServico: true,
-                            removerServico: false
-                        };
-                        console.log(`   → Funcionário escolhe adicionar APARAR_PELO_CARA`);
-                    } else {
-                        // 3ª passagem: confirmar lista final
-                        variables = {
-                            adicionarServico: false,
-                            removerServico: false
-                        };
-                        console.log('   → Funcionário confirma lista de serviços');
+                case 'Funcionário confirma ou altera serviços': {
+                    const acao = acoesSub[acaoIndex];
+                    if (!acao) {
+                        throw new Error(`BP56 invocado para além do plano (acaoIndex=${acaoIndex}).`);
                     }
-                    break;
 
-                case 'Selecionar serviço a remover':
-                    variables = { servicoARemover: dados.antiQuedaId };
-                    console.log(`   → Selecionar ANTI_QUEDA para remover`);
+                    if (acao.tipo === 'adicionar') {
+                        variables = { adicionarServico: true, removerServico: false };
+                        // BP56 herda servicosActualizados da call activity, mas reforçamos
+                        // na 1ª invocação para garantir estado consistente.
+                        if (primeiraInvocacaoBP56) {
+                            variables.servicosActualizados = [dados.servicos[0]];
+                            variables.qtdServicos = 1;
+                        }
+                        console.log(`   → Funcionário escolhe adicionar ${acao.servico.nomeServico}`);
+                    } else if (acao.tipo === 'remover') {
+                        variables = { adicionarServico: false, removerServico: true };
+                        console.log(`   → Funcionário escolhe remover ${acao.nome}`);
+                    } else {
+                        // confirmar
+                        variables = { adicionarServico: false, removerServico: false };
+                        console.log('   → Funcionário confirma lista de serviços');
+                        acaoIndex++; // confirmar não tem task seguinte que avance o cursor
+                    }
+                    primeiraInvocacaoBP56 = false;
                     break;
+                }
 
-                case 'Selecionar serviço a adicionar':
-                    // Em sub_preparar_servicos: indica qual serviço adicionar
-                    // o worker obter-preco-duracao lê tipoServicoId e servicoTemp
+                case 'Selecionar serviço a remover': {
+                    const acao = acoesSub[acaoIndex];
+                    variables = { servicoARemover: acao.servicoId };
+                    console.log(`   → Selecionar ${acao.nome} para remover`);
+                    acaoIndex++;
+                    break;
+                }
+
+                case 'Selecionar serviço a adicionar': {
+                    const acao = acoesSub[acaoIndex];
                     variables = {
-                        tipoServicoId: dados.servicoAdicionar.tipoServicoId,
+                        tipoServicoId: acao.servico.tipoServicoId,
                         servicoTemp: {
-                            tipoServicoId: dados.servicoAdicionar.tipoServicoId,
-                            nomeServico: dados.servicoAdicionar.nomeServico
+                            tipoServicoId: acao.servico.tipoServicoId,
+                            nomeServico: acao.servico.nomeServico
                         }
                     };
-                    console.log(`   → Selecionar APARAR_PELO_CARA para adicionar`);
+                    console.log(`   → Selecionar ${acao.servico.nomeServico} para adicionar`);
+                    acaoIndex++;
                     break;
+                }
 
                 case 'Funcionário indica data e hora preferida': {
-                    let dataPreferida = new Date('2026-06-15T09:00:00');
+                    let dataPreferida = new Date('2026-06-16T09:30:00');
                     while (dataPreferida.getDay() === 0) {
                         dataPreferida = addDays(dataPreferida, 1);
                     }
                     variables = {
                         dataPreferida: dataPreferida.toISOString(),
-                        horaPreferida: '09:00',
+                        horaPreferida: '09:30',
                         operacaoBemSucedida: true
                     };
                     console.log(`   → Definir data preferida: ${format(dataPreferida, 'dd/MM/yyyy HH:mm:ss')}`);
@@ -525,7 +550,7 @@ function validarAgendamento(agendamento, dados, reservasResiduais) {
     }
 
     if (reservasResiduais > 0) {
-        problemas.push(`${reservasResiduais} ReservaTemporaria órfã(s) deste processo após confirmação — confirmar-reservas/libertar-reservas falhou`);
+        problemas.push(`${reservasResiduais} ReservaTemporaria órfã(s) deste processo após confirmação — libertar-reservas-temporarias/libertar-reservas-processo falhou`);
     }
 
     let somaPrecos = 0;
@@ -584,9 +609,16 @@ function validarAgendamento(agendamento, dados, reservasResiduais) {
 // TESTE GESTÃO DE AGENDAMENTO — INÍCIO
 // =====================================================
 
-// Configuração: escolher caminho a testar
-const GESTAO_ACCAO = 'CANCELAR';       // 'ATENDER' | 'CANCELAR' | 'NAO_COMPARECEU'
-const GESTAO_QUER_REAGENDAR = true;    // true | false — só relevante em CANCELAR e NAO_COMPARECEU
+// ajustes:
+// Caminho a exercitar no bloco gestão (gestao_agendamento.bpmn). Cada valor activa um ramo distinto da user task BP161 ("Funcionário abre agendamento")
+// via `accaoFuncionario`. Mudar aqui é a forma de testar os 4 fluxos sem alterar BPMN.
+//   'ATENDER'         -> check-in -> check-out -> sub_faturar (add CORTE_UNHAS) -> pagamento -> fatura
+//   'CANCELAR'        -> marca CANCELADO + email de cancelamento
+//   'NAO_COMPARECEU'  -> marca NAO_COMPARECEU + email
+//   'REAGENDAR'       -> novo agendamento via call activity (sub_preparar + sub_gerar_selecionar_opcao)
+// A validação na BD (validarGestaoAgendamento) varia consoante o caminho -
+// validações específicas de ATENDER (fatura, 5 linhas) saltam para os outros.
+const GESTAO_ACCAO = 'REAGENDAR';
 
 async function limparGestaoAnterior() {
     console.log('🧹 [Gestão] Limpar instâncias gestao_agendamento anteriores...');
@@ -629,11 +661,15 @@ async function iniciarGestaoAgendamento(agendamentoId, dados) {
     return response.id;
 }
 
-async function processarTasksGestao(processId) {
+async function processarTasksGestao(processId, dados) {
     let tentativas = 0;
     let tasksProcessadas = 0;
     let terminouComSucesso = false;
     let passagemConfirmar = 0;
+    // Contador do sub_faturar_servicos (caminho ATENDER):
+    //   0 = ainda não fizemos nada -> pedir para adicionar
+    //   1 = já passámos por BP58_sub3 e o serviço foi inserido -> confirmar
+    let faturarPasso = 0;
 
     console.log('🔄 [Gestão] Processar tasks automaticamente...\n');
 
@@ -646,17 +682,23 @@ async function processarTasksGestao(processId) {
             [
                 'Funcionário abre agendamento',
                 'Registar Check-in',
-                'Executar serviços',
                 'Registar Check-out',
                 'Receber pagamento',
                 'Registar cancelamento',
                 'Registar não comparência',
-                // sub-processos (caminho de reagendamento)
+                'Registar reagendamento',
+                // sub_preparar_servicos (caminho REAGENDAR, via novo agendamento)
                 'Funcionário confirma ou altera serviços',
+                'Selecionar serviço a adicionar',
+                'Selecionar serviço a remover',
                 'Funcionário indica data e hora preferida',
                 'Funcionário visualiza e seleciona opção',
                 'Funcionário confirma agendamento',
                 'Confirma agendamento',
+                // sub_faturar_servicos (caminho ATENDER, entre check-out e pagamento)
+                'Funcionário confirma ou altera serviços a faturar',
+                'Selecionar serviço a adicionar à fatura',
+                'Selecionar serviço a remover da fatura',
             ].includes(task.name)
         );
 
@@ -686,20 +728,15 @@ async function processarTasksGestao(processId) {
                     console.log(`   → Ação: ${GESTAO_ACCAO}`);
                     break;
 
-                // Caminho ATENDER
+                // Caminho ATENDER - `estado` vem do inputParameter no service task
                 case 'Registar Check-in':
-                    variables = { estado: 'EM_ATENDIMENTO', checkIn: true };
-                    console.log('   → Registar check-in (EM_ATENDIMENTO)');
-                    break;
-
-                case 'Executar serviços':
-                    variables = {};
-                    console.log('   → Executar serviços (sem variáveis)');
+                    variables = { checkIn: true };
+                    console.log('   → Registar check-in');
                     break;
 
                 case 'Registar Check-out':
-                    variables = { estado: 'CONCLUIDO', checkOut: true };
-                    console.log('   → Registar check-out (CONCLUIDO)');
+                    variables = { checkOut: true };
+                    console.log('   → Registar check-out');
                     break;
 
                 case 'Receber pagamento':
@@ -707,30 +744,64 @@ async function processarTasksGestao(processId) {
                     console.log('   → Pagamento: MULTIBANCO');
                     break;
 
-                // Caminho CANCELAR
+                // Caminhos CANCELAR / NAO_COMPARECEU / REAGENDAR - user tasks sem variáveis (confirmação consciente da acção).
+                // estado=CANCELADO/etc vem do inputParameter dos service tasks `atualizar-estado-agendamento`.
                 case 'Registar cancelamento':
-                    variables = { estado: 'CANCELADO', clienteQuerReagendar: GESTAO_QUER_REAGENDAR };
-                    console.log(`   → Cancelamento registado (reagendar=${GESTAO_QUER_REAGENDAR})`);
-                    break;
-
-                // Caminho NAO_COMPARECEU
                 case 'Registar não comparência':
-                    variables = { estado: 'NAO_COMPARECEU', clienteQuerReagendar: GESTAO_QUER_REAGENDAR };
-                    console.log(`   → Não comparência registada (reagendar=${GESTAO_QUER_REAGENDAR})`);
+                case 'Registar reagendamento':
+                    variables = {};
+                    console.log(`   → ${task.name} (sem variáveis)`);
                     break;
 
-                // Sub-processos do reagendamento (CANCELAR com reagendar=true)
+                // sub_preparar_servicos via REAGENDAR - confirma a lista herdada sem alterar.
                 case 'Funcionário confirma ou altera serviços':
                     passagemConfirmar++;
                     variables = { adicionarServico: false, removerServico: false };
                     console.log(`   → Confirmar serviços sem alterações (passagem ${passagemConfirmar})`);
                     break;
 
+                // sub_faturar_servicos via ATENDER . entre check-out e pagamento.
+                // 1ª passagem: pede para ADICIONAR um serviço extra (simula o funcionário a registar um serviço prestado mas não previsto).
+                // 2ª passagem (após o worker adicionar-servico-lista correr): confirma a lista final.
+                case 'Funcionário confirma ou altera serviços a faturar':
+                    if (faturarPasso === 0) {
+                        variables = { adicionarServico: true, removerServico: false };
+                        console.log(`   → Adicionar ${dados.servicoFaturarAdicionar.nomeServico} à fatura`);
+                        faturarPasso = 1;
+                    } else {
+                        variables = { adicionarServico: false, removerServico: false };
+                        console.log('   → Confirmar lista final de faturação');
+                    }
+                    break;
+
+                case 'Selecionar serviço a adicionar à fatura':
+                    variables = {
+                        tipoServicoId: dados.servicoFaturarAdicionar.tipoServicoId,
+                        servicoTemp: {
+                            tipoServicoId: dados.servicoFaturarAdicionar.tipoServicoId,
+                            nomeServico: dados.servicoFaturarAdicionar.nomeServico,
+                        },
+                    };
+                    console.log(`   → Selecionar ${dados.servicoFaturarAdicionar.nomeServico} para adicionar à fatura`);
+                    break;
+
+                // Defensive: o cenário actual não exercita remoção dentro de sub_faturar.
+                // Se entrar aqui por engano, falha em vez de "task ignorada" silenciosa.
+                case 'Selecionar serviço a remover da fatura':
+                    throw new Error(`Test não preparado para "${task.name}" no fluxo ATENDER.`);
+
+                // Defensive: REAGENDAR actualmente confirma a lista herdada sem adicionar nem remover (BP56->BP67->BP61->BP73->fim).
+                // Se um cenário futuro exercitar add/remove dentro do sub_preparar via REAGENDAR, falhamos explicitamente
+                // em vez de "task ignorada" + loop até MAX_TENTATIVAS.
+                case 'Selecionar serviço a adicionar':
+                case 'Selecionar serviço a remover':
+                    throw new Error(`Test não preparado para "${task.name}" no fluxo REAGENDAR.`);
+
                 case 'Funcionário indica data e hora preferida': {
                     const dataReagendar = new Date('2026-06-16T09:00:00');
                     variables = {
                         dataPreferida: dataReagendar.toISOString(),
-                        horaPreferida: '17:00',
+                        horaPreferida: 'O9:00',
                         operacaoBemSucedida: true,
                     };
                     console.log(`   → Nova data: ${format(dataReagendar, 'dd/MM/yyyy HH:mm:ss')}`);
@@ -773,13 +844,14 @@ async function processarTasksGestao(processId) {
     return tasksProcessadas;
 }
 
-async function validarGestaoAgendamento(agendamentoId, instanceIds) {
+async function validarGestaoAgendamento(agendamentoId, instanceIds, dados) {
     console.log('\n📊 [Gestão] Verificar resultado na BD...\n');
 
     const agendamento = await prisma.agendamento.findUnique({
         where: { id: agendamentoId },
         include: {
-            servicos: { orderBy: { ordem: 'asc' }, include: { tipoServico: true } }
+            servicos: { orderBy: { ordem: 'asc' }, include: { tipoServico: true } },
+            fatura: true,
         }
     });
 
@@ -795,48 +867,51 @@ async function validarGestaoAgendamento(agendamentoId, instanceIds) {
         problemas.push(`${reservasResiduais} ReservaTemporaria(s) órfã(s) após gestão`);
     }
 
+    const esperadoEstado = {
+        ATENDER: 'CONCLUIDO',
+        CANCELAR: 'CANCELADO',
+        NAO_COMPARECEU: 'NAO_COMPARECEU',
+        REAGENDAR: 'CONFIRMADO',
+    }[GESTAO_ACCAO];
+
+    console.log(`   Estado: ${agendamento.estado}`);
+    if (agendamento.estado !== esperadoEstado) {
+        problemas.push(`estado esperado '${esperadoEstado}', obtido '${agendamento.estado}'`);
+    }
+
     if (GESTAO_ACCAO === 'ATENDER') {
-        console.log(`   Estado: ${agendamento.estado}`);
-        console.log(`   Fatura: ${agendamento.faturaId ?? '—'}`);
+        // US - BET-43: fatura é agora entidade própria (camunda/workers/services/faturacao.js).
+        // O agendamento já não tem faturaId - a relação inversa `fatura` traz {id, numero}.
+        console.log(`   Fatura: ${agendamento.fatura?.numero ?? '—'}`);
         console.log(`   Pago em: ${agendamento.pagoEm ? format(agendamento.pagoEm, 'dd/MM/yyyy HH:mm:ss') : '—'}`);
         console.log(`   Método: ${agendamento.metodoPagamento ?? '—'}`);
 
-        if (agendamento.estado !== 'CONCLUIDO')
-            problemas.push(`estado esperado 'CONCLUIDO', obtido '${agendamento.estado}'`);
-        if (!agendamento.faturaId)
-            problemas.push('faturaId não preenchido após CONCLUIDO');
+        if (!agendamento.fatura)
+            problemas.push('fatura não criada após CONCLUIDO');
         if (!agendamento.pagoEm)
             problemas.push('pagoEm não preenchido após pagamento');
         if (agendamento.metodoPagamento !== 'MULTIBANCO')
             problemas.push(`metodoPagamento esperado 'MULTIBANCO', obtido '${agendamento.metodoPagamento}'`);
 
-    } else if (GESTAO_ACCAO === 'CANCELAR' && GESTAO_QUER_REAGENDAR) {
-        console.log(`   Estado: ${agendamento.estado}`);
+        // O fluxo ATENDER do teste exercita sub_faturar_servicos a ADICIONAR um serviço  extra (dados.servicoFaturarAdicionar).
+        // A fatura deve reflectir esse extra no snapshot conteudoJson.servicos (4 originais + 1 adicionado = 5).
+        if (agendamento.fatura) {
+            const linhas = Array.isArray(agendamento.fatura.conteudoJson?.servicos)
+                ? agendamento.fatura.conteudoJson.servicos
+                : [];
+            console.log(`   Linhas na fatura: ${linhas.length}`);
+            if (linhas.length !== 5) {
+                problemas.push(`fatura.conteudoJson.servicos tem ${linhas.length} linhas (esperado 5: 4 originais + ${dados.servicoFaturarAdicionar.nomeServico})`);
+            }
+            // O snapshot da fatura (gerar-fatura.js) guarda cada linha com `nome` (string) - não há tipoServicoId no JSON. Validamos por nome.
+            const temExtra = linhas.some(l => l?.nome === dados.servicoFaturarAdicionar.nomeServico);
+            if (!temExtra) {
+                problemas.push(`fatura não contém o serviço extra adicionado em sub_faturar (${dados.servicoFaturarAdicionar.nomeServico})`);
+            }
+        }
+    } else if (GESTAO_ACCAO === 'REAGENDAR') {
         console.log(`   Nova data início: ${agendamento.dataHoraInicio ? format(agendamento.dataHoraInicio, 'dd/MM/yyyy HH:mm:ss') : '—'}`);
         console.log(`   Serviços: ${agendamento.servicos.length}`);
-
-        if (agendamento.estado !== 'CONFIRMADO')
-            problemas.push(`estado esperado 'CONFIRMADO' após reagendamento, obtido '${agendamento.estado}'`);
-
-    } else if (GESTAO_ACCAO === 'CANCELAR' && !GESTAO_QUER_REAGENDAR) {
-        console.log(`   Estado: ${agendamento.estado}`);
-
-        if (agendamento.estado !== 'CANCELADO')
-            problemas.push(`estado esperado 'CANCELADO', obtido '${agendamento.estado}'`);
-
-    } else if (GESTAO_ACCAO === 'NAO_COMPARECEU' && GESTAO_QUER_REAGENDAR) {
-        console.log(`   Estado: ${agendamento.estado}`);
-        console.log(`   Nova data início: ${agendamento.dataHoraInicio ? format(agendamento.dataHoraInicio, 'dd/MM/yyyy HH:mm:ss') : '—'}`);
-        console.log(`   Serviços: ${agendamento.servicos.length}`);
-
-        if (agendamento.estado !== 'CONFIRMADO')
-            problemas.push(`estado esperado 'CONFIRMADO' após reagendamento, obtido '${agendamento.estado}'`);
-
-    } else if (GESTAO_ACCAO === 'NAO_COMPARECEU' && !GESTAO_QUER_REAGENDAR) {
-        console.log(`   Estado: ${agendamento.estado}`);
-
-        if (agendamento.estado !== 'NAO_COMPARECEU')
-            problemas.push(`estado esperado 'NAO_COMPARECEU', obtido '${agendamento.estado}'`);
     }
 
     if (problemas.length > 0) {
@@ -847,17 +922,20 @@ async function validarGestaoAgendamento(agendamentoId, instanceIds) {
 }
 
 async function testeGestaoAgendamento(agendamentoId, dados) {
-    const reagendarLabel = GESTAO_ACCAO === 'CANCELAR' || GESTAO_ACCAO === 'NAO_COMPARECEU' ? ` (reagendar=${GESTAO_QUER_REAGENDAR})` : '';
     console.log('\n╔════════════════════════════════════════════════════════════╗');
-    console.log(`║  TESTE GESTÃO — ${(GESTAO_ACCAO + reagendarLabel).padEnd(43)}║`);
+    console.log(`║  TESTE GESTÃO — ${GESTAO_ACCAO.padEnd(43)}║`);
     console.log('╚════════════════════════════════════════════════════════════╝\n');
     console.log(`   Agendamento base: ${agendamentoId}\n`);
 
-    await limparGestaoAnterior();
+    // Desactivado: apaga TODAS as instâncias active de gestao_agendamento, incluindo processos válidos de outros agendamentos
+    // (ex: um EM_ATENDIMENTO à espera de check-out via frontend).
+    // Como cada corrida cria um agendamento novo, não há "lixo" a limpar.
+    // Reactivar apenas se for preciso forçar um reset global do Camunda.
+    // await limparGestaoAnterior();
     const processId = await iniciarGestaoAgendamento(agendamentoId, dados);
-    await processarTasksGestao(processId);
+    await processarTasksGestao(processId, dados);
     const instanceIds = await validarProcessoCamunda(processId);
-    await validarGestaoAgendamento(agendamentoId, instanceIds);
+    await validarGestaoAgendamento(agendamentoId, instanceIds, dados);
 
     console.log('\n🎉 [Gestão] TESTE CONCLUÍDO!\n');
 }

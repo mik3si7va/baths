@@ -271,6 +271,277 @@ const options = {
           },
         },
 
+        // ─── AGENDAMENTOS ────────────────────────────────────────
+        EstadoAgendamentoEnum: {
+          type: 'string',
+          enum: [
+            'CONFIRMADO',
+            'EM_ATENDIMENTO',
+            'CONCLUIDO',
+            'CANCELADO',
+            'NAO_COMPARECEU',
+          ],
+          description: `Estado do agendamento:
+- CONFIRMADO — marcado, ainda não começou
+- EM_ATENDIMENTO — em curso (check-in efectuado)
+- CONCLUIDO — terminado (check-out + pagamento)
+- CANCELADO — anulado pelo cliente/clínica antes de começar
+- NAO_COMPARECEU — cliente faltou sem cancelar`,
+          example: 'CONFIRMADO',
+        },
+
+        AgendamentoServico: {
+          type: 'object',
+          description: 'Linha de serviço dentro de um agendamento — snapshot do que foi marcado (preço/duração imutáveis após criação).',
+          properties: {
+            id: { type: 'string', format: 'uuid' },
+            agendamentoId: { type: 'string', format: 'uuid' },
+            tipoServicoId: { type: 'string', format: 'uuid' },
+            funcionarioId: { type: 'string', format: 'uuid' },
+            salaId: { type: 'string', format: 'uuid' },
+            dataHoraInicio: { type: 'string', format: 'date-time' },
+            dataHoraFim: { type: 'string', format: 'date-time' },
+            precoNoMomento: {
+              type: 'number',
+              format: 'float',
+              description: 'Snapshot do preço aplicado no momento (BET-460: imutável após criação).',
+              example: 25.00,
+            },
+            duracaoNoMomento: {
+              type: 'integer',
+              description: 'Snapshot da duração em minutos.',
+              example: 30,
+            },
+            ordem: {
+              type: 'integer',
+              description: 'Posição na sequência de serviços do agendamento (1, 2, 3...).',
+              example: 1,
+            },
+            tipoServico: { $ref: '#/components/schemas/TipoServico' },
+            funcionario: { $ref: '#/components/schemas/Funcionario' },
+            sala: { $ref: '#/components/schemas/Sala' },
+          },
+        },
+
+        Agendamento: {
+          type: 'object',
+          description: 'Agendamento de visita à clínica. Shape devolvido pelos endpoints /agendamentos* (com animal, cliente, serviços, funcionário e sala incluídos via AGENDAMENTO_COMPLETO_INCLUDE).',
+          properties: {
+            id: { type: 'string', format: 'uuid' },
+            animalId: { type: 'string', format: 'uuid' },
+            dataHoraInicio: {
+              type: 'string',
+              format: 'date-time',
+              description: 'Início planeado (schedule). Não muda quando há add/remove em sub_faturar — semântica de horário marcado.',
+            },
+            dataHoraFim: {
+              type: 'string',
+              format: 'date-time',
+              description: 'Fim planeado (schedule).',
+            },
+            estado: { $ref: '#/components/schemas/EstadoAgendamentoEnum' },
+            valorTotal: {
+              type: 'number',
+              format: 'float',
+              description: 'Total cobrado. Sincronizado no pagamento (audit-by-total: ∑ Agendamento.valorTotal == ∑ Fatura.valorTotal).',
+              example: 107.00,
+            },
+            metodoPagamento: {
+              oneOf: [
+                { $ref: '#/components/schemas/MetodoPagamentoEnum' },
+                { type: 'null' },
+              ],
+              nullable: true,
+            },
+            pagoEm: {
+              type: 'string',
+              format: 'date-time',
+              nullable: true,
+              description: 'Timestamp do pagamento (naive Lisboa empacotado como UTC).',
+            },
+            checkInRealizadoEm: {
+              type: 'string',
+              format: 'date-time',
+              nullable: true,
+              description: 'Timestamp real do check-in pelo funcionário.',
+            },
+            checkOutRealizadoEm: {
+              type: 'string',
+              format: 'date-time',
+              nullable: true,
+            },
+            processInstanceId: {
+              type: 'string',
+              format: 'uuid',
+              description: 'ID da instância Camunda que criou este agendamento (agendamento.bpmn).',
+            },
+            animal: {
+              type: 'object',
+              description: 'Animal incluído via include — traz também o cliente e utilizador.',
+              properties: {
+                id: { type: 'string', format: 'uuid' },
+                nome: { type: 'string', example: 'Mia' },
+                especie: { type: 'string', example: 'Cão' },
+                raca: { type: 'string', nullable: true },
+                porte: { $ref: '#/components/schemas/PorteEnum' },
+                cliente: {
+                  type: 'object',
+                  properties: {
+                    id: { type: 'string', format: 'uuid' },
+                    nif: { type: 'string', nullable: true },
+                    telefone: { type: 'string' },
+                    utilizador: {
+                      type: 'object',
+                      properties: {
+                        nome: { type: 'string' },
+                        email: { type: 'string', format: 'email' },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+            servicos: {
+              type: 'array',
+              items: { $ref: '#/components/schemas/AgendamentoServico' },
+              description: 'Linhas de serviço ordenadas por `ordem`.',
+            },
+            fatura: {
+              type: 'object',
+              nullable: true,
+              description: 'Resumo da fatura associada — só {id, numero}. Para o conteúdo completo, GET /faturas/:id.',
+              properties: {
+                id: { type: 'string', format: 'uuid' },
+                numero: { type: 'string', example: 'FAT-MPHTXZUP-d60c3c3b' },
+              },
+            },
+          },
+        },
+
+        // ─── FATURAS (BET-43) ────────────────────────────────────
+        TipoFaturaEnum: {
+          type: 'string',
+          enum: ['SERVICO_INTERNO', 'ALUGUER_SALA'],
+          description: `Tipo de fatura:
+- SERVICO_INTERNO — fatura de visita à clínica (BET-43). 1:1 com Agendamento.
+- ALUGUER_SALA — fatura de aluguer a entidade parceira (BET-44 reservado, ainda não implementado).`,
+          example: 'SERVICO_INTERNO',
+        },
+
+        MetodoPagamentoEnum: {
+          type: 'string',
+          enum: ['DINHEIRO', 'MULTIBANCO', 'TRANSFERENCIA'],
+          description: 'Método de pagamento usado pelo cliente.',
+          example: 'MULTIBANCO',
+        },
+
+        Fatura: {
+          type: 'object',
+          description: 'Fatura — entidade própria desde BET-43. Snapshot imutável depois de emitida. Para SERVICO_INTERNO há relação 1:1 com Agendamento via agendamentoId (unique).',
+          properties: {
+            id: { type: 'string', format: 'uuid' },
+            numero: {
+              type: 'string',
+              description: 'Número único da fatura, formato `FAT-{base36 timestamp}-{8 chars agendamentoId}`.',
+              example: 'FAT-MPHTXZUP-d60c3c3b',
+            },
+            tipo: { $ref: '#/components/schemas/TipoFaturaEnum' },
+            agendamentoId: {
+              type: 'string',
+              format: 'uuid',
+              nullable: true,
+              description: 'Preenchido em SERVICO_INTERNO. Null em ALUGUER_SALA (BET-44).',
+            },
+            entidadeParceiraId: {
+              type: 'string',
+              format: 'uuid',
+              nullable: true,
+              description: 'Preenchido em ALUGUER_SALA (BET-44). Null em SERVICO_INTERNO.',
+            },
+            periodoMes: { type: 'integer', minimum: 1, maximum: 12, nullable: true },
+            periodoAno: { type: 'integer', nullable: true, example: 2026 },
+            valorTotal: { type: 'number', format: 'float', example: 107.00 },
+            metodoPagamento: {
+              oneOf: [
+                { $ref: '#/components/schemas/MetodoPagamentoEnum' },
+                { type: 'null' },
+              ],
+              nullable: true,
+            },
+            pagoEm: { type: 'string', format: 'date-time', nullable: true },
+            dataEmissao: {
+              type: 'string',
+              format: 'date-time',
+              description: 'Timestamp da emissão (naive Lisboa empacotado como UTC).',
+            },
+            conteudoJson: {
+              type: 'object',
+              description: `Snapshot imutável dos dados no momento da emissão. Shape varia por \`tipo\`:
+- SERVICO_INTERNO: { clienteNome, clienteEmail, clienteNif, clienteTelefone, animalNome, dataHoraInicio, dataHoraFim, servicos: [{ nome, duracao, valorComIva, valorSemIva, valorIva }], taxaIva, subTotalSemIva, valorIva, valorTotal, metodoPagamento, pagoEm }
+- ALUGUER_SALA: TBD (BET-44)`,
+              properties: {
+                tipo: { type: 'string', example: 'SERVICO_INTERNO' },
+                clienteNome: { type: 'string' },
+                animalNome: { type: 'string' },
+                servicos: {
+                  type: 'array',
+                  items: {
+                    type: 'object',
+                    properties: {
+                      nome: { type: 'string', example: 'BANHO' },
+                      duracao: { type: 'integer', example: 30 },
+                      valorComIva: { type: 'number', format: 'float' },
+                      valorSemIva: { type: 'number', format: 'float' },
+                      valorIva: { type: 'number', format: 'float' },
+                    },
+                  },
+                },
+                taxaIva: { type: 'integer', example: 23 },
+                valorTotal: { type: 'number', format: 'float' },
+              },
+            },
+          },
+        },
+
+        // ─── CAMUNDA (responses dos endpoints /agendamentos/processos/*) ──
+        ProcessoInstanciado: {
+          type: 'object',
+          description: 'Resposta de POST /agendamentos/processos e /agendamentos/:agendamentoId/processos/gestao.',
+          properties: {
+            processInstanceId: {
+              type: 'string',
+              format: 'uuid',
+              description: 'ID da instância Camunda criada — usado nas chamadas subsequentes ao processo.',
+            },
+          },
+        },
+
+        TarefaCamunda: {
+          type: 'object',
+          nullable: true,
+          description: 'User task pendente devolvida por GET /agendamentos/processos/:procId/tarefa-actual. Null se não houver tarefa pendente (processo terminado ou entre workers).',
+          properties: {
+            id: {
+              type: 'string',
+              format: 'uuid',
+              description: 'taskId — passar a POST .../tarefas/:taskId/completar.',
+            },
+            taskDefinitionKey: {
+              type: 'string',
+              description: 'ID do elemento no BPMN (ex: BP116, BP56_sub3) — usado pelo frontend para escolher o form a mostrar.',
+              example: 'BP116',
+            },
+            nome: {
+              type: 'string',
+              example: 'Selecionar porte do animal',
+            },
+            criadaEm: {
+              type: 'string',
+              format: 'date-time',
+            },
+          },
+        },
+
         Event: {
           type: 'object',
           required: ['title', 'start', 'end'],

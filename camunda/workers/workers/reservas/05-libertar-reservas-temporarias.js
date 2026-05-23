@@ -1,13 +1,13 @@
 const { subscribeWorker } = require('../../utils/subscribeWorker');
-const { libertarPorIdsDaTask } = require('./_shared');
+const { limparReservasAposCommit } = require('./_shared');
 
 module.exports = (client) => {
     subscribeWorker(client, {
-        topic: 'libertar-reservas-opcao',
+        topic: 'libertar-reservas-temporarias',
         onError: 'complete',
         handler: async ({ task }) => {
-            await libertarPorIdsDaTask(task);
-            return 'Reservas libertadas com sucesso';
+            await limparReservasAposCommit(task);
+            return 'Reservas temporárias libertadas';
         },
     });
 };

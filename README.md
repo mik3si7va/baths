@@ -136,6 +136,8 @@ Boa exploração 👀🚀
 
 ## Docker + Camunda (guia rapido)
 
+> **Atalho:** na raiz, `npm start` faz `camunda:boot` (sobe containers + deploya BPMN) e arranca os workers numa unica consola. Os passos manuais abaixo continuam disponiveis para debug.
+
 ### Pre-requisitos
 - Docker Desktop instalado e a correr
 - Node.js 18+ instalado
@@ -156,6 +158,8 @@ Boa exploração 👀🚀
 Nota: com `example.enabled: false`, no primeiro acesso vais criar o user admin manualmente na pagina de setup.
 
 ### Scripts disponiveis
+- `npm start` (na raiz): atalho para `camunda:boot` + workers
+- `npm run project` (na raiz): arranca o projecto inteiro (Postgres + migrations + seed + Camunda + deploy BPMN + backend + frontend + workers, em paralelo via `concurrently`)
 - `npm run camunda:up`: sobe containers em background
 - `npm run camunda:down`: para e remove containers (mantem dados)
 - `npm run camunda:logs`: segue logs do servico Camunda
@@ -174,6 +178,8 @@ Nota: com `example.enabled: false`, no primeiro acesso vais criar o user admin m
 Swagger UI local: http://localhost:8081
 
 ## Startup guide (Backend + DB + Frontend)
+
+> **Atalho recomendado:** `npm run project` na raiz faz tudo numa so consola (BD + Camunda + backend + frontend + workers). Os passos manuais abaixo sao uteis quando queres arrancar apenas uma parte ou debugar.
 
 ### Terminal 1 - Backend + Postgres
 Na raiz do projeto (`\baths`):

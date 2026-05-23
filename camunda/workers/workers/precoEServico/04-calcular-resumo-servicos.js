@@ -38,7 +38,7 @@ module.exports = (client) => {
             vars.set('contemTosquiaHigienicaEAparar',
                 tipos.includes('TOSQUIA_HIGIENICA') && tipos.includes('APARAR_PELO_CARA'));
 
-            vars.set('servicosActualizados', servicosCompletos);
+            vars.set('servicosActualizados', JSON.stringify(servicosCompletos));
             vars.set('duracaoTotal', duracaoTotal);
             vars.set('valorEstimado', valorEstimado);
             vars.set('qtdServicos', servicosCompletos.length);

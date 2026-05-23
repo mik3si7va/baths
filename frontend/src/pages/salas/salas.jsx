@@ -38,17 +38,17 @@ export default function Sala() {
     const [loadingSalas, setLoadingSalas] = useState(true);
 
     // Estado para controlar se está em modo edição
-    const [editMode, setEditMode] = useState(false);
-    const [editSalaId, setEditSalaId] = useState(null);
-    const [editSalaAtiva, setEditSalaAtiva] = useState(true);
+    const [modoEdicao, setModoEdicao] = useState(false);
+    const [idSalaEmEdicao, setIdSalaEmEdicao] = useState(null);
+    const [salaEmEdicaoAtiva, setSalaEmEdicaoAtiva] = useState(true);
 
     // Estado para o diálogo de confirmação
-    const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-    const [salaToDelete, setSalaToDelete] = useState(null);
+    const [dialogoInativarAberto, setDialogoInativarAberto] = useState(false);
+    const [salaParaInativar, setSalaParaInativar] = useState(null);
 
     // Diálogo de erro modal (BET-180): quando o backend devolve 409 ao tentar inativar uma sala com agendamentos futuros
-    const [errorDialogOpen, setErrorDialogOpen] = useState(false);
-    const [errorDialogMessage, setErrorDialogMessage] = useState('');
+    const [dialogoErroAberto, setDialogoErroAberto] = useState(false);
+    const [dialogoErroMensagem, setDialogoErroMensagem] = useState('');
 
     // Ref para timeout de sucesso
     const successTimeoutRef = useRef(null);
@@ -58,16 +58,7 @@ export default function Sala() {
         return Object.fromEntries(servicos.map((s) => [s.id, s.tipo]));
     }, [servicos]);
 
-    // Limpar timeout ao desmontar
-    useEffect(() => {
-        return () => {
-            if (successTimeoutRef.current) {
-                clearTimeout(successTimeoutRef.current);
-            }
-        };
-    }, []);
-
-    // Auto-limpar mensagem de sucesso
+    // Auto-limpar mensagem de sucesso. Cleanup também trata do unmount - não é preciso um useEffect dedicado a unmount.
     useEffect(() => {
         if (sucesso) {
             successTimeoutRef.current = setTimeout(() => {
@@ -136,17 +127,17 @@ export default function Sala() {
     const resetForm = () => {
         setForm({ nome: '', capacidade: '', equipamento: '', precoHora: '' });
         setServicosSelecionados([]);
-        setEditMode(false);
-        setEditSalaId(null);
-        setEditSalaAtiva(true);
+        setModoEdicao(false);
+        setIdSalaEmEdicao(null);
+        setSalaEmEdicaoAtiva(true);
         setErro('');
     };
 
     // Preencher formulário para edição
-    const handleEditClick = (sala) => {
-        setEditMode(true);
-        setEditSalaId(sala.id);
-        setEditSalaAtiva(sala.ativo);
+    const iniciarEdicao = (sala) => {
+        setModoEdicao(true);
+        setIdSalaEmEdicao(sala.id);
+        setSalaEmEdicaoAtiva(sala.ativo);
         setForm({
             nome: sala.nome,
             capacidade: sala.capacidade.toString(),
@@ -162,7 +153,7 @@ export default function Sala() {
     };
 
     // Cancelar edição
-    const handleCancelEdit = () => {
+    const cancelarEdicao = () => {
         resetForm();
     };
 
@@ -193,8 +184,8 @@ export default function Sala() {
     };
 
     // Reativar sala (soft delete reverso)
-    const handleReativar = async () => {
-        if (!editSalaId) return;
+    const reativarSala = async () => {
+        if (!idSalaEmEdicao) return;
 
         const validationError = validateForm();
         if (validationError) {
@@ -204,14 +195,14 @@ export default function Sala() {
 
         setLoading(true);
         try {
-            const response = await fetch(`${API_BASE_URL}/salas/${editSalaId}`, {
+            const response = await fetch(`${API_BASE_URL}/salas/${idSalaEmEdicao}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     nome: form.nome.trim(),
                     capacidade: parseInt(form.capacidade),
                     equipamento: form.equipamento.trim(),
-                    precoHora: parseFloat(parseFloat(form.precoHora).toFixed(2)),
+                    precoHora: Number(parseFloat(form.precoHora).toFixed(2)),
                     tipoServicoIds: servicosSelecionados,
                     ativo: true
                 }),
@@ -233,7 +224,7 @@ export default function Sala() {
     };
 
     // Criar ou atualizar sala
-    const handleSubmit = async (e) => {
+    const submeter = async (e) => {
         e.preventDefault();
         setErro('');
         setSucesso('');
@@ -253,13 +244,13 @@ export default function Sala() {
                 nome: form.nome.trim(),
                 capacidade: parseInt(form.capacidade),
                 equipamento: form.equipamento.trim(),
-                precoHora: parseFloat(parseFloat(form.precoHora).toFixed(2)),
+                precoHora: Number(parseFloat(form.precoHora).toFixed(2)),
                 tipoServicoIds: servicosSelecionados
             };
 
-            if (editMode && editSalaId) {
+            if (modoEdicao && idSalaEmEdicao) {
                 // UPDATE - Editar sala existente
-                response = await fetch(`${API_BASE_URL}/salas/${editSalaId}`, {
+                response = await fetch(`${API_BASE_URL}/salas/${idSalaEmEdicao}`, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(payload),
@@ -275,10 +266,10 @@ export default function Sala() {
 
             if (!response.ok) {
                 const err = await response.json();
-                throw new Error(err.error || (editMode ? 'Erro ao atualizar sala.' : 'Erro ao criar sala.'));
+                throw new Error(err.error || (modoEdicao ? 'Erro ao atualizar sala.' : 'Erro ao criar sala.'));
             }
 
-            setSucesso(editMode ? 'Sala atualizada com sucesso!' : 'Sala criada com sucesso!');
+            setSucesso(modoEdicao ? 'Sala atualizada com sucesso!' : 'Sala criada com sucesso!');
             resetForm();
             await carregarSalas();
         } catch (err) {
@@ -289,17 +280,17 @@ export default function Sala() {
     };
 
     // Abrir diálogo de confirmação para eliminar
-    const handleDeleteClick = (sala) => {
-        setSalaToDelete(sala);
-        setDeleteDialogOpen(true);
+    const pedirInativacao = (sala) => {
+        setSalaParaInativar(sala);
+        setDialogoInativarAberto(true);
     };
 
     // Confirmar e eliminar
-    const handleConfirmDelete = async () => {
-        if (!salaToDelete) return;
+    const inativarSala = async () => {
+        if (!salaParaInativar) return;
 
         try {
-            const res = await fetch(`${API_BASE_URL}/salas/${salaToDelete.id}`, {
+            const res = await fetch(`${API_BASE_URL}/salas/${salaParaInativar.id}`, {
                 method: 'DELETE',
             });
 
@@ -309,10 +300,10 @@ export default function Sala() {
 
                 // BET-180: 409 = sala tem agendamentos futuros
                 if (res.status === 409) {
-                    setDeleteDialogOpen(false);
-                    setSalaToDelete(null);
-                    setErrorDialogMessage(message);
-                    setErrorDialogOpen(true);
+                    setDialogoInativarAberto(false);
+                    setSalaParaInativar(null);
+                    setDialogoErroMensagem(message);
+                    setDialogoErroAberto(true);
                     return;
                 }
 
@@ -320,25 +311,25 @@ export default function Sala() {
             }
 
             // Se a sala que estava a ser editada for eliminada, limpar formulário
-            if (editMode && editSalaId === salaToDelete.id) {
+            if (modoEdicao && idSalaEmEdicao === salaParaInativar.id) {
                 resetForm();
             }
 
             await carregarSalas();
-            setSucesso(`Sala "${salaToDelete.nome}" inativada com sucesso!`);
-            setDeleteDialogOpen(false);
-            setSalaToDelete(null);
+            setSucesso(`Sala "${salaParaInativar.nome}" inativada com sucesso!`);
+            setDialogoInativarAberto(false);
+            setSalaParaInativar(null);
         } catch (err) {
             setErro(err.message);
-            setDeleteDialogOpen(false);
-            setSalaToDelete(null);
+            setDialogoInativarAberto(false);
+            setSalaParaInativar(null);
         }
     };
 
     // Fechar diálogo
-    const handleCloseDialog = () => {
-        setDeleteDialogOpen(false);
-        setSalaToDelete(null);
+    const fecharDialogo = () => {
+        setDialogoInativarAberto(false);
+        setSalaParaInativar(null);
     };
 
     return (
@@ -352,7 +343,7 @@ export default function Sala() {
 
             {/* Formulário de criação/edição */}
             <Paper elevation={2} sx={{ borderRadius: 3, p: 3, mb: 4 }}>
-                <Box component="form" onSubmit={handleSubmit} noValidate sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                <Box component="form" onSubmit={submeter} noValidate sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                     {sucesso && <Alert severity="success">{sucesso}</Alert>}
                     {erro && <Alert severity="error">{erro}</Alert>}
 
@@ -360,25 +351,25 @@ export default function Sala() {
                     <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                             <Typography variant="h2" sx={{ color: colors.text }}>
-                                {editMode ? 'Editar Sala' : 'Criar Nova Sala'}
+                                {modoEdicao ? 'Editar Sala' : 'Criar Nova Sala'}
                             </Typography>
-                            {editMode && (
+                            {modoEdicao && (
                                 <Chip
                                     size="small"
-                                    label={editSalaAtiva ? "Modo edição" : "Sala Inativa"}
-                                    color={editSalaAtiva ? "warning" : "default"}
+                                    label={salaEmEdicaoAtiva ? "Modo edição" : "Sala Inativa"}
+                                    color={salaEmEdicaoAtiva ? "warning" : "default"}
                                     variant="outlined"
                                 />
                             )}
                         </Box>
 
                         {/* Botão Reativar (só aparece se sala estiver inativa) */}
-                        {editMode && !editSalaAtiva && (
+                        {modoEdicao && !salaEmEdicaoAtiva && (
                             <Button
                                 variant="outlined"
                                 color="success"
                                 startIcon={<RestoreIcon />}
-                                onClick={handleReativar}
+                                onClick={reativarSala}
                                 disabled={loading}
                                 size="small"
                             >
@@ -426,7 +417,7 @@ export default function Sala() {
                             }}
                             placeholder="Ex: 10.50"
                             // BET-460: avisar o admin que alterar o preço não retroage - reservas já existentes mantêm o preço com que foram criados.
-                            helperText={editMode ? 'Alterações ao preço só afetam novas reservas. Reservas já marcadas mantêm o preço original.' : ''}
+                            helperText={modoEdicao ? 'Alterações ao preço só afetam novas reservas. Reservas já marcadas mantêm o preço original.' : ''}
                         />
                     </Box>
 
@@ -446,16 +437,6 @@ export default function Sala() {
                                 placeholder: "Ex: Banheira, mesa de tosquia, secador..."
                             }
                         }}
-                    /*minRows={2}
-                    maxRows={2}
-                    rows={2}
-                    sx={{
-                        '& .MuiInputBase-inputMultiline': {
-                            padding: '16.5px 14px',
-                            //height: '40px',
-                        },
-                    }}
-                    placeholder="Ex: Banheira, mesa de tosquia, secador..."*/
                     />
 
                     <Typography variant="h2" sx={{ mt: 1, color: colors.text }}>
@@ -494,7 +475,7 @@ export default function Sala() {
                             type="submit"
                             variant="contained"
                             disabled={loading}
-                            startIcon={editMode ? <SaveIcon /> : null}
+                            startIcon={modoEdicao ? <SaveIcon /> : null}
                             sx={{
                                 flex: 1,
                                 py: 1.5,
@@ -502,14 +483,14 @@ export default function Sala() {
                                 '&:hover': { backgroundColor: `${colors.primary}dd` }
                             }}
                         >
-                            {loading ? <CircularProgress size={24} sx={{ color: colors.white }} /> : (editMode ? 'Atualizar Sala' : 'Criar Sala')}
+                            {loading ? <CircularProgress size={24} sx={{ color: colors.white }} /> : (modoEdicao ? 'Atualizar Sala' : 'Criar Sala')}
                         </Button>
 
-                        {editMode && (
+                        {modoEdicao && (
                             <Button
                                 type="button"
                                 variant="outlined"
-                                onClick={handleCancelEdit}
+                                onClick={cancelarEdicao}
                                 startIcon={<CancelIcon />}
                                 sx={{ py: 1.5, px: 3 }}
                             >
@@ -598,7 +579,7 @@ export default function Sala() {
                                 <Box sx={{ display: 'flex', gap: 1 }}>
                                     <IconButton
                                         size="small"
-                                        onClick={(e) => { e.stopPropagation(); handleEditClick(sala); }}
+                                        onClick={(e) => { e.stopPropagation(); iniciarEdicao(sala); }}
                                         sx={{ color: colors.primary }}
                                         title="Editar sala"
                                     >
@@ -607,7 +588,7 @@ export default function Sala() {
                                     {sala.ativo && (
                                         <IconButton
                                             size="small"
-                                            onClick={(e) => { e.stopPropagation(); handleDeleteClick(sala); }}
+                                            onClick={(e) => { e.stopPropagation(); pedirInativacao(sala); }}
                                             sx={{ color: colors.textSecondary }}
                                             title="Inativar sala"
                                         >
@@ -622,12 +603,12 @@ export default function Sala() {
             </Paper>
 
             <ConfirmDialog
-                open={deleteDialogOpen}
+                open={dialogoInativarAberto}
                 title="Inativar Sala"
                 message={
                     <>
                         <Typography>
-                            Tem a certeza que pretende inativar a sala <strong>"{salaToDelete?.nome}"</strong>?
+                            Tem a certeza que pretende inativar a sala <strong>"{salaParaInativar?.nome}"</strong>?
                         </Typography>
                         <Typography sx={{ mt: 1 }}>
                             A sala ficará indisponível para novos agendamentos. Pode reativá-la a qualquer momento através do botão de edição.
@@ -636,24 +617,24 @@ export default function Sala() {
                 }
                 confirmLabel="Inativar"
                 confirmColor="warning"
-                onConfirm={handleConfirmDelete}
-                onClose={handleCloseDialog}
+                onConfirm={inativarSala}
+                onClose={fecharDialogo}
             />
 
             {/* BET-180: diálogo modal de erro quando o backend bloqueia a inativação
                 (sala com agendamentos futuros). Reutiliza o ConfirmDialog em modo
-                hideCancel — só botão "OK" fecha o diálogo. */}
+                hideCancel - só botão "OK" fecha o diálogo. */}
             <ConfirmDialog
-                open={errorDialogOpen}
+                open={dialogoErroAberto}
                 title="Não é possível inativar"
                 message={
-                    <Typography>{errorDialogMessage}</Typography>
+                    <Typography>{dialogoErroMensagem}</Typography>
                 }
                 confirmLabel="OK"
                 confirmColor="primary"
                 hideCancel
-                onConfirm={() => { setErrorDialogOpen(false); setErrorDialogMessage(''); }}
-                onClose={() => { setErrorDialogOpen(false); setErrorDialogMessage(''); }}
+                onConfirm={() => { setDialogoErroAberto(false); setDialogoErroMensagem(''); }}
+                onClose={() => { setDialogoErroAberto(false); setDialogoErroMensagem(''); }}
             />
         </Box>
     );

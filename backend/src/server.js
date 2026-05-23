@@ -53,6 +53,22 @@ const {
   deleteAnimal,
 } = require("./repositories/repositorioClientes");
 const {
+  getAllAgendamentos,
+  getAgendamentoById,
+} = require("./repositories/repositorioAgendamentos");
+const {
+  getFaturaById,
+  getFaturaByAgendamentoId,
+} = require("./repositories/repositorioFaturas");
+const {
+  iniciarProcesso,
+  getTarefaActual,
+  completarTarefa,
+  getVariaveis,
+  getProcessoGestaoActual,
+  cancelarProcesso,
+} = require("./repositories/repositorioCamunda");
+const {
   getContasFuncionarios,
   updateEstadoContaFuncionario,
   gerarConviteFuncionario,
@@ -1267,6 +1283,8 @@ app.post("/regras-preco", async (req, res) => {
   }
 });
 
+// Salas
+
 /**
  * @swagger
  * /salas:
@@ -1873,6 +1891,90 @@ app.get("/funcionarios", async (_req, res) => {
   }
 });
 
+// US - BET-34: lista funcionários elegíveis para uma lista de serviços + porte.
+// Replica a triagem que o worker gerar-solucoes faz em
+// camunda/workers/services/solucoes.js (cobre porte + faz pelo menos um dos tipos).
+// O frontend chama isto para popular o dropdown "Funcionário preferido" sem
+// duplicar a lógica de filtragem do lado do cliente.
+//
+// Query params:
+//   porte    : valor de PorteEnum (ex: PEQUENO)
+//   tiposIds : lista CSV de tipoServicoId (UUIDs)
+app.get("/funcionarios/elegiveis", async (req, res) => {
+  try {
+    const { porte, tiposIds, data, hora, duracaoTotal } = req.query;
+    if (!porte) {
+      return res.status(400).json({ error: "porte é obrigatório" });
+    }
+    const tiposArr = String(tiposIds || "")
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
+    if (tiposArr.length === 0) {
+      return res.status(400).json({ error: "tiposIds é obrigatório (CSV de UUIDs)" });
+    }
+
+    const where = {
+      porteAnimais: { has: porte },
+      funcionarioServico: { some: { tipoServicoId: { in: tiposArr } } },
+    };
+
+    // Filtro opcional por dia da semana — só devolve funcionários com um horário
+    // activo a cobrir esse dia. Mapeamento JS getDay() → enum (igual ao scheduler).
+    let diaSemana = null;
+    if (data) {
+      const d = new Date(`${data}T00:00:00`);
+      if (!Number.isNaN(d.getTime())) {
+        diaSemana = ["DOMINGO", "SEGUNDA", "TERCA", "QUARTA", "QUINTA", "SEXTA", "SABADO"][d.getDay()];
+        where.horariosTrabalho = {
+          some: { ativo: true, diasSemana: { has: diaSemana } },
+        };
+      }
+    }
+
+    const funcionarios = await prisma.funcionario.findMany({
+      where,
+      include: {
+        utilizador: { select: { nome: true, ativo: true } },
+        horariosTrabalho: { where: { ativo: true } },
+      },
+    });
+
+    // Filtro opcional por hora — quando `hora` + `duracaoTotal` são passados,
+    // restringe a quem tem turno a cobrir o slot pedido. Versão simplificada do
+    // que o scheduler faz: aqui só verifica turno (não verifica reservas existentes
+    // nem pausa — isso é trabalho do scheduler em gerar-solucoes).
+    //
+    // ajustes: para tornar o filtro mais ou menos estrito, mexer aqui.
+    // Ex: para validar pausa, comparar slot contra [pausaInicio, pausaFim].
+    let resultado = funcionarios.filter((f) => f.utilizador?.ativo !== false);
+    if (diaSemana && hora && duracaoTotal) {
+      const [hh, mm] = String(hora).split(":").map(Number);
+      const slotInicioMin = hh * 60 + mm;
+      const slotFimMin = slotInicioMin + Number(duracaoTotal);
+      if (!Number.isNaN(slotInicioMin) && !Number.isNaN(slotFimMin)) {
+        resultado = resultado.filter((f) =>
+          (f.horariosTrabalho || []).some((h) => {
+            if (!h.diasSemana.includes(diaSemana)) return false;
+            // horaInicio/Fim são Time — Prisma materializa como Date UTC (ver helper
+            // parseTimeToDate em repositorioFuncionarios.js que faz o inverso).
+            const hi = h.horaInicio.getUTCHours() * 60 + h.horaInicio.getUTCMinutes();
+            const hf = h.horaFim.getUTCHours() * 60 + h.horaFim.getUTCMinutes();
+            return hi <= slotInicioMin && slotFimMin <= hf;
+          })
+        );
+      }
+    }
+
+    return res.json(
+      resultado.map((f) => ({ id: f.id, nomeCompleto: f.utilizador?.nome }))
+    );
+  } catch (error) {
+    console.error("Erro ao obter funcionários elegíveis:", error);
+    return res.status(500).json({ error: "Erro ao obter funcionários elegíveis" });
+  }
+});
+
 app.get("/funcionarios/opcoes", (_req, res) => {
   return res.json({
     cargos: Object.values(TipoFuncionarioEnum),
@@ -2330,6 +2432,585 @@ app.post("/events", async (req, res) => {
     console.error("Failed to create event:", error);
     return res.status(500).json({ error: "Failed to create event" });
   }
+});
+
+// Agendamentos
+/**
+ * @swagger
+ * /agendamentos:
+ *   get:
+ *     summary: Lista todos os agendamentos (com filtros opcionais)
+ *     tags: [Agendamentos]
+ *     parameters:
+ *       - in: query
+ *         name: funcionarioId
+ *         schema: { type: string, format: uuid }
+ *         description: Filtra por funcionário associado a algum serviço
+ *       - in: query
+ *         name: salaId
+ *         schema: { type: string, format: uuid }
+ *         description: Filtra por sala associada a algum serviço
+ *       - in: query
+ *         name: dataFrom
+ *         schema: { type: string, format: date-time }
+ *         description: Início do intervalo de pesquisa (inclusive)
+ *       - in: query
+ *         name: dataTo
+ *         schema: { type: string, format: date-time }
+ *         description: Fim do intervalo de pesquisa (inclusive)
+ *       - in: query
+ *         name: estado
+ *         schema: { $ref: '#/components/schemas/EstadoAgendamentoEnum' }
+ *         description: Filtra por estado do agendamento
+ *     responses:
+ *       200:
+ *         description: Lista de agendamentos
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/Agendamento'
+ *       500:
+ *         description: Erro interno
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ */
+app.get("/agendamentos", async (req, res) => {
+  try {
+    const { funcionarioId, salaId, dataFrom, dataTo, estado } = req.query;
+    const agendamentos = await getAllAgendamentos({
+      funcionarioId,
+      salaId,
+      dataFrom,
+      dataTo,
+      estado,
+    });
+    return res.json(agendamentos);
+  } catch (error) {
+    console.error("Erro ao obter agendamentos:", error);
+    return res.status(500).json({ error: "Erro ao obter agendamentos" });
+  }
+});
+
+/**
+ * @swagger
+ * /agendamentos/{id}:
+ *   get:
+ *     summary: Obtém um agendamento por ID (com animal, cliente, serviços, funcionário e sala)
+ *     tags: [Agendamentos]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string, format: uuid }
+ *         description: ID do agendamento
+ *     responses:
+ *       200:
+ *         description: Agendamento encontrado
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Agendamento'
+ *       404:
+ *         description: Agendamento não encontrado
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       500:
+ *         description: Erro interno
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ */
+app.get("/agendamentos/:id", async (req, res) => {
+  try {
+    const agendamento = await getAgendamentoById(req.params.id);
+    if (!agendamento) {
+      return res.status(404).json({ error: "Agendamento não encontrado" });
+    }
+    return res.json(agendamento);
+  } catch (error) {
+    console.error("Erro ao obter agendamento:", error);
+    return res.status(500).json({ error: "Erro ao obter agendamento" });
+  }
+});
+
+// US - BET-43: consulta de fatura por ID (genérico — funciona para SERVICO_INTERNO
+// e ALUGUER_SALA). Devolve o registo cru com `conteudoJson` aninhado: o frontend
+// decide o que mostrar consoante `tipo`.
+/**
+ * @swagger
+ * /faturas/{id}:
+ *   get:
+ *     summary: Devolve uma fatura pelo seu ID
+ *     tags: [Faturas]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string, format: uuid }
+ *     responses:
+ *       200:
+ *         description: Fatura encontrada
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Fatura'
+ *       404:
+ *         description: Fatura não encontrada
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       500:
+ *         description: Erro interno
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ */
+app.get("/faturas/:id", async (req, res) => {
+  try {
+    const fatura = await getFaturaById(req.params.id);
+    if (!fatura) {
+      return res.status(404).json({ error: "Fatura não encontrada" });
+    }
+    return res.json(fatura);
+  } catch (error) {
+    console.error("Erro ao obter fatura:", error);
+    return res.status(500).json({ error: "Erro ao obter fatura" });
+  }
+});
+
+// Atalho para o frontend obter a fatura associada a um agendamento sem precisar
+// de saber o faturaId. Útil no botão "Fatura" da ListaAgendamentos.
+/**
+ * @swagger
+ * /agendamentos/{agendamentoId}/fatura:
+ *   get:
+ *     summary: Devolve a fatura associada a um agendamento (se existir)
+ *     tags: [Faturas]
+ *     parameters:
+ *       - in: path
+ *         name: agendamentoId
+ *         required: true
+ *         schema: { type: string, format: uuid }
+ *     responses:
+ *       200:
+ *         description: Fatura encontrada
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Fatura'
+ *       404:
+ *         description: Fatura não encontrada para este agendamento
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       500:
+ *         description: Erro interno
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ */
+app.get("/agendamentos/:agendamentoId/fatura", async (req, res) => {
+  try {
+    const fatura = await getFaturaByAgendamentoId(req.params.agendamentoId);
+    if (!fatura) {
+      return res.status(404).json({ error: "Fatura não encontrada para este agendamento" });
+    }
+    return res.json(fatura);
+  } catch (error) {
+    console.error("Erro ao obter fatura do agendamento:", error);
+    return res.status(500).json({ error: "Erro ao obter fatura do agendamento" });
+  }
+});
+
+/**
+ * @swagger
+ * /agendamentos/processos:
+ *   post:
+ *     summary: Arranca uma nova instância do processo BPMN "agendamento"
+ *     tags: [Agendamentos]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               clienteRegistado: { type: boolean }
+ *               clienteId: { type: string, format: uuid, nullable: true }
+ *               animalId: { type: string, format: uuid, nullable: true }
+ *     responses:
+ *       201:
+ *         description: Instância criada — devolve processInstanceId
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ProcessoInstanciado'
+ *       400:
+ *         description: clienteRegistado em falta
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       500:
+ *         description: Erro interno
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ */
+app.post("/agendamentos/processos", async (req, res) => {
+  try {
+    const { clienteRegistado, clienteId, animalId } = req.body;
+
+    // clienteRegistado é obrigatório — define o ramo do BPMN.
+    if (typeof clienteRegistado !== "boolean") {
+      return res.status(400).json({ error: "clienteRegistado (boolean) é obrigatório" });
+    }
+
+    const variaveis = { clienteRegistado };
+    if (clienteId) variaveis.clienteId = clienteId;
+    if (animalId) variaveis.animalId = animalId;
+
+    // No ramo cliente-registado o BPMN salta as user tasks que normalmente
+    // setam estes dados (BP116=porteAnimal, BP130=clienteEmail/nomeCliente).
+    // Resolvemos da BD a partir dos IDs para alimentar:
+    //   - worker obter-preco-duracao (BP243) → precisa de porteAnimal
+    //   - gateway BP146 e vários do gestao_agendamento.bpmn → precisam de clienteEmail
+    //   - worker montar-resumo (BP135) e templates de email → precisam de nomeCliente
+    if (clienteRegistado && (clienteId || animalId)) {
+      const [animal, cliente] = await Promise.all([
+        animalId
+          ? prisma.animal.findUnique({ where: { id: animalId }, select: { porte: true } })
+          : Promise.resolve(null),
+        clienteId
+          ? prisma.cliente.findUnique({
+              where: { id: clienteId },
+              select: { utilizador: { select: { email: true, nome: true } } },
+            })
+          : Promise.resolve(null),
+      ]);
+      if (animal?.porte) variaveis.porteAnimal = animal.porte;
+      if (cliente?.utilizador?.email) variaveis.clienteEmail = cliente.utilizador.email;
+      if (cliente?.utilizador?.nome) variaveis.nomeCliente = cliente.utilizador.nome;
+    }
+
+    const { processInstanceId } = await iniciarProcesso("agendamento", variaveis);
+    return res.status(201).json({ processInstanceId });
+  } catch (error) {
+    console.error("Erro ao iniciar processo de agendamento:", error);
+    return res.status(500).json({ error: "Erro ao iniciar processo de agendamento" });
+  }
+});
+
+// US - BET (check-in/check-out): devolve processInstanceId activo do gestao_agendamento
+// para um agendamento. Frontend faz lookup para retomar Check-out/pagamento sem
+// precisar de persistir o procId entre sessões.
+/**
+ * @swagger
+ * /agendamentos/{agendamentoId}/processo-gestao-actual:
+ *   get:
+ *     summary: Devolve o processInstanceId activo do processo gestao_agendamento para um agendamento
+ *     tags: [Agendamentos]
+ *     parameters:
+ *       - in: path
+ *         name: agendamentoId
+ *         required: true
+ *         schema: { type: string, format: uuid }
+ *     responses:
+ *       200:
+ *         description: processInstanceId activo ou null se nenhuma instância em curso
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 processInstanceId:
+ *                   type: string
+ *                   format: uuid
+ *                   nullable: true
+ *       500:
+ *         description: Erro interno
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ */
+app.get("/agendamentos/:agendamentoId/processo-gestao-actual", async (req, res) => {
+  try {
+    const processInstanceId = await getProcessoGestaoActual(req.params.agendamentoId);
+    return res.json({ processInstanceId });
+  } catch (error) {
+    console.error("Erro ao consultar processo gestao actual:", error);
+    return res.status(500).json({ error: "Erro ao consultar processo gestao actual" });
+  }
+});
+
+// Arranca uma nova instância do gestao_agendamento.bpmn (4 caminhos disponíveis:
+// ATENDER, REAGENDAR, CANCELAR, NAO_COMPARECEU — o ramo concreto é decidido depois
+// na user task BP161 via `accaoFuncionario`). Resolve clienteEmail e nomeCliente
+// a partir do agendamentoId — o BPMN usa-os em vários gateways "Cliente tem email?"
+// e em templates de email.
+/**
+ * @swagger
+ * /agendamentos/{agendamentoId}/processos/gestao:
+ *   post:
+ *     summary: Arranca uma nova instância do processo BPMN "gestao_agendamento"
+ *     tags: [Agendamentos]
+ *     parameters:
+ *       - in: path
+ *         name: agendamentoId
+ *         required: true
+ *         schema: { type: string, format: uuid }
+ *     responses:
+ *       201:
+ *         description: Instância criada — devolve processInstanceId
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ProcessoInstanciado'
+ *       404:
+ *         description: Agendamento não encontrado
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       500:
+ *         description: Erro interno
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ */
+app.post("/agendamentos/:agendamentoId/processos/gestao", async (req, res) => {
+  try {
+    const { agendamentoId } = req.params;
+
+    const agendamento = await prisma.agendamento.findUnique({
+      where: { id: agendamentoId },
+      select: {
+        id: true,
+        animal: {
+          select: {
+            cliente: {
+              select: { utilizador: { select: { email: true, nome: true } } },
+            },
+          },
+        },
+      },
+    });
+    if (!agendamento) {
+      return res.status(404).json({ error: "Agendamento não encontrado" });
+    }
+
+    const variaveis = { agendamentoId };
+    const utilizador = agendamento.animal?.cliente?.utilizador;
+    if (utilizador?.email) variaveis.clienteEmail = utilizador.email;
+    if (utilizador?.nome) variaveis.nomeCliente = utilizador.nome;
+
+    const { processInstanceId } = await iniciarProcesso("gestao_agendamento", variaveis);
+    return res.status(201).json({ processInstanceId });
+  } catch (error) {
+    console.error("Erro ao iniciar processo gestao_agendamento:", error);
+    return res.status(500).json({ error: "Erro ao iniciar processo de gestão" });
+  }
+});
+
+/**
+ * @swagger
+ * /agendamentos/processos/{procId}/tarefa-actual:
+ *   get:
+ *     summary: Devolve a user task pendente da instância (ou null se não houver)
+ *     tags: [Agendamentos]
+ *     parameters:
+ *       - in: path
+ *         name: procId
+ *         required: true
+ *         schema: { type: string, format: uuid }
+ *     responses:
+ *       200:
+ *         description: User task pendente (ou null se o processo já não tem tarefa em curso)
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/TarefaCamunda'
+ *       500:
+ *         description: Erro interno
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ */
+app.get("/agendamentos/processos/:procId/tarefa-actual", async (req, res) => {
+  try {
+    const tarefa = await getTarefaActual(req.params.procId);
+    return res.json(tarefa);
+  } catch (error) {
+    console.error("Erro ao obter tarefa actual:", error);
+    return res.status(500).json({ error: "Erro ao obter tarefa actual" });
+  }
+});
+
+/**
+ * @swagger
+ * /agendamentos/processos/{procId}/tarefas/{taskId}/completar:
+ *   post:
+ *     summary: Completa uma user task com as variáveis enviadas no body
+ *     tags: [Agendamentos]
+ *     parameters:
+ *       - in: path
+ *         name: procId
+ *         required: true
+ *         schema: { type: string, format: uuid }
+ *       - in: path
+ *         name: taskId
+ *         required: true
+ *         schema: { type: string, format: uuid }
+ *     requestBody:
+ *       required: false
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             description: "Objecto plano com as variáveis a passar (ex: { porte: 'M' })"
+ *     responses:
+ *       204:
+ *         description: Tarefa completada (sem body)
+ *       500:
+ *         description: Erro interno
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ */
+app.post("/agendamentos/processos/:procId/tarefas/:taskId/completar", async (req, res) => {
+  try {
+    const variaveis = req.body || {};
+    await completarTarefa(req.params.taskId, variaveis);
+    return res.status(204).send();
+  } catch (error) {
+    console.error("Erro ao completar tarefa:", error);
+    return res.status(500).json({ error: "Erro ao completar tarefa" });
+  }
+});
+
+/**
+ * @swagger
+ * /agendamentos/processos/{procId}/variaveis:
+ *   get:
+ *     summary: Lê todas as variáveis do processo (formato JS plano)
+ *     tags: [Agendamentos]
+ *     parameters:
+ *       - in: path
+ *         name: procId
+ *         required: true
+ *         schema: { type: string, format: uuid }
+ *     responses:
+ *       200:
+ *         description: "Objecto plano com as variáveis do processo (parent + sub-instances activas; sub-instance ganha em colisões)"
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               additionalProperties: true
+ *               description: "Chaves dependem do estado do processo. Exemplos: servicosActualizados, qtdServicos, opcaoSelecionada, valorEstimado, dataPreferida."
+ *       500:
+ *         description: Erro interno
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ */
+app.get("/agendamentos/processos/:procId/variaveis", async (req, res) => {
+  try {
+    const variaveis = await getVariaveis(req.params.procId);
+    return res.json(variaveis);
+  } catch (error) {
+    console.error("Erro ao obter variáveis:", error);
+    return res.status(500).json({ error: "Erro ao obter variáveis" });
+  }
+});
+
+/**
+ * @swagger
+ * /agendamentos/processos/{procId}:
+ *   delete:
+ *     summary: Cancela e remove uma instância de processo em curso
+ *     tags: [Agendamentos]
+ *     parameters:
+ *       - in: path
+ *         name: procId
+ *         required: true
+ *         schema: { type: string, format: uuid }
+ *     responses:
+ *       204:
+ *         description: Instância cancelada (ou já não existia — idempotente)
+ *       500:
+ *         description: Erro interno
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ */
+app.delete("/agendamentos/processos/:procId", async (req, res) => {
+  // US - BET-34: cancelar agendamento a partir do wizard. O cancelamento humano
+  // não está modelado no BPMN — o caminho "abandonar a meio" é responsabilidade
+  // deste endpoint.
+  //
+  // Ordem B refinada (decidida em 2026-05-12):
+  //   1. Ler `reservasTemporariasIds` das vars Camunda — antes de cancelar, porque
+  //      as vars desaparecem com a instância.
+  //   2. Cancelar processo Camunda — operação principal; se falhar, devolvemos 500
+  //      sem ter tocado em BD.
+  //   3. Apagar reservas em BD pelos IDs lidos — best-effort. Se falhar, log mas
+  //      devolve 204: o TTL da ReservaTemporaria (5 min) limpa orfãs.
+  //
+  // Usamos IDs (não `processInstanceId`) porque o worker `criar-reservas-temporarias-opcao`
+  // grava as reservas com o id da SUB-INSTANCE (sub_gerar_selecionar_opcao), não do parent.
+  // A variável `reservasTemporariasIds` é o contrato externo da opção escolhida.
+  const procId = req.params.procId;
+  let idsParaApagar = [];
+
+  try {
+    const vars = await getVariaveis(procId);
+    const raw = vars.reservasTemporariasIds;
+    if (raw) {
+      const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
+      if (Array.isArray(parsed)) idsParaApagar = parsed;
+    }
+  } catch (e) {
+    console.warn(`[cancelar-processo] Sem reservasTemporariasIds: ${e.message}`);
+  }
+
+  try {
+    await cancelarProcesso(procId);
+  } catch (error) {
+    console.error("Erro ao cancelar processo Camunda:", error);
+    return res.status(500).json({ error: "Erro ao cancelar processo" });
+  }
+
+  if (idsParaApagar.length > 0) {
+    try {
+      const { count } = await prisma.reservaTemporaria.deleteMany({
+        where: { id: { in: idsParaApagar } },
+      });
+      console.log(`[cancelar-processo] ${count}/${idsParaApagar.length} reservas libertadas [proc=${procId}]`);
+    } catch (e) {
+      console.warn(`[cancelar-processo] Falha a libertar reservas (TTL recuperará): ${e.message}`);
+    }
+  }
+
+  return res.status(204).send();
 });
 
 async function startServer() {

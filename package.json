@@ -2,6 +2,10 @@
   "name": "baths",
   "private": true,
   "scripts": {
+    "start": "npm run camunda:boot && npm run workers",
+    "project": "npm run project:db && npm run camunda:boot && npm run project:apps",
+    "project:db": "npm run db:full --prefix backend",
+    "project:apps": "concurrently -k -n backend,frontend,workers -c blue,green,magenta \"npm start --prefix backend\" \"npm start --prefix frontend\" \"npm run workers\"",
     "camunda:up": "docker compose up -d",
     "camunda:logs": "docker compose logs -f camunda",
     "camunda:down": "docker compose down",
@@ -24,6 +28,7 @@
     "nodemailer": "^8.0.4"
   },
   "devDependencies": {
+    "concurrently": "^9.1.0",
     "cross-env": "^10.1.0",
     "nodemon": "^3.1.0",
     "prisma": "^6.19.0"

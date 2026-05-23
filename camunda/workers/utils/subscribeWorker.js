@@ -14,9 +14,11 @@ const { log } = require('./logger');
  * @param {object} opts
  * @param {string} opts.topic — nome do topic
  * @param {({ task, taskService, vars }) => Promise<void|string>} opts.handler
- * @param {'handleFailure'|'completeWithFlag'|'complete'} [opts.onError='handleFailure']
+ * @param {'handleFailure'|'completeWithFlag'|'falhaTecnica'|'complete'} [opts.onError='handleFailure']
  *        - handleFailure    → bloqueia o processo (errorMessage + retries=0).
  *        - completeWithFlag → define operacaoBemSucedida=false e completa; processo continua pelo ramo de erro do BPMN.
+ *        - falhaTecnica     → dispara Boundary Error com errorCode 'FALHA_TECNICA'. O BPMN tem de ter um boundary
+ *                             anexado à ST com esse código (ex: BP87, BP91, BP103, BP101 em sub_gerar_selecionar_opcao).
  *        - complete         → best-effort; completa sem flag. Para tasks onde o erro não deve impactar o processo (ex: emails).
  */
 function subscribeWorker(client, { topic, handler, onError = 'handleFailure' }) {
@@ -34,6 +36,8 @@ function subscribeWorker(client, { topic, handler, onError = 'handleFailure' }) 
                 vars.set('operacaoBemSucedida', false);
                 vars.set('mensagemErro', err.message);
                 await taskService.complete(task, vars);
+            } else if (onError === 'falhaTecnica') {
+                await taskService.handleBpmnError(task, 'FALHA_TECNICA', err.message);
             } else {
                 await taskService.complete(task);
             }

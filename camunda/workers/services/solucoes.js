@@ -1,6 +1,4 @@
-// =====================================================
-// Service: solucoes — gerador de propostas de horário
-// =====================================================
+// Service: solucoes — gerador de propostas de horário.
 // Dado um conjunto de serviços (já ordenados pela DMN), o porte do animal e uma data preferida,
 // procura combinações viáveis de "funcionário + sala + hora de início" para os próximos N dias (default 7)
 // e devolve até `maxOpcoes` (default 4) propostas para o funcionário escolher. Os recursos elegíveis vêm do schema
@@ -8,7 +6,7 @@
 // A disponibilidade contra agendamentos existentes e reservas de outros processos é validada via
 // `verificarDisponibilidade` em ./reservas.
 //
-// Algoritmo em 4 fases:
+// Algoritmo em 3 fases (ordenação por critérios de negócio é delegada a `ordenarSolucoes`):
 //   1. CARREGAR candidatos: funcionários elegíveis (porte + serviço) e salas elegíveis (serviço).
 //      `recursosPorServico` calcula, por serviço, o subconjunto exacto que o consegue fazer.
 //   2. CONSTRUIR slots do dia (múltiplos de 15min):
@@ -17,7 +15,6 @@
 //   3. PARA CADA SLOT (cronologicamente): heurística `algumFuncCobre` (se ninguém trabalha até
 //      slot + duracaoTotal, break do dia); senão `tentarConstruirSolucao` encadeia os serviços
 //      e devolve solução ou null. Pára em maxOpcoes (default 4).
-//   4. ORDENAR a lista final: proximidade → menos funcs → mais cedo.
 //
 // Exemplo (Mia, PEQUENO, 4 serviços = 130min, dataPreferida 29/04/2026 17:00):
 //   - Dia 1 (29/04): primeiro slot = 17:00. Fim mínimo 17:00+130min = 19:10 excede o último
@@ -37,6 +34,20 @@ const prisma = require('../utils/db');
 const { log, debug } = require('../utils/logger');
 const { verificarDisponibilidade } = require('./reservas');
 const { addMinutes, addDays, startOfDay, areIntervalsOverlapping } = require('date-fns');
+
+const TOPIC = 'scheduler';
+
+// ajustes:
+// Granularidade dos slots de início, em minutos. 15 é o equilíbrio actual entre cobertura (apanha a maioria das janelas válidas)
+// e custo (cada slot extra pode gerar queries à BD via `verificarDisponibilidade`).
+//
+// Para oferecer mais granularidade (e potencialmente mais opções), reduzir:
+//   const GRANULARIDADE_SLOT_MIN = 10;  // tenta a cada 10min — ~50% mais slots
+// Para ser mais conservador (menos queries, mas pode falhar janelas curtas):
+//   const GRANULARIDADE_SLOT_MIN = 30;  // tenta só a cada 30min
+// Não mexer abaixo de 5min sem rever a heurística `algumFuncCobre` — pode quebrar a propriedade "se ninguém cobre este slot,
+// nenhum slot seguinte também cobre" (verdadeira só porque slots subsequentes começam mais tarde).
+const GRANULARIDADE_SLOT_MIN = 15;
 
 // Formata um Date como HH:MM (UTC) — usado nos logs do scheduler.
 function fmtH(d) { return d.toISOString().slice(11, 16); }
@@ -108,9 +119,9 @@ function slotCabeNoTurno(horario, dataBase, inicio, fim) {
  *
  * Critério de escolha da sala (dentro das livres):
  *   1. A mesma sala do serviço anterior — evita mover o animal entre salas.
- *   2. Sala de menor capacidade — usa salas especializadas antes da polivalente.
- *   3. Polivalente (capacidade maior) como último recurso — fica disponível para casos
- *      onde não há alternativa, em vez de ser usada por defeito e bloquear paralelismo.
+ *   2. Sala de menor capacidade primeiro — favorece salas especializadas. A polivalente
+ *      tem a maior capacidade do catálogo e fica naturalmente em último, livre para casos
+ *      em que não há alternativa (sem regra explícita "polivalente é fallback").
  *
  * Devolve null se em qualquer ponto não houver funcionário ou sala disponível para o serviço actual
  * (a tentativa falha; o caller pode tentar outro slot de início).
@@ -146,7 +157,8 @@ async function tentarConstruirSolucao(
     funcionarioPreferido,
     processInstanceId,
     bloqueiosFuncionario,
-    bloqueiosSala
+    bloqueiosSala,
+    agendamentoIdIgnorar
 ) {
     const servicosSolucao = [];
     let cursor = new Date(inicioBase);
@@ -157,7 +169,7 @@ async function tentarConstruirSolucao(
         const fim = addMinutes(cursor, servico.duracaoMinutos);
         const nomeServico = servico.nomeServico ?? servico.nome ?? servico.tipoServicoId;
 
-        debug('scheduler', `    [${nomeServico}] ${fmtH(cursor)}–${fmtH(fim)} (${servico.duracaoMinutos}min) — ${funcionarios.length} func(s) candidato(s)`);
+        debug(TOPIC, `    [${nomeServico}] ${fmtH(cursor)}–${fmtH(fim)} (${servico.duracaoMinutos}min) — ${funcionarios.length} func(s) candidato(s)`);
 
         // Ordenar candidatos: preferido (0) → anterior (1) → outros (2). O sort é estável,
         // por isso dentro de cada grupo a ordem original é mantida.
@@ -176,7 +188,7 @@ async function tentarConstruirSolucao(
 
             const bloqueadoAte = bloqueiosFuncionario.get(func.id);
             if (bloqueadoAte && cursor < bloqueadoAte) {
-                debug('scheduler', `      ${nome}: cache bloqueado até ${fmtH(bloqueadoAte)}`);
+                debug(TOPIC, `      ${nome}: cache bloqueado até ${fmtH(bloqueadoAte)}`);
                 continue;
             }
 
@@ -188,7 +200,7 @@ async function tentarConstruirSolucao(
                 const turnoStr = turnoNoDia
                     ? `turno ${fmtH(combinarDataHora(dataDoDia, turnoNoDia.horaInicio))}–${fmtH(combinarDataHora(dataDoDia, turnoNoDia.horaFim))}`
                     : 'não trabalha neste dia';
-                debug('scheduler', `      ${nome}: fora do turno (${turnoStr})`);
+                debug(TOPIC, `      ${nome}: fora do turno (${turnoStr})`);
                 continue;
             }
 
@@ -198,27 +210,28 @@ async function tentarConstruirSolucao(
                 dataHoraInicio: cursor.toISOString(),
                 dataHoraFim: fim.toISOString(),
                 processInstanceId,
+                agendamentoIdIgnorar,
             });
 
             if (result.ok) {
-                debug('scheduler', `      ${nome}: disponível ✓`);
+                debug(TOPIC, `      ${nome}: disponível ✓`);
                 funcsDisponiveis.push(func);
             } else if (result.livreEm) {
-                debug('scheduler', `      ${nome}: ocupado até ${fmtH(new Date(result.livreEm))}`);
+                debug(TOPIC, `      ${nome}: ocupado até ${fmtH(new Date(result.livreEm))}`);
                 // Cache: este funcionário está ocupado até result.livreEm — saltamos em
                 // tentativas posteriores que comecem antes desse momento.
                 bloqueiosFuncionario.set(func.id, result.livreEm);
             } else {
-                debug('scheduler', `      ${nome}: ocupado (sem data de libertação)`);
+                debug(TOPIC, `      ${nome}: ocupado (sem data de libertação)`);
             }
         }
 
         if (funcsDisponiveis.length === 0) {
-            debug('scheduler', `    [${nomeServico}] sem funcionário disponível → slot descartado`);
+            debug(TOPIC, `    [${nomeServico}] sem funcionário disponível → slot descartado`);
             return null;
         }
         const funcEscolhido = funcsDisponiveis[0];
-        debug('scheduler', `    [${nomeServico}] funcionário escolhido: ${funcEscolhido.utilizador?.nome ?? funcEscolhido.id}`);
+        debug(TOPIC, `    [${nomeServico}] funcionário escolhido: ${funcEscolhido.utilizador?.nome ?? funcEscolhido.id}`);
 
         // Sala anterior primeiro (animal não muda de sítio); depois salas especializadas
         // (menor capacidade) antes da polivalente — reserva a polivalente para último recurso.
@@ -234,7 +247,7 @@ async function tentarConstruirSolucao(
 
             const bloqueadaAte = bloqueiosSala.get(sala.id);
             if (bloqueadaAte && cursor < bloqueadaAte) {
-                debug('scheduler', `      sala ${nomeSala}: cache bloqueada até ${fmtH(bloqueadaAte)}`);
+                debug(TOPIC, `      sala ${nomeSala}: cache bloqueada até ${fmtH(bloqueadaAte)}`);
                 continue;
             }
 
@@ -244,30 +257,31 @@ async function tentarConstruirSolucao(
                 dataHoraInicio: cursor.toISOString(),
                 dataHoraFim: fim.toISOString(),
                 processInstanceId,
+                agendamentoIdIgnorar,
                 // Passamos a capacidade que já temos em memória para evitar uma query extra
                 // dentro de verificarDisponibilidade.
                 capacidade: sala.capacidade,
             });
 
             if (result.ok) {
-                debug('scheduler', `      sala ${nomeSala}: disponível ✓`);
+                debug(TOPIC, `      sala ${nomeSala}: disponível ✓`);
                 salaEscolhida = sala;
                 break;
             }
 
             if (result.livreEm) {
-                debug('scheduler', `      sala ${nomeSala}: ocupada até ${fmtH(new Date(result.livreEm))}`);
+                debug(TOPIC, `      sala ${nomeSala}: ocupada até ${fmtH(new Date(result.livreEm))}`);
                 bloqueiosSala.set(sala.id, result.livreEm);
             } else {
-                debug('scheduler', `      sala ${nomeSala}: ocupada (sem data de libertação)`);
+                debug(TOPIC, `      sala ${nomeSala}: ocupada (sem data de libertação)`);
             }
         }
 
         if (!salaEscolhida) {
-            debug('scheduler', `    [${nomeServico}] sem sala disponível → slot descartado`);
+            debug(TOPIC, `    [${nomeServico}] sem sala disponível → slot descartado`);
             return null;
         }
-        debug('scheduler', `    [${nomeServico}] sala escolhida: ${salaEscolhida.nome ?? salaEscolhida.id}`);
+        debug(TOPIC, `    [${nomeServico}] sala escolhida: ${salaEscolhida.nome ?? salaEscolhida.id}`);
 
         servicosSolucao.push({
             tipoServicoId: servico.tipoServicoId,
@@ -311,7 +325,7 @@ async function tentarConstruirSolucao(
  * Entrada principal do scheduler. Procura até `maxOpcoes` soluções viáveis nos próximos
  * `diasParaProcurar` dias a partir de `dataPreferida`.
  *
- * Algoritmo em 4 fases:
+ * Algoritmo em 3 fases (ordenação por critérios de negócio é delegada a `ordenarSolucoes`):
  *
  * 1. Carrega da BD os funcionários elegíveis (que cobrem o porte do animal e fazem pelo menos
  *    um dos tipos de serviço pedidos) e as salas elegíveis (ativas e que suportam pelo menos
@@ -330,11 +344,11 @@ async function tentarConstruirSolucao(
  *       slot+duracaoTotal, break); senão `tentarConstruirSolucao` devolve solução ou null.
  *    c. Pára quando atinge maxOpcoes (no total, não por dia).
  *
- * 4. Ordena as opções: proximidade à dataPreferida → menos funcionários diferentes → mais cedo.
- *    NOTA: na prática o critério 1 decide tudo — o scheduler nunca gera duas soluções no mesmo
- *    slot, e os slots são sempre ≥ dataPreferida (dia 1) ou em dias futuros, pelo que ordem
- *    cronológica = ordem por proximidade. Critérios 2 e 3 são salvaguardas teóricas.
- *    O `funcionarioPreferido` desempata a escolha de trabalhador dentro de cada solução (em tentarConstruirSolucao).
+ * Devolve as opções pela ordem cronológica em que foram geradas. A ordenação por critérios
+ * de negócio (proximidade → menos funcionários diferentes → mais cedo) é responsabilidade
+ * exclusiva de `ordenarSolucoes`, invocado no passo seguinte do BPMN (BP91).
+ * O `funcionarioPreferido` é a primeira preferência dentro de `tentarConstruirSolucao`
+ * (peso 0 no sort dos candidatos disponíveis — não é desempate, é prioridade máxima).
  *
  * Exemplo A (Mia, dataPreferida 29/04 17:00):
  *   - Dia 1 (29/04): slot mínimo = max(08:00, 17:00) = 17:00. Fim mínimo 19:10 > 19:00 (último
@@ -368,6 +382,7 @@ async function gerarSolucoes({
     processInstanceId,
     diasParaProcurar = 7,
     maxOpcoes = 4,
+    agendamentoIdIgnorar = null,
 }) {
     if (servicosOrdenados.length === 0) throw new Error('Pelo menos um serviço é necessário');
     if (!porteAnimal) throw new Error('porteAnimal é obrigatório');
@@ -412,10 +427,10 @@ async function gerarSolucoes({
         ),
     }));
 
-    debug('scheduler', `Funcionários elegíveis (${todosOsFuncionarios.length}): ${todosOsFuncionarios.map((f) => f.utilizador?.nome ?? f.id).join(', ')}`);
-    debug('scheduler', `Salas elegíveis (${todasAsSalas.length}): ${todasAsSalas.map((s) => s.nome ?? s.id).join(', ')}`);
+    debug(TOPIC, `Funcionários elegíveis (${todosOsFuncionarios.length}): ${todosOsFuncionarios.map((f) => f.utilizador?.nome ?? f.id).join(', ')}`);
+    debug(TOPIC, `Salas elegíveis (${todasAsSalas.length}): ${todasAsSalas.map((s) => s.nome ?? s.id).join(', ')}`);
     for (const { servico, funcionarios, salas } of recursosPorServico) {
-        debug('scheduler', `  ${servico.nomeServico ?? servico.nome ?? servico.tipoServicoId}: funcs=[${funcionarios.map((f) => f.utilizador?.nome ?? f.id).join(', ')}] salas=[${salas.map((s) => s.nome ?? s.id).join(', ')}]`);
+        debug(TOPIC, `  ${servico.nomeServico ?? servico.nome ?? servico.tipoServicoId}: funcs=[${funcionarios.map((f) => f.utilizador?.nome ?? f.id).join(', ')}] salas=[${salas.map((s) => s.nome ?? s.id).join(', ')}]`);
     }
 
     const duracaoTotalMinutos = servicosOrdenados.reduce((sum, s) => sum + s.duracaoMinutos, 0);
@@ -426,6 +441,25 @@ async function gerarSolucoes({
     for (let dia = 0; dia < diasParaProcurar && opcoes.length < maxOpcoes; dia++) {
         const dataDoDia = addDays(startOfDay(dataBase), dia);
         const diaSemana = getDiaSemana(dataDoDia);
+
+        // Heurística de exclusão precoce do dia: se algum serviço da lista não tem
+        // nenhum funcionário elegível a trabalhar neste dia (todos os candidatos de
+        // folga), é impossível construir solução em qualquer slot — descartamos o
+        // dia inteiro sem construir slots nem fazer queries.
+        // Exemplo: TOSQUIA_COMPLETA só é feita por Sofia e Tiago; ambos de folga na
+        // segunda → segunda inteira descartada aqui em vez de tentar N slots em vão.
+        const servicoSemFuncs = recursosPorServico.find(({ funcionarios }) =>
+            !funcionarios.some((f) =>
+                f.horariosTrabalho.some((h) => h.diasSemana.includes(diaSemana))
+            )
+        );
+        if (servicoSemFuncs) {
+            const nomeServ = servicoSemFuncs.servico.nomeServico
+                ?? servicoSemFuncs.servico.nome
+                ?? servicoSemFuncs.servico.tipoServicoId;
+            log(TOPIC, `── Dia ${dia + 1}/${diasParaProcurar}: ${dataDoDia.toISOString().slice(0, 10)} (${diaSemana}) — descartado: nenhum funcionário elegível para "${nomeServ}" trabalha neste dia`, 'info');
+            continue;
+        }
 
         // Caches reiniciados por dia: a disponibilidade muda quando muda o dia.
         const bloqueiosFuncionario = new Map();
@@ -452,23 +486,26 @@ async function gerarSolucoes({
                         ? new Date(Math.max(inicioTurno.getTime(), dataBase.getTime()))
                         : inicioTurno;
 
-                    // Arredondar para o próximo múltiplo de 15 min — slots ficam em :00, :15, :30, :45.
+                    // Arredondar para o próximo múltiplo de GRANULARIDADE_SLOT_MIN —
+                    // com o default (15), slots ficam em :00, :15, :30, :45.
                     const minutos = horaMin.getUTCMinutes();
-                    const resto = minutos % 15;
-                    const cursor = resto === 0 ? new Date(horaMin) : addMinutes(horaMin, 15 - resto);
+                    const resto = minutos % GRANULARIDADE_SLOT_MIN;
+                    const cursor = resto === 0
+                        ? new Date(horaMin)
+                        : addMinutes(horaMin, GRANULARIDADE_SLOT_MIN - resto);
 
                     const fimTurno = combinarDataHora(dataDoDia, h.horaFim);
 
                     let t = new Date(cursor);
                     while (t < fimTurno) {
                         slotsInicio.add(t.toISOString());
-                        t = addMinutes(t, 15);
+                        t = addMinutes(t, GRANULARIDADE_SLOT_MIN);
                     }
                 }
             }
         }
 
-        log('scheduler', `── Dia ${dia + 1}/${diasParaProcurar}: ${dataDoDia.toISOString().slice(0, 10)} (${diaSemana}) — ${slotsInicio.size} slot(s) a tentar`, 'info');
+        log(TOPIC, `── Dia ${dia + 1}/${diasParaProcurar}: ${dataDoDia.toISOString().slice(0, 10)} (${diaSemana}) — ${slotsInicio.size} slot(s) a tentar`, 'info');
 
         // Tenta cada slot por ordem cronológica até encontrar maxOpcoes (no total).
         for (const slotStr of [...slotsInicio].sort()) {
@@ -491,11 +528,11 @@ async function gerarSolucoes({
                 })
             );
             if (!algumFuncCobre) {
-                debug('scheduler', `  slot ${fmtH(slotInicio)}: fim mínimo ${fmtH(fimMinimo)} excede todos os turnos — restantes slots do dia descartados`);
+                debug(TOPIC, `  slot ${fmtH(slotInicio)}: fim mínimo ${fmtH(fimMinimo)} excede todos os turnos — restantes slots do dia descartados`);
                 break;
             }
 
-            debug('scheduler', `  slot ${fmtH(slotInicio)}`);
+            debug(TOPIC, `  slot ${fmtH(slotInicio)}`);
 
             const solucao = await tentarConstruirSolucao(
                 recursosPorServico,
@@ -504,31 +541,23 @@ async function gerarSolucoes({
                 funcionarioPreferido,
                 processInstanceId,
                 bloqueiosFuncionario,
-                bloqueiosSala
+                bloqueiosSala,
+                agendamentoIdIgnorar
             );
 
             if (solucao) {
-                log('scheduler', `  ✓ opção ${opcoes.length + 1}: ${fmtH(new Date(solucao.dataHoraInicio))}–${fmtH(new Date(solucao.dataHoraFim))} (${solucao.numFuncionariosDiferentes} func(s))`, 'success');
+                log(TOPIC, `  ✓ opção ${opcoes.length + 1}: ${fmtH(new Date(solucao.dataHoraInicio))}–${fmtH(new Date(solucao.dataHoraFim))} (${solucao.numFuncionariosDiferentes} func(s))`, 'success');
                 opcoes.push(solucao);
             }
         }
     }
 
-    // Ordenação final: 1º proximidade à dataPreferida, 2º menos funcionários diferentes,
-    // 3º mais cedo na cronologia. Ver também ordenarSolucoes (mesma lógica, aplicada noutro ponto).
-    // Na prática o 1º critério decide tudo: o scheduler nunca gera duas soluções no mesmo slot,
-    // e como os slots são sempre ≥ dataPreferida (dia 1) ou em dias futuros (dias seguintes),
-    // ordem cronológica = ordem por proximidade. Os critérios 2 e 3 raramente actuam.
-    opcoes.sort((a, b) => {
-        const proxA = Math.abs(new Date(a.dataHoraInicio) - dataBase);
-        const proxB = Math.abs(new Date(b.dataHoraInicio) - dataBase);
-        if (proxA !== proxB) return proxA - proxB;
-        if (a.numFuncionariosDiferentes !== b.numFuncionariosDiferentes)
-            return a.numFuncionariosDiferentes - b.numFuncionariosDiferentes;
-        return new Date(a.dataHoraInicio) - new Date(b.dataHoraInicio);
-    });
+    // Ordenação por critérios de negócio é responsabilidade exclusiva de `ordenarSolucoes`
+    // (executado a seguir no BPMN, BP91 → topic ordenar-solucoes). Aqui devolvemos as
+    // opções pela ordem em que foram geradas (cronológica natural do scheduler), que
+    // empiricamente já equivale à ordem por proximidade na maioria dos casos.
 
-    log('solucoes', `✓ ${opcoes.length} opção(ões) gerada(s)`, 'success');
+    log(TOPIC, `✓ ${opcoes.length} opção(ões) gerada(s)`, 'success');
     return { solucoes: opcoes, duracaoTotalMinutos: opcoes[0]?.duracaoTotal ?? 0 };
 }
 

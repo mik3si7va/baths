@@ -2,7 +2,9 @@ import React from 'react';
 import { Card, CardContent, Typography, Box } from '@mui/material';
 import { useThemeContext } from '../contexts/ThemeContext';
 
-export default function SummaryCard({ icon: Icon, label, value = '—', height, width }) {
+// Tamanho fixo (80 × 238) para evitar reflow desconfortável ao redimensionar a janela.
+// Se um caller precisar de outro tamanho pontual, pode sobrepor via props.
+export default function SummaryCard({ icon: Icon, label, value = '-', height = 80, width = 238 }) {
     const { colors, cardStyles } = useThemeContext();
 
     return (
