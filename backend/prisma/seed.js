@@ -255,16 +255,16 @@ async function seedFuncionarios() {
       horaFim: '18:00',
       pausaInicio: '13:00',
       pausaFim: '14:00',
-      especialidades: ['TOSQUIA_COMPLETA', 
-                      'BANHO', 
-                      'CORTE_UNHAS',
-                      'LIMPEZA_OUVIDOS',
-                      'EXPRESSAO_GLANDULAS',
-                      'LIMPEZA_DENTES',
-                      'APARAR_PELO_CARA',
-                      'ANTI_PULGAS',
-                      'ANTI_QUEDA',
-                      'REMOCAO_NOS',],
+      especialidades: ['TOSQUIA_COMPLETA',
+        'BANHO',
+        'CORTE_UNHAS',
+        'LIMPEZA_OUVIDOS',
+        'EXPRESSAO_GLANDULAS',
+        'LIMPEZA_DENTES',
+        'APARAR_PELO_CARA',
+        'ANTI_PULGAS',
+        'ANTI_QUEDA',
+        'REMOCAO_NOS',],
     },
     {
       nomeCompleto: 'Miguel Torres',
@@ -278,13 +278,13 @@ async function seedFuncionarios() {
       pausaInicio: '13:00',
       pausaFim: '14:00',
       especialidades: ['BANHO',
-                      'CORTE_UNHAS',
-                      'LIMPEZA_OUVIDOS',
-                      'EXPRESSAO_GLANDULAS',
-                      'LIMPEZA_DENTES',
-                      'ANTI_PULGAS',
-                      'ANTI_QUEDA',
-                      'REMOCAO_NOS',],
+        'CORTE_UNHAS',
+        'LIMPEZA_OUVIDOS',
+        'EXPRESSAO_GLANDULAS',
+        'LIMPEZA_DENTES',
+        'ANTI_PULGAS',
+        'ANTI_QUEDA',
+        'REMOCAO_NOS',],
     },
     {
       nomeCompleto: 'Ana Rita Costa',
@@ -298,15 +298,15 @@ async function seedFuncionarios() {
       pausaInicio: '13:00',
       pausaFim: '14:00',
       especialidades: ['BANHO',
-                     'TOSQUIA_HIGIENICA',
-                      'CORTE_UNHAS',
-                      'LIMPEZA_OUVIDOS',
-                      'EXPRESSAO_GLANDULAS',
-                      'LIMPEZA_DENTES',
-                      'APARAR_PELO_CARA',
-                      'ANTI_PULGAS',
-                      'ANTI_QUEDA',
-                      'REMOCAO_NOS',],
+        'TOSQUIA_HIGIENICA',
+        'CORTE_UNHAS',
+        'LIMPEZA_OUVIDOS',
+        'EXPRESSAO_GLANDULAS',
+        'LIMPEZA_DENTES',
+        'APARAR_PELO_CARA',
+        'ANTI_PULGAS',
+        'ANTI_QUEDA',
+        'REMOCAO_NOS',],
     },
     {
       nomeCompleto: 'Mariana Cruz',
@@ -320,13 +320,13 @@ async function seedFuncionarios() {
       pausaInicio: '13:00',
       pausaFim: '14:00',
       especialidades: ['TOSQUIA_HIGIENICA',
-                      'CORTE_UNHAS',
-                      'LIMPEZA_OUVIDOS',
-                      'LIMPEZA_DENTES',
-                      'APARAR_PELO_CARA',
-                      'ANTI_PULGAS',
-                      'ANTI_QUEDA',
-                      'REMOCAO_NOS',],
+        'CORTE_UNHAS',
+        'LIMPEZA_OUVIDOS',
+        'LIMPEZA_DENTES',
+        'APARAR_PELO_CARA',
+        'ANTI_PULGAS',
+        'ANTI_QUEDA',
+        'REMOCAO_NOS',],
     },
     {
       nomeCompleto: 'Tiago Lopes',
@@ -340,13 +340,13 @@ async function seedFuncionarios() {
       pausaInicio: '13:00',
       pausaFim: '14:00',
       especialidades: ['TOSQUIA_COMPLETA',
-                      'CORTE_UNHAS',
-                      'LIMPEZA_OUVIDOS',
-                      'LIMPEZA_DENTES',
-                      'APARAR_PELO_CARA',
-                      'ANTI_PULGAS',
-                      'ANTI_QUEDA',
-                      'REMOCAO_NOS',],
+        'CORTE_UNHAS',
+        'LIMPEZA_OUVIDOS',
+        'LIMPEZA_DENTES',
+        'APARAR_PELO_CARA',
+        'ANTI_PULGAS',
+        'ANTI_QUEDA',
+        'REMOCAO_NOS',],
     },
     {
       nomeCompleto: 'Joao Miguel',
@@ -540,6 +540,223 @@ async function seedClientes() {
   }
 }
 
+async function seedAgendamentos() {
+  // Agendamentos de exemplo para povoar a BD em ambiente de desenvolvimento.
+  // Resolvem-se IDs por valores únicos (email, nome, tipo) porque os UUIDs são gerados em runs anteriores e não os conhecemos aqui.
+  //
+  // Os 3 primeiros estão no PASSADO em estados terminais (CANCELADO, NAO_COMPARECEU, CONCLUIDO) para preencher o histórico da pesquisa e do calendário.
+  // O último (Rex) fica em CONFIRMADO no futuro para testar os fluxos de gestão (reagendar/cancelar/check-in/check-out/pagamento).
+
+  const servicoIdByTipo = await getServicoIdsByTipo();
+
+  const clientesSeed = await prisma.utilizador.findMany({
+    where: {
+      email: { in: ['joao.silva@email.com', 'maria.santos@email.com', 'carlos.ferreira@email.com'] },
+    },
+    select: {
+      id: true,
+      email: true,
+      nome: true,
+      cliente: { select: { nif: true, telefone: true } },
+    },
+  });
+
+  // Map por email - id/nome/nif/telefone acedidos via `.cliente?.X` ou directos.
+  // Usados para resolver IDs e para popular o snapshot da Fatura (conteudoJson).
+  const clienteByEmail = new Map(clientesSeed.map((c) => [c.email, c]));
+
+  const animais = await prisma.animal.findMany({
+    where: { clienteId: { in: clientesSeed.map((c) => c.id) } },
+    select: { id: true, nome: true, clienteId: true },
+  });
+  const animalIdByClienteNome = new Map(
+    animais.map((a) => [`${a.clienteId}:${a.nome}`, a.id]),
+  );
+
+  const salas = await prisma.sala.findMany({ select: { id: true, nome: true } });
+  const salaIdByNome = new Map(salas.map((s) => [s.nome, s.id]));
+
+  const funcionariosSeed = await prisma.utilizador.findMany({
+    where: { email: { in: ['miguel.t@bet.com', 'ana.c@bet.com', 'mariana.c@bet.com'] } },
+    select: { id: true, email: true, nome: true },
+  });
+  const funcionarioByEmail = new Map(funcionariosSeed.map((f) => [f.email, f]));
+
+  const agendamentos = [
+    // --- 1) CANCELADO - Luna (Carlos, GRANDE) ---
+    // TOSQUIA_HIGIENICA com Mariana Cruz (TOSQUIADOR, seg-sex 09-18, atende todos os portes).
+    // Sala de Tosquia 1 aceita TOSQUIA_HIGIENICA. Preço/duração: 55€ / 40min (porte GRANDE).
+    {
+      clienteEmail: 'carlos.ferreira@email.com',
+      animalNome: 'Luna',
+      tipoServico: 'TOSQUIA_HIGIENICA',
+      sala: 'Sala de Tosquia 1',
+      funcionarioEmail: 'mariana.c@bet.com',
+      inicio: '2026-05-08T11:00:00.000Z',
+      duracao: 40,
+      preco: 55,
+      estado: 'CANCELADO',
+    },
+    // --- 2) NAO_COMPARECEU - Thor (Carlos, EXTRA_GRANDE) ---
+    // BANHO com Miguel Torres (BANHISTA_SENIOR, seg-sex 08-17, pausa 13-14, todos os portes).
+    // 14:00 fica logo a seguir à pausa. Preço/duração: 40€ / 45min (porte EXTRA_GRANDE).
+    {
+      clienteEmail: 'carlos.ferreira@email.com',
+      animalNome: 'Thor',
+      tipoServico: 'BANHO',
+      sala: 'Sala de Banho 1',
+      funcionarioEmail: 'miguel.t@bet.com',
+      inicio: '2026-05-12T14:00:00.000Z',
+      duracao: 45,
+      preco: 40,
+      estado: 'NAO_COMPARECEU',
+    },
+    // --- 3) CONCLUIDO - Bolinha (Maria, EXTRA_PEQUENO) ---
+    // BANHO com Ana Rita Costa (BANHISTA, seg-sex 09-18, atende EXTRA_PEQUENO/PEQUENO/MEDIO).
+    // Fluxo completo: check-in 2min antes, check-out 30min depois, pagamento em DINHEIRO
+    // e fatura emitida. Preço/duração: 20€ / 30min (porte EXTRA_PEQUENO).
+    {
+      clienteEmail: 'maria.santos@email.com',
+      animalNome: 'Bolinha',
+      tipoServico: 'BANHO',
+      sala: 'Sala de Banho 2',
+      funcionarioEmail: 'ana.c@bet.com',
+      inicio: '2026-05-15T09:30:00.000Z',
+      duracao: 30,
+      preco: 20,
+      estado: 'CONCLUIDO',
+      checkIn: '2026-05-15T09:28:00.000Z',
+      checkOut: '2026-05-15T10:00:00.000Z',
+      metodoPagamento: 'DINHEIRO',
+      pagoEm: '2026-05-15T10:02:00.000Z',
+      faturaNumero: 'FAT-2026-0001',
+    },
+    // --- 4) CONFIRMADO (futuro) - Rex (João, GRANDE) ---
+    // Único em estado activo: serve para testar reagendar / cancelar /
+    // check-in / check-out / receber pagamento via Camunda. Alterar a data
+    // para uma futura antes de cada bateria de testes.
+    {
+      clienteEmail: 'joao.silva@email.com',
+      animalNome: 'Rex',
+      tipoServico: 'BANHO',
+      sala: 'Sala de Banho 1',
+      funcionarioEmail: 'miguel.t@bet.com',
+      inicio: '2026-05-19T10:00:00.000Z',
+      duracao: 40,
+      preco: 35,
+      estado: 'CONFIRMADO',
+    },
+  ];
+
+  for (const spec of agendamentos) {
+    const cliente = clienteByEmail.get(spec.clienteEmail);
+    if (!cliente) continue; // cliente ainda não foi semeado nesta run, salta
+
+    const animalId = animalIdByClienteNome.get(`${cliente.id}:${spec.animalNome}`);
+    const tipoServicoId = servicoIdByTipo.get(spec.tipoServico);
+    const salaId = salaIdByNome.get(spec.sala);
+    const funcionario = funcionarioByEmail.get(spec.funcionarioEmail);
+    if (!animalId || !tipoServicoId || !salaId || !funcionario) continue;
+
+    const inicio = new Date(spec.inicio);
+    const fim = new Date(inicio.getTime() + spec.duracao * 60_000);
+
+    // Idempotência granular: cada entidade (Agendamento, Fatura) é verificada e criada independentemente.
+    // Permite ao seed reconstruir o que faltar (ex: se apagamos só a Fatura via Prisma Studio, o seed recria sem precisar de
+    // apagar e recriar o agendamento inteiro).
+    const existing = await prisma.agendamento.findFirst({
+      where: { animalId, dataHoraInicio: inicio },
+      select: { id: true },
+    });
+
+    await prisma.$transaction(async (tx) => {
+      let ag = existing;
+      if (!existing) {
+        ag = await tx.agendamento.create({
+          data: {
+            animalId,
+            dataHoraInicio: inicio,
+            dataHoraFim: fim,
+            valorTotal: new Prisma.Decimal(spec.preco),
+            estado: spec.estado,
+            checkInRealizadoEm: spec.checkIn ? new Date(spec.checkIn) : null,
+            checkOutRealizadoEm: spec.checkOut ? new Date(spec.checkOut) : null,
+            metodoPagamento: spec.metodoPagamento ?? null,
+            pagoEm: spec.pagoEm ? new Date(spec.pagoEm) : null,
+          },
+        });
+        await tx.agendamentoServico.create({
+          data: {
+            agendamentoId: ag.id,
+            tipoServicoId,
+            funcionarioId: funcionario.id,
+            salaId,
+            dataHoraInicio: inicio,
+            dataHoraFim: fim,
+            precoNoMomento: new Prisma.Decimal(spec.preco),
+            duracaoNoMomento: spec.duracao,
+            ordem: 0,
+          },
+        });
+      }
+
+      // Garante a Fatura associada sempre que a spec a tem - independentemente de o agendamento ser novo ou pré-existente.
+      // Verifica via FK `agendamentoId @unique`.
+      if (spec.faturaNumero) {
+        const faturaExistente = await tx.fatura.findUnique({
+          where: { agendamentoId: ag.id },
+          select: { id: true },
+        });
+        if (faturaExistente) return;
+
+        // Snapshot completo do conteúdo da fatura - espelha o que o worker `gerar-fatura` produz em runtime, para coerência visual ao listar/imprimir.
+        const clienteNome = cliente.nome ?? 'Cliente';
+
+        const valorComIva = spec.preco;
+        const valorSemIva = +(valorComIva / 1.23).toFixed(2);
+        const valorIva = +(valorComIva - valorSemIva).toFixed(2);
+
+        await tx.fatura.create({
+          data: {
+            numero: spec.faturaNumero,
+            tipo: 'SERVICO_INTERNO',
+            agendamentoId: ag.id,
+            valorTotal: new Prisma.Decimal(spec.preco),
+            metodoPagamento: spec.metodoPagamento ?? null,
+            pagoEm: spec.pagoEm ? new Date(spec.pagoEm) : null,
+            dataEmissao: spec.pagoEm ? new Date(spec.pagoEm) : new Date(),
+            conteudoJson: {
+              tipo: 'SERVICO_INTERNO',
+              clienteNome,
+              clienteEmail: spec.clienteEmail,
+              clienteNif: cliente.cliente?.nif ?? null,
+              clienteTelefone: cliente.cliente?.telefone ?? null,
+              animalNome: spec.animalNome,
+              dataHoraInicio: inicio.toISOString(),
+              dataHoraFim: fim.toISOString(),
+              servicos: [
+                {
+                  nome: spec.tipoServico,
+                  duracao: spec.duracao,
+                  valorComIva,
+                  valorSemIva,
+                  valorIva,
+                },
+              ],
+              taxaIva: 23,
+              subTotalSemIva: valorSemIva,
+              valorIva,
+              valorTotal: spec.preco,
+              metodoPagamento: spec.metodoPagamento ?? null,
+              pagoEm: spec.pagoEm ? new Date(spec.pagoEm).toISOString() : null,
+            },
+          },
+        });
+      }
+    });
+  }
+}
+
 async function main() {
   await seedEvents();
   await seedServicos();
@@ -547,6 +764,7 @@ async function main() {
   await seedSalas();
   await seedFuncionarios();
   await seedClientes();
+  await seedAgendamentos();
 }
 
 main()

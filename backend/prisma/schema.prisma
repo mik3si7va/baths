@@ -172,7 +172,9 @@ model Agendamento {
 
   metodoPagamento     MetodoPagamentoEnum?  @map("metodo_pagamento")
   pagoEm              DateTime?             @map("pago_em") @db.Timestamptz(6)
-  faturaId            String?               @map("fatura_id")
+  // Relação inversa: Fatura.agendamentoId tem @unique -> garante 1:1 com Agendamento.
+  // O número descritivo (ex: "FAT-2026-0001") fica em Fatura.numero - não duplicado aqui.
+  fatura              Fatura?
 
   @@map("agendamento")
 }
@@ -286,4 +288,44 @@ enum MetodoPagamentoEnum {
   TRANSFERENCIA
 
   @@map("metodo_pagamento_enum")
+}
+
+enum TipoFaturaEnum {
+  SERVICO_INTERNO
+  ALUGUER_SALA
+
+  @@map("tipo_fatura_enum")
+}
+
+// US - BET-43 (fatura de serviço interno) + BET-44 (fatura de aluguer de sala).
+// Entidade única reutilizável: o `tipo` distingue a origem, e `conteudoJson` guarda o snapshot imutável do documento
+// (cliente/entidade, linhas, totais) no momento da emissão.
+// Campos comuns à raiz (`valorTotal`, `metodoPagamento`, etc.) permitem queries directas sem parse do JSON.
+model Fatura {
+  id                 String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  numero             String               @unique                                              // ex: "FAT-2026-0001"
+  tipo               TipoFaturaEnum
+
+  // Origem - BET-43: 1 agendamento -> 1 fatura (relação 1:1 garantida pelo @unique).
+  agendamentoId      String?              @unique @map("agendamento_id") @db.Uuid
+  agendamento        Agendamento?         @relation(fields: [agendamentoId], references: [id], onDelete: Restrict, map: "fk_fatura_agendamento")
+
+  // Origem - BET-44: entidade parceira + período (mes/ano).
+  // FK adicionada quando o modelo `EntidadeParceira` for criado; por agora fica como referência solta.
+  entidadeParceiraId String?              @map("entidade_parceira_id") @db.Uuid
+  periodoMes         Int?                 @map("periodo_mes")                                  // 1-12
+  periodoAno         Int?                 @map("periodo_ano")                                  // ex: 2026
+
+  // Valores e pagamento
+  valorTotal         Decimal              @map("valor_total") @db.Decimal(10, 2)
+  metodoPagamento    MetodoPagamentoEnum? @map("metodo_pagamento")
+  pagoEm             DateTime?            @map("pago_em") @db.Timestamptz(6)
+  dataEmissao        DateTime             @default(now()) @map("data_emissao") @db.Timestamptz(6)
+
+  // Snapshot imutável - shape difere por `tipo`:
+  //   SERVICO_INTERNO -> { clienteNome, animalNome, servicos: [...], funcionarios, salas, ... }
+  //   ALUGUER_SALA   -> { entidadeNome, reservas: [...], ... }
+  conteudoJson       Json                 @map("conteudo_json")
+
+  @@map("fatura")
 }
