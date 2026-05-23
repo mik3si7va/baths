@@ -7,6 +7,7 @@ const prisma = require('../../utils/db');
 module.exports = (client) => {
     subscribeWorker(client, {
         topic: 'criar-reservas-temporarias-opcao',
+        onError: 'falhaTecnica',
         handler: async ({ task, vars }) => {
             const opcao = resolverOpcao(task);
             const servicos = opcao?.servicos || [];
@@ -38,6 +39,9 @@ module.exports = (client) => {
 
             const idsReservas = await criarReservasParaServicos(servicos, task.processInstanceId);
 
+            // Capturar o processInstanceId do sub-processo para 05-libertar-reservas-temporarias.
+            // Depois do callActivity terminar, o parent retoma com outro processInstanceId;
+            // sem este snapshot não haveria forma de recuperar as reservas criadas aqui dentro.
             vars.set('subProcessInstanceId', task.processInstanceId);
             vars.set('reservasTemporariasIds', JSON.stringify(idsReservas));
 

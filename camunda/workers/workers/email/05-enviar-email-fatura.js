@@ -8,7 +8,11 @@ module.exports = (client) => {
         extract: (task) => {
             const faturaId = getVariable(task, 'faturaId');
             if (!faturaId) return null;
-            return { faturaId, faturaUrl: getVariable(task, 'faturaUrl') };
+            return {
+                faturaId,
+                faturaNumero: getVariable(task, 'faturaNumero'),  // descritivo, para mostrar ao cliente
+                faturaUrl: getVariable(task, 'faturaUrl'),
+            };
         },
         send: enviarEmailFatura,
     });

@@ -14,8 +14,6 @@ module.exports = (client) => {
 
             const resultado = await obterPrecoEDuracao(tipoServicoId, porteAnimal);
 
-            vars.set('precoBase', resultado.preco);
-            vars.set('duracaoMinutos', resultado.duracao);
             vars.set('servicoTemp', {
                 ...servicoTemp,
                 tipoServicoId,

@@ -1,22 +1,32 @@
-const { libertarReservasPorIds, libertarReservas } = require('../../services/reservas');
+const { libertarReservasPorIds, libertarReservas, limparReservasExpiradas } = require('../../services/reservas');
 
-// Handler partilhado entre libertar-reservas-opcao e libertar-reservas-processo.
+// Handler de libertar-reservas-processo (rollback): lê os ids das reservas
+// guardados na variável `reservasTemporariasIds` e apaga-as.
 async function libertarPorIdsDaTask(task) {
-    /* Alternativa: libertar todas as reservas do processo
-       await libertarReservas(task.processInstanceId);
-    */
     const raw = task.variables.get('reservasTemporariasIds');
     const ids = raw ? JSON.parse(raw) : [];
     await libertarReservasPorIds(ids);
 }
 
-// Detecta o índice da opção atualmente escolhida (número ou string numérica).
-// Se a opcaoSelecionada for um objeto (escolha por payload, raro), devolve -1.
-function detectarIndiceAtual(task) {
-    const raw = task.variables.get('opcaoSelecionada');
-    if (typeof raw === 'number') return raw;
-    if (typeof raw === 'string' && !isNaN(raw)) return Number(raw);
-    return -1;
+// Handler de libertar-reservas-temporarias (commit): apaga as reservas temporárias que
+// foram convertidas em AgendamentoServico definitivos (BP143/BP212 já correram).
+// Difere de libertarPorIdsDaTask em dois pontos:
+//   1. Fallback se `reservasTemporariasIds` estiver vazio — apaga por
+//      processInstanceId para garantir que não ficam órfãs após o commit.
+//      Usa-se `subProcessInstanceId` (guardado quando as reservas foram criadas
+//      no sub_gerar_selecionar_opcao) porque `task.processInstanceId` aqui
+//      aponta ao processo principal e não apanharia as reservas do sub.
+//   2. Corre `limparReservasExpiradas()` no fim como housekeeping global.
+async function limparReservasAposCommit(task) {
+    const raw = task.variables.get('reservasTemporariasIds');
+    const ids = raw ? JSON.parse(raw) : [];
+    if (ids.length > 0) {
+        await libertarReservasPorIds(ids);
+    } else {
+        const subId = task.variables.get('subProcessInstanceId');
+        await libertarReservas(subId || task.processInstanceId);
+    }
+    await limparReservasExpiradas();
 }
 
-module.exports = { libertarPorIdsDaTask, detectarIndiceAtual };
+module.exports = { libertarPorIdsDaTask, limparReservasAposCommit };

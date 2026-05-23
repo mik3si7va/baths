@@ -11,9 +11,14 @@ module.exports = (client) => {
 
             vars.set('clienteId', dados.clienteId);
             vars.set('animalId', dados.animalId);
+            if (dados.animalNome) vars.set('animalNome', dados.animalNome);
             vars.set('porteAnimal', dados.porteAnimal);
             vars.set('clienteEmail', dados.clienteEmail);
             if (dados.nomeCliente) vars.set('nomeCliente', dados.nomeCliente);
+            if (dados.clienteNif) vars.set('clienteNif', dados.clienteNif);
+            if (dados.clienteTelefone) vars.set('clienteTelefone', dados.clienteTelefone);
+            vars.set('dataHoraInicio', dados.dataHoraInicio);
+            vars.set('dataHoraFim', dados.dataHoraFim);
             vars.set('servicosActualizados', JSON.stringify(dados.servicosIniciais));
             vars.set('qtdServicos', dados.servicosIniciais.length);
             vars.set('valorTotal', dados.valorTotal);
