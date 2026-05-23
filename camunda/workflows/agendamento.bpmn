@@ -85,16 +85,16 @@
     <sequenceFlow id="BP141" name="" sourceRef="BP138" targetRef="BP139" />
     <serviceTask id="BP142" name="Libertar reservas (topic: libertar-reservas-processo)" implementation="##WebService" camunda:type="external" camunda:topic="libertar-reservas-processo">
       <incoming>BP152</incoming>
-      <outgoing>BP153</outgoing>
+      <outgoing>Flow_0nsyb16</outgoing>
     </serviceTask>
     <serviceTask id="BP143" name="Criar agendamento e serviços (topic: criar-agendamento-completo)" implementation="##WebService" camunda:type="external" camunda:topic="criar-agendamento-completo">
       <incoming>BP151</incoming>
       <outgoing>BP154</outgoing>
     </serviceTask>
     <endEvent id="BP144" name="Fim">
-      <incoming>BP153</incoming>
+      <incoming>Flow_0nsyb16</incoming>
     </endEvent>
-    <serviceTask id="BP145" name="Converter reservas temporárias em bloqueios definitivo (topic: confirmar-reservas)" implementation="##WebService" camunda:type="external" camunda:topic="confirmar-reservas">
+    <serviceTask id="BP145" name="Libertar reservas temporárias (topic: libertar-reservas-temporarias)" implementation="##WebService" camunda:type="external" camunda:topic="libertar-reservas-temporarias">
       <incoming>BP154</incoming>
       <outgoing>BP155</outgoing>
     </serviceTask>
@@ -119,7 +119,6 @@
     <sequenceFlow id="BP152" name="Não" sourceRef="BP139" targetRef="BP142">
       <conditionExpression xsi:type="tFormalExpression">${funcionarioConfirma == false}</conditionExpression>
     </sequenceFlow>
-    <sequenceFlow id="BP153" name="" sourceRef="BP142" targetRef="BP144" />
     <sequenceFlow id="BP154" name="" sourceRef="BP143" targetRef="BP145" />
     <sequenceFlow id="BP155" name="" sourceRef="BP145" targetRef="BP146" />
     <sequenceFlow id="BP156" name="Sim" sourceRef="BP146" targetRef="BP147">
@@ -132,7 +131,6 @@
     <userTask id="BP242" name="Selecionar serviço" implementation="##unspecified" camunda:assignee="funcionario">
       <incoming>BP249</incoming>
       <incoming>BP253</incoming>
-      <incoming>BP256</incoming>
       <incoming>Flow_00ypmq1</incoming>
       <outgoing>BP250</outgoing>
     </userTask>
@@ -144,16 +142,22 @@
       <incoming>BP254</incoming>
       <outgoing>BP255</outgoing>
     </serviceTask>
-    <exclusiveGateway id="BP245" name="Operação bem sucedida? ">
+    <exclusiveGateway id="BP245" name="Operação bem sucedida?">
       <incoming>BP251</incoming>
       <outgoing>BP252</outgoing>
       <outgoing>BP254</outgoing>
     </exclusiveGateway>
     <serviceTask id="BP246" name="Informar erro (topic: notificar-erro-sistema)" implementation="##WebService" camunda:type="external" camunda:topic="notificar-erro-sistema">
+      <extensionElements>
+        <camunda:inputOutput>
+          <camunda:inputParameter name="tipoErro">OPERACIONAL</camunda:inputParameter>
+        </camunda:inputOutput>
+      </extensionElements>
       <incoming>BP252</incoming>
+      <incoming>BP256</incoming>
       <outgoing>BP253</outgoing>
     </serviceTask>
-    <exclusiveGateway id="BP248" name="Adicionar outro serviço?">
+    <exclusiveGateway id="BP248" name="Operação bem sucedida?">
       <incoming>BP255</incoming>
       <outgoing>BP256</outgoing>
       <outgoing>BP258</outgoing>
@@ -169,8 +173,8 @@
       <conditionExpression xsi:type="tFormalExpression">${operacaoBemSucedida == true}</conditionExpression>
     </sequenceFlow>
     <sequenceFlow id="BP255" name="" sourceRef="BP244" targetRef="BP248" />
-    <sequenceFlow id="BP256" name="Sim" sourceRef="BP248" targetRef="BP242">
-      <conditionExpression xsi:type="tFormalExpression">${adicionarOutroServico == true}</conditionExpression>
+    <sequenceFlow id="BP256" name="Não" sourceRef="BP248" targetRef="BP246">
+      <conditionExpression xsi:type="tFormalExpression">${operacaoBemSucedida == false}</conditionExpression>
     </sequenceFlow>
     <callActivity id="BP257" name="SUB-PROCESSO 1: PREPARAR SERVIÇOS " calledElement="sub_preparar_servicos">
       <extensionElements>
@@ -184,21 +188,17 @@
       <incoming>BP258</incoming>
       <outgoing>BP260</outgoing>
     </callActivity>
-    <sequenceFlow id="BP258" name="Não" sourceRef="BP248" targetRef="BP257">
-      <conditionExpression xsi:type="tFormalExpression">${adicionarOutroServico == false}</conditionExpression>
+    <sequenceFlow id="BP258" name="Sim" sourceRef="BP248" targetRef="BP257">
+      <conditionExpression xsi:type="tFormalExpression">${operacaoBemSucedida == true}</conditionExpression>
     </sequenceFlow>
-    <callActivity id="BP259"
-              name="SUB-PROCESSO 2: GERAR E SELECIONAR OPÇÃO"
-              calledElement="sub_gerar_selecionar_opcao">
+    <callActivity id="BP259" name="SUB-PROCESSO 2: GERAR E SELECIONAR OPÇÃO" calledElement="sub_gerar_selecionar_opcao">
       <extensionElements>
         <camunda:in source="servicosActualizados" target="servicosActualizados" />
-        <camunda:in source="servicosOrdenados" target="servicosOrdenados" /> 
+        <camunda:in source="servicosOrdenados" target="servicosOrdenados" />
         <camunda:in source="porteAnimal" target="porteAnimal" />
-        <camunda:in source="dataPreferida" target="dataPreferida" />
         <camunda:in source="animalId" target="animalId" />
         <camunda:in source="clienteId" target="clienteId" />
         <camunda:in source="funcionarioPreferido" target="funcionarioPreferido" />
-
         <camunda:out source="servicosActualizados" target="servicosActualizados" />
         <camunda:out source="solucoes" target="solucoes" />
         <camunda:out source="dataHoraInicio" target="dataHoraInicio" />
@@ -218,7 +218,63 @@
     <sequenceFlow id="BP260" name="" sourceRef="BP257" targetRef="BP259" />
     <sequenceFlow id="BP261" name="" sourceRef="BP259" targetRef="BP129" />
     <sequenceFlow id="Flow_00ypmq1" sourceRef="BP116" targetRef="BP242" />
+    <boundaryEvent id="Event_1niy6c4" name="Falha técnica" attachedToRef="BP143">
+      <outgoing>Flow_1keandm</outgoing>
+      <errorEventDefinition id="ErrorEventDefinition_097i4dn" errorRef="Error_18n7wmg" camunda:errorCodeVariable="ultimoErroCode" camunda:errorMessageVariable="ultimoErroMensagem" />
+    </boundaryEvent>
+    <serviceTask id="BP90_prince" name="Notificar erro técnico (termina) (topic: notificar-erro-sistema)" implementation="##WebService" camunda:type="external" camunda:topic="notificar-erro-sistema">
+      <extensionElements>
+        <camunda:inputOutput>
+          <camunda:inputParameter name="tipoErro">TECNICO</camunda:inputParameter>
+        </camunda:inputOutput>
+      </extensionElements>
+      <incoming>Flow_1keandm</incoming>
+      <incoming>Flow_08g9ci3</incoming>
+      <incoming>Flow_00qrwtk</incoming>
+      <incoming>Flow_15r4j7e</incoming>
+      <incoming>Flow_0mqb7f1</incoming>
+      <incoming>Flow_0hspyjb</incoming>
+      <incoming>Flow_1f91b76</incoming>
+      <outgoing>Flow_0ew63kh</outgoing>
+    </serviceTask>
+    <sequenceFlow id="Flow_1keandm" sourceRef="Event_1niy6c4" targetRef="BP90_prince" />
+    <boundaryEvent id="Event_0jr8olx" name="Falha técnica" attachedToRef="BP135">
+      <outgoing>Flow_0hspyjb</outgoing>
+      <errorEventDefinition id="ErrorEventDefinition_0rxx9ty" errorRef="Error_18n7wmg" camunda:errorCodeVariable="ultimoErroCode" camunda:errorMessageVariable="ultimoErroMensagem" />
+    </boundaryEvent>
+    <boundaryEvent id="Event_1uuvfu5" name="Falha técnica" attachedToRef="BP243">
+      <outgoing>Flow_00qrwtk</outgoing>
+      <errorEventDefinition id="ErrorEventDefinition_1d0fdyb" errorRef="Error_18n7wmg" camunda:errorCodeVariable="ultimoErroCode" camunda:errorMessageVariable="ultimoErroMensagem" />
+    </boundaryEvent>
+    <boundaryEvent id="Event_1hcsot7" name="Falha técnica" attachedToRef="BP244">
+      <outgoing>Flow_15r4j7e</outgoing>
+      <errorEventDefinition id="ErrorEventDefinition_0w7335n" errorRef="Error_18n7wmg" camunda:errorCodeVariable="ultimoErroCode" camunda:errorMessageVariable="ultimoErroMensagem" />
+    </boundaryEvent>
+    <boundaryEvent id="Event_1onr7ms" name="Falha técnica" attachedToRef="BP142">
+      <outgoing>Flow_0mqb7f1</outgoing>
+      <errorEventDefinition id="ErrorEventDefinition_1o1vxcw" errorRef="Error_18n7wmg" camunda:errorCodeVariable="ultimoErroCode" camunda:errorMessageVariable="ultimoErroMensagem" />
+    </boundaryEvent>
+    <boundaryEvent id="Event_16c97tr" name="Falha técnica" attachedToRef="BP145">
+      <outgoing>Flow_08g9ci3</outgoing>
+      <errorEventDefinition id="ErrorEventDefinition_0q4ql13" errorRef="Error_18n7wmg" camunda:errorCodeVariable="ultimoErroCode" camunda:errorMessageVariable="ultimoErroMensagem" />
+    </boundaryEvent>
+    <sequenceFlow id="Flow_08g9ci3" sourceRef="Event_16c97tr" targetRef="BP90_prince" />
+    <sequenceFlow id="Flow_00qrwtk" sourceRef="Event_1uuvfu5" targetRef="BP90_prince" />
+    <sequenceFlow id="Flow_15r4j7e" sourceRef="Event_1hcsot7" targetRef="BP90_prince" />
+    <sequenceFlow id="Flow_0mqb7f1" sourceRef="Event_1onr7ms" targetRef="BP90_prince" />
+    <sequenceFlow id="Flow_0hspyjb" sourceRef="Event_0jr8olx" targetRef="BP90_prince" />
+    <endEvent id="Event_0wp37sz" name="Fim">
+      <incoming>Flow_0ew63kh</incoming>
+    </endEvent>
+    <sequenceFlow id="Flow_0nsyb16" sourceRef="BP142" targetRef="BP144" />
+    <sequenceFlow id="Flow_0ew63kh" sourceRef="BP90_prince" targetRef="Event_0wp37sz" />
+    <boundaryEvent id="Event_11l3w8c" name="Falha técnica" attachedToRef="BP147">
+      <outgoing>Flow_1f91b76</outgoing>
+      <errorEventDefinition id="ErrorEventDefinition_15dy8xz" errorRef="Error_18n7wmg" camunda:errorCodeVariable="ultimoErroCode" camunda:errorMessageVariable="ultimoErroMensagem" />
+    </boundaryEvent>
+    <sequenceFlow id="Flow_1f91b76" sourceRef="Event_11l3w8c" targetRef="BP90_prince" />
   </process>
+  <error id="Error_18n7wmg" name="Falha técnica" errorCode="FALHA_TECNICA" />
   <bpmndi:BPMNDiagram id="diagram-agendamento" name="agendamento">
     <bpmndi:BPMNPlane id="plane-agendamento" bpmnElement="agendamento">
       <bpmndi:BPMNShape id="ID_35100733_5053_4606_0052_000222200206" bpmnElement="BP115">
@@ -269,17 +325,8 @@
           <omgdc:Bounds x="2466" y="271" width="58" height="27" />
         </bpmndi:BPMNLabel>
       </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="ID_37100733_5053_4606_0052_000222200241" bpmnElement="BP142" bioc:stroke="#205022" bioc:fill="#c8e6c9" color:background-color="#c8e6c9" color:border-color="#205022">
-        <omgdc:Bounds x="2557" y="374" width="208" height="40" />
-      </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="ID_37100733_5053_4606_0052_000222200242" bpmnElement="BP143" bioc:stroke="#205022" bioc:fill="#c8e6c9" color:background-color="#c8e6c9" color:border-color="#205022">
         <omgdc:Bounds x="2558" y="305" width="208" height="40" />
-      </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="ID_37100733_5053_4606_0052_000222200243" bpmnElement="BP144" bioc:stroke="#831311" bioc:fill="#ffcdd2" color:background-color="#ffcdd2" color:border-color="#831311">
-        <omgdc:Bounds x="2815" y="384" width="20" height="20" />
-        <bpmndi:BPMNLabel>
-          <omgdc:Bounds x="2816" y="404" width="19" height="14" />
-        </bpmndi:BPMNLabel>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="ID_37100733_5053_4606_0052_000222200244" bpmnElement="BP145" bioc:stroke="#205022" bioc:fill="#c8e6c9" color:background-color="#c8e6c9" color:border-color="#205022">
         <omgdc:Bounds x="2815" y="305" width="267" height="40" />
@@ -299,12 +346,6 @@
           <omgdc:Bounds x="3142" y="404" width="19" height="14" />
         </bpmndi:BPMNLabel>
       </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="ID_37100733_5053_4606_0052_000222200250" bpmnElement="BP150" bioc:stroke="#831311" bioc:fill="#ffcdd2" color:background-color="#ffcdd2" color:border-color="#831311">
-        <omgdc:Bounds x="3430" y="315" width="20" height="20" />
-        <bpmndi:BPMNLabel>
-          <omgdc:Bounds x="3431" y="335" width="19" height="14" />
-        </bpmndi:BPMNLabel>
-      </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="ID_47306704_3053_4606_0052_000222200261" bpmnElement="BP242" bioc:stroke="#0d4372" bioc:fill="#bbdefb" color:background-color="#bbdefb" color:border-color="#0d4372">
         <omgdc:Bounds x="650" y="130" width="120" height="40" />
       </bpmndi:BPMNShape>
@@ -317,7 +358,7 @@
       <bpmndi:BPMNShape id="ID_47306704_3053_4606_0052_000222200264" bpmnElement="BP245" isMarkerVisible="true" bioc:stroke="#6b3c00" bioc:fill="#ffe0b2" color:background-color="#ffe0b2" color:border-color="#6b3c00">
         <omgdc:Bounds x="1025" y="130" width="40" height="40" />
         <bpmndi:BPMNLabel>
-          <omgdc:Bounds x="1009" y="96" width="74" height="27" />
+          <omgdc:Bounds x="1010" y="96" width="73" height="27" />
         </bpmndi:BPMNLabel>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="ID_47306704_3053_4606_0052_000222200265" bpmnElement="BP246" bioc:stroke="#205022" bioc:fill="#c8e6c9" color:background-color="#c8e6c9" color:border-color="#205022">
@@ -326,7 +367,7 @@
       <bpmndi:BPMNShape id="ID_47306704_3053_4606_0052_000222200266" bpmnElement="BP248" isMarkerVisible="true" bioc:stroke="#6b3c00" bioc:fill="#ffe0b2" color:background-color="#ffe0b2" color:border-color="#6b3c00">
         <omgdc:Bounds x="1177" y="203" width="40" height="40" />
         <bpmndi:BPMNLabel>
-          <omgdc:Bounds x="1160" y="176" width="74" height="27" />
+          <omgdc:Bounds x="1161" y="176" width="73" height="27" />
         </bpmndi:BPMNLabel>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="ID_47306704_3053_4606_0052_000222200277" bpmnElement="BP257" bioc:stroke="#5b176d" bioc:fill="#e1bee7" color:background-color="#e1bee7" color:border-color="#5b176d">
@@ -334,6 +375,73 @@
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="ID_47306704_3053_4606_0052_000222200301" bpmnElement="BP259" bioc:stroke="#5b176d" bioc:fill="#e1bee7" color:background-color="#e1bee7" color:border-color="#5b176d">
         <omgdc:Bounds x="1340" y="276" width="180" height="100" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="ID_37100733_5053_4606_0052_000222200241" bpmnElement="BP142" bioc:stroke="#205022" bioc:fill="#c8e6c9" color:background-color="#c8e6c9" color:border-color="#205022">
+        <omgdc:Bounds x="2391" y="394" width="208" height="40" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="ID_50671533_5053_4606_0052_000222200120" bpmnElement="BP90_prince" bioc:stroke="#205022" bioc:fill="#c8e6c9" color:background-color="#c8e6c9" color:border-color="#205022">
+        <omgdc:Bounds x="1346" y="490" width="168" height="40" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="ID_37100733_5053_4606_0052_000222200243" bpmnElement="BP144" bioc:stroke="#831311" bioc:fill="#ffcdd2" color:background-color="#ffcdd2" color:border-color="#831311">
+        <omgdc:Bounds x="2652" y="404" width="20" height="20" />
+        <bpmndi:BPMNLabel>
+          <omgdc:Bounds x="2652" y="437" width="19" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="BPMNShape_0n7h9pi" bpmnElement="Event_0wp37sz" bioc:stroke="#831311" bioc:fill="#ffcdd2" color:background-color="#ffcdd2" color:border-color="#831311">
+        <omgdc:Bounds x="1410" y="570" width="20" height="20" />
+        <bpmndi:BPMNLabel>
+          <omgdc:Bounds x="1410" y="603" width="19" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="ID_37100733_5053_4606_0052_000222200250" bpmnElement="BP150" bioc:stroke="#831311" bioc:fill="#ffcdd2" color:background-color="#ffcdd2" color:border-color="#831311">
+        <omgdc:Bounds x="3440" y="315" width="20" height="20" />
+        <bpmndi:BPMNLabel>
+          <omgdc:Bounds x="3441" y="335" width="19" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="BPMNShape_12s0wwy" bpmnElement="Event_1uuvfu5" bioc:stroke="#831311" bioc:fill="#ffcdd2" color:background-color="#ffcdd2" color:border-color="#831311">
+        <omgdc:Bounds x="795" y="152" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <omgdc:Bounds x="836" y="174" width="66" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="BPMNShape_0u4t3f3" bpmnElement="Event_1hcsot7" bioc:stroke="#831311" bioc:fill="#ffcdd2" color:background-color="#ffcdd2" color:border-color="#831311">
+        <omgdc:Bounds x="940" y="212" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <omgdc:Bounds x="973" y="248" width="66" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="BPMNShape_1n1eool" bpmnElement="Event_16c97tr" bioc:stroke="#831311" bioc:fill="#ffcdd2" color:background-color="#ffcdd2" color:border-color="#831311">
+        <omgdc:Bounds x="3052" y="327" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <omgdc:Bounds x="2982" y="351" width="66" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Event_1niy6c4_di" bpmnElement="Event_1niy6c4" bioc:stroke="#831311" bioc:fill="#ffcdd2" color:background-color="#ffcdd2" color:border-color="#831311">
+        <omgdc:Bounds x="2748" y="327" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <omgdc:Bounds x="2677" y="349" width="66" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="BPMNShape_03b5run" bpmnElement="Event_0jr8olx" bioc:stroke="#831311" bioc:fill="#ffcdd2" color:background-color="#ffcdd2" color:border-color="#831311">
+        <omgdc:Bounds x="2167" y="327" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <omgdc:Bounds x="2096" y="350" width="66" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="BPMNShape_12bbahg" bpmnElement="Event_1onr7ms" bioc:stroke="#831311" bioc:fill="#ffcdd2" color:background-color="#ffcdd2" color:border-color="#831311">
+        <omgdc:Bounds x="2373" y="416" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <omgdc:Bounds x="2413" y="439" width="66" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="BPMNShape_16jn3ff" bpmnElement="Event_11l3w8c" bioc:stroke="#831311" bioc:fill="#ffcdd2" color:background-color="#ffcdd2" color:border-color="#831311">
+        <omgdc:Bounds x="3378" y="327" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <omgdc:Bounds x="3307" y="352" width="66" height="14" />
+        </bpmndi:BPMNLabel>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNEdge id="ID_03100733_5053_4606_0052_000222200213" bpmnElement="BP120">
         <omgdi:waypoint x="183" y="110" />
@@ -399,16 +507,11 @@
         </bpmndi:BPMNLabel>
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="ID_37100733_5053_4606_0052_000222200252" bpmnElement="BP152">
-        <omgdi:waypoint x="2495" y="344" />
+        <omgdi:waypoint x="2495" y="345" />
         <omgdi:waypoint x="2495" y="394" />
-        <omgdi:waypoint x="2556" y="394" />
         <bpmndi:BPMNLabel>
-          <omgdc:Bounds x="2500" y="359" width="21" height="14" />
+          <omgdc:Bounds x="2499" y="355" width="21" height="14" />
         </bpmndi:BPMNLabel>
-      </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="ID_37100733_5053_4606_0052_000222200253" bpmnElement="BP153">
-        <omgdi:waypoint x="2766" y="394" />
-        <omgdi:waypoint x="2815" y="394" />
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="ID_37100733_5053_4606_0052_000222200254" bpmnElement="BP154">
         <omgdi:waypoint x="2766" y="325" />
@@ -434,7 +537,7 @@
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="ID_37100733_5053_4606_0052_000222200260" bpmnElement="BP158">
         <omgdi:waypoint x="3396" y="325" />
-        <omgdi:waypoint x="3430" y="325" />
+        <omgdi:waypoint x="3440" y="325" />
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="ID_47306704_3053_4606_0052_000222200267" bpmnElement="BP249">
         <omgdi:waypoint x="606" y="150" />
@@ -474,19 +577,18 @@
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="ID_47306704_3053_4606_0052_000222200276" bpmnElement="BP256">
         <omgdi:waypoint x="1215" y="221" />
-        <omgdi:waypoint x="1303" y="221" />
-        <omgdi:waypoint x="1303" y="51" />
-        <omgdi:waypoint x="720" y="51" />
-        <omgdi:waypoint x="720" y="130" />
+        <omgdi:waypoint x="1320" y="221" />
+        <omgdi:waypoint x="1320" y="150" />
+        <omgdi:waypoint x="1285" y="150" />
         <bpmndi:BPMNLabel>
-          <omgdc:Bounds x="1308" y="126" width="20" height="14" />
+          <omgdc:Bounds x="1325" y="178" width="21" height="14" />
         </bpmndi:BPMNLabel>
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="ID_47306704_3053_4606_0052_000222200300" bpmnElement="BP258">
         <omgdi:waypoint x="1197" y="244" />
         <omgdi:waypoint x="1197" y="275" />
         <bpmndi:BPMNLabel>
-          <omgdc:Bounds x="1202" y="250" width="21" height="14" />
+          <omgdc:Bounds x="1203" y="250" width="19" height="14" />
         </bpmndi:BPMNLabel>
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="ID_47306704_3053_4606_0052_000222200302" bpmnElement="BP260">
@@ -501,6 +603,51 @@
         <omgdi:waypoint x="446" y="70" />
         <omgdi:waypoint x="680" y="70" />
         <omgdi:waypoint x="680" y="130" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_1keandm_di" bpmnElement="Flow_1keandm">
+        <omgdi:waypoint x="2766" y="363" />
+        <omgdi:waypoint x="2766" y="470" />
+        <omgdi:waypoint x="1480" y="470" />
+        <omgdi:waypoint x="1480" y="490" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_08g9ci3_di" bpmnElement="Flow_08g9ci3">
+        <omgdi:waypoint x="3070" y="363" />
+        <omgdi:waypoint x="3070" y="500" />
+        <omgdi:waypoint x="1514" y="500" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_00qrwtk_di" bpmnElement="Flow_00qrwtk">
+        <omgdi:waypoint x="813" y="188" />
+        <omgdi:waypoint x="813" y="520" />
+        <omgdi:waypoint x="1346" y="520" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_15r4j7e_di" bpmnElement="Flow_15r4j7e">
+        <omgdi:waypoint x="958" y="248" />
+        <omgdi:waypoint x="958" y="500" />
+        <omgdi:waypoint x="1346" y="500" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_0mqb7f1_di" bpmnElement="Flow_0mqb7f1">
+        <omgdi:waypoint x="2383" y="450" />
+        <omgdi:waypoint x="1430" y="450" />
+        <omgdi:waypoint x="1430" y="490" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_0hspyjb_di" bpmnElement="Flow_0hspyjb">
+        <omgdi:waypoint x="2185" y="363" />
+        <omgdi:waypoint x="2185" y="400" />
+        <omgdi:waypoint x="1390" y="400" />
+        <omgdi:waypoint x="1390" y="490" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_0nsyb16_di" bpmnElement="Flow_0nsyb16">
+        <omgdi:waypoint x="2599" y="414" />
+        <omgdi:waypoint x="2652" y="414" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_0ew63kh_di" bpmnElement="Flow_0ew63kh">
+        <omgdi:waypoint x="1420" y="530" />
+        <omgdi:waypoint x="1420" y="570" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_1f91b76_di" bpmnElement="Flow_1f91b76">
+        <omgdi:waypoint x="3396" y="363" />
+        <omgdi:waypoint x="3396" y="520" />
+        <omgdi:waypoint x="1514" y="520" />
       </bpmndi:BPMNEdge>
     </bpmndi:BPMNPlane>
   </bpmndi:BPMNDiagram>

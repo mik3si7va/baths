@@ -45,8 +45,10 @@ async function main() {
   }
   form.append("deployment-name", `baths-workflows-${Date.now()}`);
 
+  // Strip `/engine-rest` para mostrar a base do Camunda (servidor + porto) - derivado do env CAMUNDA_URL para que o log fique correcto também em remoto/Docker custom.
+  const camundaBase = CAMUNDA_URL.replace(/\/engine-rest\/?$/, '');
   console.log(
-    `Deploying ${bpmnFiles.length} BPMN, ${dmnFiles.length} DMN and ${formFiles.length} form file(s) to: http://localhost:8080`
+    `Deploying ${bpmnFiles.length} BPMN, ${dmnFiles.length} DMN and ${formFiles.length} form file(s) to: ${camundaBase}`
   );
 
   const res = await fetch(`${CAMUNDA_URL}/deployment/create`, {
@@ -68,7 +70,7 @@ async function waitForCamunda(url, tries = 30) {
     try {
       const r = await fetch(`${url}/engine`);
       if (r.ok) return true;
-    } catch {}
+    } catch { }
     await new Promise((res) => setTimeout(res, 1000));
   }
   throw new Error("Camunda not reachable yet. Try again in a few seconds.");
