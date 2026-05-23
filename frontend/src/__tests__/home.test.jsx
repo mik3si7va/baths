@@ -51,8 +51,8 @@ describe("Home page", () => {
   test("mostra metricas mas esconde atalhos administrativos para funcionario", async () => {
     renderHome({ id: "func-1", tipoConta: "FUNCIONARIO" });
 
-    expect(await screen.findByText("Nova Consulta")).toBeInTheDocument();
-    expect(screen.getByText("Pesquisar Clientes e Animais")).toBeInTheDocument();
+    expect(await screen.findByText("Novo Agendamento")).toBeInTheDocument();
+    expect(screen.getByText("Pesquisar Clientes")).toBeInTheDocument();
     expect(screen.getAllByText("Clientes").length).toBeGreaterThan(0);
     expect(screen.getAllByText(/Funcion/).length).toBe(1);
     expect(screen.getAllByText("Salas").length).toBe(1);
