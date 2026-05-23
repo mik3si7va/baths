@@ -10,6 +10,7 @@ export default function HeaderCompact({ showBack = false }) {
     const navigate = useNavigate();
 
     const handleLogout = () => {
+        localStorage.removeItem('btUser');
         localStorage.removeItem('usernameB&T');
         navigate('/login');
     };
@@ -92,6 +93,17 @@ export default function HeaderCompact({ showBack = false }) {
                     onClick={() => navigate('/calendar')}
                 >
                     Agenda
+                </Button>
+                <Button
+                    sx={{
+                        color: colors.white,
+                        fontSize: { xs: '13px', sm: '16px' },
+                        minWidth: 'auto',
+                        px: { xs: 1, sm: 2 }
+                    }}
+                    onClick={() => navigate('/perfil')}
+                >
+                    Perfil
                 </Button>
                 <Button
                     variant="contained"

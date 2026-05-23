@@ -8,16 +8,21 @@ import {
   CircularProgress,
   FormControlLabel,
   FormGroup,
+  IconButton,
   MenuItem,
   Paper,
   TextField,
   Typography,
 } from '@mui/material';
 import { useThemeContext } from '../../../contexts/ThemeContext';
+import BlockIcon from '@mui/icons-material/Block';
+import DeleteIcon from '@mui/icons-material/Delete';
+import EditIcon from '@mui/icons-material/Edit';
+import RestoreIcon from '@mui/icons-material/Restore';
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
 
-const CARGO_OPTIONS = [
+const DEFAULT_CARGO_OPTIONS = [
   { value: 'TOSQUIADOR_SENIOR', label: 'Tosquiador Senior' },
   { value: 'TOSQUIADOR', label: 'Tosquiador' },
   { value: 'TOSQUIADOR_ESTAGIARIO', label: 'Tosquiador Estagiario' },
@@ -28,7 +33,7 @@ const CARGO_OPTIONS = [
   { value: 'ADMINISTRACAO', label: 'Administracao' },
 ];
 
-const PORTE_OPTIONS = [
+const DEFAULT_PORTE_OPTIONS = [
   { value: 'EXTRA_PEQUENO', label: 'Extra pequeno' },
   { value: 'PEQUENO', label: 'Pequeno' },
   { value: 'MEDIO', label: 'Medio' },
@@ -36,7 +41,7 @@ const PORTE_OPTIONS = [
   { value: 'EXTRA_GRANDE', label: 'Extra grande' },
 ];
 
-const DIA_OPTIONS = [
+const DEFAULT_DIA_OPTIONS = [
   { value: 'SEGUNDA', label: 'Segunda' },
   { value: 'TERCA', label: 'Terca' },
   { value: 'QUARTA', label: 'Quarta' },
@@ -69,14 +74,20 @@ const initialForm = {
   },
 };
 
-export default function Users() {
+export default function Funcionarios() {
   const { colors } = useThemeContext();
 
   const [form, setForm] = useState(initialForm);
+  const [cargoOptions, setCargoOptions] = useState(DEFAULT_CARGO_OPTIONS);
+  const [porteOptions, setPorteOptions] = useState(DEFAULT_PORTE_OPTIONS);
+  const [diaOptions, setDiaOptions] = useState(DEFAULT_DIA_OPTIONS);
   const [servicos, setServicos] = useState([]);
   const [funcionarios, setFuncionarios] = useState([]);
+  const [editingId, setEditingId] = useState(null);
   const [loadingInitial, setLoadingInitial] = useState(true);
   const [loadingSubmit, setLoadingSubmit] = useState(false);
+  const [loadingDeleteId, setLoadingDeleteId] = useState(null);
+  const [loadingStatusId, setLoadingStatusId] = useState(null);
   const [erro, setErro] = useState('');
   const [sucesso, setSucesso] = useState('');
 
@@ -89,10 +100,15 @@ export default function Users() {
     setErro('');
 
     try {
-      const [servicosRes, funcionariosRes] = await Promise.all([
+      const [opcoesRes, servicosRes, funcionariosRes] = await Promise.all([
+        fetch(`${API_BASE_URL}/funcionarios/opcoes`),
         fetch(`${API_BASE_URL}/servicos`),
         fetch(`${API_BASE_URL}/funcionarios`),
       ]);
+
+      if (!opcoesRes.ok) {
+        throw new Error('Erro ao carregar opcoes de funcionarios.');
+      }
 
       if (!servicosRes.ok) {
         throw new Error('Erro ao carregar servicos.');
@@ -102,9 +118,13 @@ export default function Users() {
         throw new Error('Erro ao carregar funcionarios.');
       }
 
+      const opcoesData = await opcoesRes.json();
       const servicosData = await servicosRes.json();
       const funcionariosData = await funcionariosRes.json();
 
+      setCargoOptions(Array.isArray(opcoesData.cargos) ? opcoesData.cargos : DEFAULT_CARGO_OPTIONS);
+      setPorteOptions(Array.isArray(opcoesData.portes) ? opcoesData.portes : DEFAULT_PORTE_OPTIONS);
+      setDiaOptions(Array.isArray(opcoesData.diasSemana) ? opcoesData.diasSemana : DEFAULT_DIA_OPTIONS);
       setServicos(Array.isArray(servicosData) ? servicosData : []);
       setFuncionarios(Array.isArray(funcionariosData) ? funcionariosData : []);
     } catch (e) {
@@ -154,6 +174,34 @@ export default function Users() {
         [key]: value,
       },
     }));
+  };
+
+  const resetForm = () => {
+    setForm(initialForm);
+    setEditingId(null);
+  };
+
+  const handleEdit = (funcionario) => {
+    const horario = funcionario.horariosTrabalho?.[0] || initialForm.horario;
+
+    setForm({
+      nomeCompleto: funcionario.nomeCompleto || '',
+      cargo: funcionario.cargo || '',
+      telefone: funcionario.telefone || '',
+      email: funcionario.email || '',
+      porteAnimais: funcionario.porteAnimais || [],
+      tipoServicoIds: (funcionario.servicos || []).map((s) => s.tipoServicoId),
+      horario: {
+        diasSemana: horario.diasSemana || [],
+        horaInicio: horario.horaInicio || initialForm.horario.horaInicio,
+        horaFim: horario.horaFim || initialForm.horario.horaFim,
+        pausaInicio: horario.pausaInicio || initialForm.horario.pausaInicio,
+        pausaFim: horario.pausaFim || initialForm.horario.pausaFim,
+      },
+    });
+    setEditingId(funcionario.id);
+    setErro('');
+    setSucesso('');
   };
 
   const validateForm = () => {
@@ -214,8 +262,13 @@ export default function Users() {
         },
       };
 
-      const response = await fetch(`${API_BASE_URL}/funcionarios`, {
-        method: 'POST',
+      const funcionarioUrl = editingId
+        ? `${API_BASE_URL}/funcionarios/${editingId}`
+        : `${API_BASE_URL}/funcionarios`;
+      const submitLabel = editingId ? 'atualizar' : 'criar';
+
+      const response = await fetch(funcionarioUrl, {
+        method: editingId ? 'PUT' : 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
@@ -224,16 +277,86 @@ export default function Users() {
 
       const body = await response.json();
       if (!response.ok) {
-        throw new Error(body.error || `Erro ao criar funcionario (${response.status})`);
+        throw new Error(body.error || `Erro ao ${submitLabel} funcionario (${response.status})`);
       }
 
-      setSucesso('Funcionario criado com sucesso.');
-      setForm(initialForm);
+      setSucesso(editingId ? 'Funcionario atualizado com sucesso.' : 'Funcionario criado com sucesso.');
+      resetForm();
       await loadData();
     } catch (e) {
-      setErro(e.message || 'Erro ao criar funcionario.');
+      setErro(e.message || `Erro ao ${editingId ? 'atualizar' : 'criar'} funcionario.`);
     } finally {
       setLoadingSubmit(false);
+    }
+  };
+
+  const handleDelete = async (funcionario) => {
+    const confirmed = window.confirm(`Eliminar definitivamente "${funcionario.nomeCompleto}"? Esta acao remove o funcionario da base de dados.`);
+    if (!confirmed) {
+      return;
+    }
+
+    setErro('');
+    setSucesso('');
+    setLoadingDeleteId(funcionario.id);
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/funcionarios/${funcionario.id}`, {
+        method: 'DELETE',
+      });
+      const body = await response.json();
+
+      if (!response.ok) {
+        throw new Error(body.error || `Erro ao eliminar funcionario (${response.status})`);
+      }
+
+      if (editingId === funcionario.id) {
+        resetForm();
+      }
+
+      setSucesso('Funcionario eliminado com sucesso.');
+      await loadData();
+    } catch (e) {
+      setErro(e.message || 'Erro ao eliminar funcionario.');
+    } finally {
+      setLoadingDeleteId(null);
+    }
+  };
+
+  const handleToggleAtivo = async (funcionario) => {
+    const nextAtivo = !funcionario.ativo;
+
+    if (!nextAtivo) {
+      const confirmed = window.confirm(`Desativar "${funcionario.nomeCompleto}"? O funcionario fica visivel, mas marcado como inativo.`);
+      if (!confirmed) {
+        return;
+      }
+    }
+
+    setErro('');
+    setSucesso('');
+    setLoadingStatusId(funcionario.id);
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/funcionarios/${funcionario.id}/ativo`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ ativo: nextAtivo }),
+      });
+      const body = await response.json();
+
+      if (!response.ok) {
+        throw new Error(body.error || `Erro ao ${nextAtivo ? 'ativar' : 'desativar'} funcionario (${response.status})`);
+      }
+
+      setSucesso(nextAtivo ? 'Funcionario ativado com sucesso.' : 'Funcionario desativado com sucesso.');
+      await loadData();
+    } catch (e) {
+      setErro(e.message || `Erro ao ${nextAtivo ? 'ativar' : 'desativar'} funcionario.`);
+    } finally {
+      setLoadingStatusId(null);
     }
   };
 
@@ -268,7 +391,7 @@ export default function Users() {
               required
               fullWidth
             >
-              {CARGO_OPTIONS.map((option) => (
+              {cargoOptions.map((option) => (
                 <MenuItem key={option.value} value={option.value}>
                   {option.label}
                 </MenuItem>
@@ -297,7 +420,7 @@ export default function Users() {
             Porte de animais
           </Typography>
           <FormGroup sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', lg: 'repeat(3, 1fr)' } }}>
-            {PORTE_OPTIONS.map((porte) => (
+            {porteOptions.map((porte) => (
               <FormControlLabel
                 key={porte.value}
                 control={
@@ -338,7 +461,7 @@ export default function Users() {
           <Alert severity="info">Domingo é dia de descanso semanal e nao pode ser selecionado.</Alert>
 
           <FormGroup sx={{ display: 'grid', gridTemplateColumns: { xs: 'repeat(2, 1fr)', md: 'repeat(3, 1fr)' } }}>
-            {DIA_OPTIONS.map((dia) => (
+            {diaOptions.map((dia) => (
               <FormControlLabel
                 key={dia.value}
                 control={
@@ -390,19 +513,35 @@ export default function Users() {
             />
           </Box>
 
-          <Button
-            type="submit"
-            variant="contained"
-            disabled={loadingSubmit || loadingInitial}
-            sx={{
-              mt: 1,
-              py: 1.5,
-              backgroundColor: colors.primary,
-              '&:hover': { backgroundColor: `${colors.primary}dd` },
-            }}
-          >
-            {loadingSubmit ? 'A criar...' : 'Criar Funcionario'}
-          </Button>
+          <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+            <Button
+              type="submit"
+              variant="contained"
+              disabled={loadingSubmit || loadingInitial}
+              sx={{
+                mt: 1,
+                py: 1.5,
+                flexGrow: 1,
+                backgroundColor: colors.primary,
+                '&:hover': { backgroundColor: `${colors.primary}dd` },
+              }}
+            >
+              {loadingSubmit
+                ? editingId ? 'A guardar...' : 'A criar...'
+                : editingId ? 'Guardar alteracoes' : 'Criar Funcionario'}
+            </Button>
+            {editingId && (
+              <Button
+                type="button"
+                variant="outlined"
+                disabled={loadingSubmit}
+                onClick={resetForm}
+                sx={{ mt: 1, py: 1.5 }}
+              >
+                Cancelar edicao
+              </Button>
+            )}
+          </Box>
         </Box>
       </Paper>
 
@@ -423,16 +562,57 @@ export default function Users() {
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
           {funcionarios.map((f) => (
             <Paper key={f.id} variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
-              <Typography variant="subtitle1" sx={{ fontWeight: 700, color: colors.text }}>
-                {f.nomeCompleto}
-              </Typography>
+              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2, flexWrap: 'wrap' }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+                  <Typography variant="subtitle1" sx={{ fontWeight: 700, color: colors.text }}>
+                    {f.nomeCompleto}
+                  </Typography>
+                  <Chip
+                    size="small"
+                    label={f.ativo ? 'Ativo' : 'Inativo'}
+                    color={f.ativo ? 'success' : 'default'}
+                    sx={{ color: colors.white, fontSize: '11px', height: 24 }}
+                  />
+                </Box>
+                <Box sx={{ display: 'flex', gap: 1 }}>
+                  <IconButton
+                    size="small"
+                    onClick={() => handleEdit(f)}
+                    sx={{ color: colors.primary }}
+                    title="Editar funcionario"
+                    aria-label="Editar"
+                  >
+                    <EditIcon fontSize="small" />
+                  </IconButton>
+                  <IconButton
+                    size="small"
+                    disabled={loadingStatusId === f.id}
+                    onClick={() => handleToggleAtivo(f)}
+                    sx={{ color: colors.textSecondary }}
+                    title={f.ativo ? 'Desativar funcionario' : 'Ativar funcionario'}
+                    aria-label={f.ativo ? 'Desativar' : 'Ativar'}
+                  >
+                    {f.ativo ? <BlockIcon fontSize="small" /> : <RestoreIcon fontSize="small" />}
+                  </IconButton>
+                  <IconButton
+                    size="small"
+                    disabled={loadingDeleteId === f.id}
+                    onClick={() => handleDelete(f)}
+                    sx={{ color: colors.textSecondary }}
+                    title="Eliminar funcionario"
+                    aria-label="Eliminar"
+                  >
+                    <DeleteIcon fontSize="small" />
+                  </IconButton>
+                </Box>
+              </Box>
               <Typography variant="body2" sx={{ color: colors.textSecondary }}>
-                {enumLabel(CARGO_OPTIONS, f.cargo)} | {f.email} | {f.telefone}
+                {enumLabel(cargoOptions, f.cargo)} | {f.email} | {f.telefone}
               </Typography>
 
               <Box sx={{ mt: 1, display: 'flex', flexWrap: 'wrap', gap: 1 }}>
                 {(f.horariosTrabalho?.[0]?.diasSemana || []).map((dia) => (
-                  <Chip key={`${f.id}-${dia}`} size="small" label={enumLabel(DIA_OPTIONS, dia)} />
+                  <Chip key={`${f.id}-${dia}`} size="small" label={enumLabel(diaOptions, dia)} />
                 ))}
               </Box>
 

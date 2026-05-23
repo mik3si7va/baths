@@ -1,7 +1,9 @@
 const { PrismaClient, Prisma } = require('@prisma/client');
 const { randomUUID } = require('node:crypto');
+const bcrypt = require('bcrypt');
 
 const prisma = new PrismaClient();
+const BCRYPT_ROUNDS = 10;
 
 async function seedEvents() {
   const title = 'Banho Rex';
@@ -245,6 +247,34 @@ async function seedFuncionarios() {
 
   const funcionarios = [
     {
+      nomeCompleto: 'Administrador B&T',
+      cargo: 'ADMINISTRACAO',
+      telefone: '910100100',
+      email: 'admin@bet.com',
+      password: 'Admin123!',
+      porteAnimais: ['EXTRA_PEQUENO', 'PEQUENO', 'MEDIO', 'GRANDE', 'EXTRA_GRANDE'],
+      diasSemana: ['SEGUNDA', 'TERCA', 'QUARTA', 'QUINTA', 'SEXTA'],
+      horaInicio: '09:00',
+      horaFim: '18:00',
+      pausaInicio: '13:00',
+      pausaFim: '14:00',
+      especialidades: [],
+    },
+    {
+      nomeCompleto: 'Funcionario B&T',
+      cargo: 'BANHISTA',
+      telefone: '910100101',
+      email: 'funcionario@bet.com',
+      password: 'Funcionario123!',
+      porteAnimais: ['EXTRA_PEQUENO', 'PEQUENO', 'MEDIO', 'GRANDE', 'EXTRA_GRANDE'],
+      diasSemana: ['SEGUNDA', 'TERCA', 'QUARTA', 'QUINTA', 'SEXTA'],
+      horaInicio: '09:00',
+      horaFim: '18:00',
+      pausaInicio: '13:00',
+      pausaFim: '14:00',
+      especialidades: ['BANHO', 'CORTE_UNHAS', 'LIMPEZA_OUVIDOS'],
+    },
+    {
       nomeCompleto: 'Sofia Ramalho',
       cargo: 'TOSQUIADOR_SENIOR',
       telefone: '912345678',
@@ -398,6 +428,8 @@ async function seedFuncionarios() {
       return servicoId;
     });
 
+    const passwordHash = f.password ? await bcrypt.hash(f.password, BCRYPT_ROUNDS) : undefined;
+
     await prisma.$transaction(async (tx) => {
       const utilizador = await tx.utilizador.upsert({
         where: { email: f.email },
@@ -407,11 +439,13 @@ async function seedFuncionarios() {
           email: f.email,
           estadoConta: 'ATIVA',
           ativo: true,
+          ...(passwordHash ? { passwordHash } : {}),
         },
         update: {
           nome: f.nomeCompleto,
           estadoConta: 'ATIVA',
           ativo: true,
+          ...(passwordHash ? { passwordHash } : {}),
         },
       });
 

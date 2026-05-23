@@ -7,9 +7,13 @@ import {
   Home,
   Calendar,
   Login,
+  RecuperarPassword,
+  DefinirPassword,
   Salas,
   SalaDetalhes,
-  Users,
+  Funcionarios,
+  Contas,
+  Perfil,
   Pesquisa,
   AgendamentoNovo,
   AgendamentoEditar,
@@ -17,13 +21,31 @@ import {
 } from "./pages";
 import App from "./App";
 
+function getStoredUser() {
+  try {
+    return JSON.parse(localStorage.getItem("btUser") || "null");
+  } catch (_error) {
+    return null;
+  }
+}
+
 const PrivateRoute = ({ element }) => {
-  const user = localStorage.getItem("usernameB&T");
+  const user = localStorage.getItem("btUser") || localStorage.getItem("usernameB&T");
   return user ? element : <Navigate to="/login" replace />;
 };
 
+const AdminRoute = ({ element }) => {
+  const user = getStoredUser();
+
+  if (!user) {
+    return <Navigate to="/login" replace />;
+  }
+
+  return user.tipoConta === "ADMIN" ? element : <Navigate to="/home" replace />;
+};
+
 const PublicLoginRoute = () => {
-  const user = localStorage.getItem("usernameB&T");
+  const user = localStorage.getItem("btUser") || localStorage.getItem("usernameB&T");
   return user ? <Navigate to="/home" replace /> : <Login />;
 };
 
@@ -71,7 +93,7 @@ export default function AppRoutes() {
         <Route
           path="/servicos"
           element={
-            <PrivateRoute
+            <AdminRoute
               element={
                 <CompactLayout showBack>
                   <ServicosPage />
@@ -131,7 +153,7 @@ export default function AppRoutes() {
         <Route
           path="/salas"
           element={
-            <PrivateRoute
+            <AdminRoute
               element={
                 <CompactLayout showBack>
                   <Salas />
@@ -143,7 +165,7 @@ export default function AppRoutes() {
         <Route
           path="/salas/:id/:nome"
           element={
-            <PrivateRoute
+            <AdminRoute
               element={
                 <CompactLayout showBack>
                   <SalaDetalhes />
@@ -155,16 +177,42 @@ export default function AppRoutes() {
         <Route
           path="/funcionarios"
           element={
-            <PrivateRoute
+            <AdminRoute
               element={
                 <CompactLayout>
-                  <Users />
+                  <Funcionarios />
+                </CompactLayout>
+              }
+            />
+          }
+        />
+        <Route
+          path="/contas"
+          element={
+            <AdminRoute
+              element={
+                <CompactLayout>
+                  <Contas />
+                </CompactLayout>
+              }
+            />
+          }
+        />
+        <Route
+          path="/perfil"
+          element={
+            <PrivateRoute
+              element={
+                <CompactLayout showBack>
+                  <Perfil />
                 </CompactLayout>
               }
             />
           }
         />
         <Route path="/login" element={<PublicLoginRoute />} />
+        <Route path="/recuperar-password" element={<RecuperarPassword />} />
+        <Route path="/definir-password" element={<DefinirPassword />} />
       </Routes>
     </BrowserRouter>
   );

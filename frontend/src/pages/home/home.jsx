@@ -17,11 +17,21 @@ import EventAvailableIcon from "@mui/icons-material/EventAvailable";
 import HourglassBottomIcon from "@mui/icons-material/HourglassBottom";
 import TaskAltIcon from "@mui/icons-material/TaskAlt";
 import EventBusyIcon from "@mui/icons-material/EventBusy";
+import ManageAccountsIcon from "@mui/icons-material/ManageAccounts";
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || "http://localhost:5000";
 
+function getStoredUser() {
+  try {
+    return JSON.parse(localStorage.getItem("btUser") || "null");
+  } catch (_error) {
+    return null;
+  }
+}
+
 export default function Home() {
   const { colors } = useThemeContext();
+  const [user] = useState(() => getStoredUser());
   const [stats, setStats] = useState({
     totalClientes: 0,
     totalAnimais: 0,
@@ -33,6 +43,7 @@ export default function Home() {
     agendNaoCompareceuOuCancelados: 0,
   });
   const [loading, setLoading] = useState(true);
+  const isAdmin = user?.tipoConta === "ADMIN";
 
   useEffect(() => {
     const fetchStats = async () => {
@@ -177,6 +188,16 @@ export default function Home() {
       width: 328,
     },
     {
+      title: "Contas",
+      description: "Ativar, desativar e preparar acessos ao backoffice.",
+      icon: ManageAccountsIcon,
+      buttonText: "Gerir",
+      buttonIcon: ManageAccountsIcon,
+      href: "/contas",
+      height: 180,
+      width: 328,
+    },
+    {
       title: "Salas",
       description: "Criar e gerir salas, equipamentos, serviços e preço.",
       icon: MeetingRoomIcon,
@@ -187,6 +208,11 @@ export default function Home() {
       width: 328,
     },
   ];
+  const visibleQuickAcessCardsData = isAdmin
+    ? quickAcessCardsData
+    : quickAcessCardsData.filter(
+        (card) => !["/servicos", "/funcionarios", "/contas", "/salas"].includes(card.href),
+      );
 
   return (
     <>
@@ -246,7 +272,7 @@ export default function Home() {
           justifyContent: "flex-start",
         }}
       >
-        {quickAcessCardsData.map((card, index) => (
+        {visibleQuickAcessCardsData.map((card, index) => (
           <QuickAcessCard
             key={index}
             title={card.title}

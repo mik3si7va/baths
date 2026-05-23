@@ -336,7 +336,6 @@ async function updateFuncionario(
         data: {
           nome: nomeCompleto,
           email: normalizedEmail,
-          ativo: true,
         },
       });
 
@@ -416,22 +415,65 @@ async function deleteFuncionario(id) {
     return null;
   }
 
-  await prisma.$transaction(async (tx) => {
-    await tx.utilizador.update({
+  try {
+    await prisma.utilizador.delete({
       where: { id },
-      data: {
-        ativo: false,
-        estadoConta: 'INATIVA',
-      },
     });
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2003') {
+      throw new Error('Nao e possivel eliminar este funcionario porque existem registos associados.', { cause: error });
+    }
+
+    throw error;
+  }
+
+  return { removed: true, id };
+}
+
+async function setFuncionarioAtivo(id, ativo) {
+  const existing = await prisma.funcionario.findUnique({
+    where: { id },
+    select: { id: true },
+  });
+
+  if (!existing) {
+    return null;
+  }
+
+  const funcionario = await prisma.$transaction(async (tx) => {
+      await tx.utilizador.update({
+        where: { id },
+        data: {
+          ativo,
+          estadoConta: ativo ? 'ATIVA' : 'INATIVA',
+          ...(ativo ? {} : { passwordHash: null }),
+        },
+      });
 
     await tx.horarioTrabalho.updateMany({
       where: { funcionarioId: id },
-      data: { ativo: false },
+      data: { ativo },
+    });
+
+    return tx.funcionario.findUnique({
+      where: { id },
+      include: {
+        utilizador: true,
+        horariosTrabalho: true,
+        funcionarioServico: {
+          include: {
+            tipoServico: {
+              select: {
+                tipo: true,
+              },
+            },
+          },
+        },
+      },
     });
   });
 
-  return { removed: true, id };
+  return mapFuncionarioRow(funcionario);
 }
 
 module.exports = {
@@ -440,4 +482,5 @@ module.exports = {
   createFuncionario,
   updateFuncionario,
   deleteFuncionario,
+  setFuncionarioAtivo,
 };

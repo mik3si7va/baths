@@ -33,7 +33,11 @@ const {
   createFuncionario,
   updateFuncionario,
   deleteFuncionario,
+  setFuncionarioAtivo,
 } = require("./repositories/repositorioFuncionarios");
+const TipoFuncionarioEnum = require("./domain/enums/TipoFuncionarioEnum");
+const PorteEnum = require("./domain/enums/PorteEnum");
+const DiaSemanaEnum = require("./domain/enums/DiaSemanaEnum");
 const {
   getAllClientes,
   getClienteById,
@@ -64,6 +68,21 @@ const {
   getProcessoGestaoActual,
   cancelarProcesso,
 } = require("./repositories/repositorioCamunda");
+const {
+  getContasFuncionarios,
+  updateEstadoContaFuncionario,
+  gerarConviteFuncionario,
+} = require("./repositories/repositorioContas");
+const {
+  loginUtilizador,
+  solicitarRecuperacaoPassword,
+  definirPasswordComToken,
+} = require("./repositories/repositorioAuth");
+const {
+  getPerfil,
+  updatePerfil,
+  alterarPassword,
+} = require("./repositories/repositorioPerfil");
 
 const app = express();
 const PORT = Number(process.env.PORT || 5000);
@@ -71,6 +90,133 @@ const PORT = Number(process.env.PORT || 5000);
 app.use(cors({ origin: "http://localhost:3000" }));
 app.use(express.json());
 app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+
+// ─── AUTH ─────────────────────────────────────────────────────────────────────
+
+app.post("/auth/login", async (req, res) => {
+  const { email, password } = req.body || {};
+
+  try {
+    const user = await loginUtilizador({ email, password });
+    return res.json({ user });
+  } catch (error) {
+    if (
+      error.message === "Credenciais invalidas." ||
+      error.message === "Conta inativa ou sem acesso." ||
+      error.message === "email e password sao obrigatorios."
+    ) {
+      return res.status(401).json({ error: error.message });
+    }
+
+    console.error("Failed to login:", error);
+    return res.status(500).json({ error: "Failed to login" });
+  }
+});
+
+app.post("/auth/recuperar-password", async (req, res) => {
+  try {
+    const result = await solicitarRecuperacaoPassword(req.body || {});
+    return res.json(result);
+  } catch (error) {
+    return res.status(400).json({ error: error.message });
+  }
+});
+
+app.post("/auth/definir-password", async (req, res) => {
+  try {
+    const result = await definirPasswordComToken(req.body || {});
+    return res.json(result);
+  } catch (error) {
+    return res.status(400).json({ error: error.message });
+  }
+});
+
+// ─── PERFIL ───────────────────────────────────────────────────────────────────
+
+app.get("/perfil/:id", async (req, res) => {
+  try {
+    const perfil = await getPerfil(req.params.id);
+    if (!perfil) {
+      return res.status(404).json({ error: "Utilizador nao encontrado" });
+    }
+
+    return res.json(perfil);
+  } catch (error) {
+    console.error("Failed to fetch perfil:", error);
+    return res.status(500).json({ error: "Failed to fetch perfil" });
+  }
+});
+
+app.patch("/perfil/:id", async (req, res) => {
+  try {
+    const perfil = await updatePerfil(req.params.id, req.body || {});
+    if (!perfil) {
+      return res.status(404).json({ error: "Utilizador nao encontrado" });
+    }
+
+    return res.json(perfil);
+  } catch (error) {
+    return res.status(400).json({ error: error.message });
+  }
+});
+
+app.patch("/perfil/:id/password", async (req, res) => {
+  try {
+    const result = await alterarPassword(req.params.id, req.body || {});
+    if (!result) {
+      return res.status(404).json({ error: "Utilizador nao encontrado" });
+    }
+
+    return res.json(result);
+  } catch (error) {
+    return res.status(400).json({ error: error.message });
+  }
+});
+
+// ─── CONTAS ───────────────────────────────────────────────────────────────────
+
+app.get("/contas/funcionarios", async (_req, res) => {
+  try {
+    return res.json(await getContasFuncionarios());
+  } catch (error) {
+    console.error("Failed to fetch contas de funcionarios:", error);
+    return res.status(500).json({ error: "Failed to fetch contas de funcionarios" });
+  }
+});
+
+app.patch("/contas/funcionarios/:id/estado", async (req, res) => {
+  const { estadoConta } = req.body || {};
+
+  if (!estadoConta) {
+    return res.status(400).json({ error: "estadoConta e obrigatorio" });
+  }
+
+  try {
+    const conta = await updateEstadoContaFuncionario(req.params.id, estadoConta);
+    if (!conta) {
+      return res.status(404).json({ error: "Funcionario nao encontrado" });
+    }
+
+    return res.json(conta);
+  } catch (error) {
+    console.error("Failed to update conta de funcionario:", error);
+    return res.status(400).json({ error: error.message });
+  }
+});
+
+app.post("/contas/funcionarios/:id/convite", async (req, res) => {
+  try {
+    const result = await gerarConviteFuncionario(req.params.id);
+    if (!result) {
+      return res.status(404).json({ error: "Funcionario nao encontrado" });
+    }
+
+    return res.json(result);
+  } catch (error) {
+    console.error("Failed to generate funcionario invite:", error);
+    return res.status(400).json({ error: error.message });
+  }
+});
 
 // ─── CLIENTES ─────────────────────────────────────────────────────────────────
 
@@ -1829,6 +1975,14 @@ app.get("/funcionarios/elegiveis", async (req, res) => {
   }
 });
 
+app.get("/funcionarios/opcoes", (_req, res) => {
+  return res.json({
+    cargos: Object.values(TipoFuncionarioEnum),
+    portes: Object.values(PorteEnum),
+    diasSemana: Object.values(DiaSemanaEnum),
+  });
+});
+
 /**
  * @swagger
  * /funcionarios/{id}:
@@ -2096,6 +2250,28 @@ app.put("/funcionarios/:id", async (req, res) => {
   }
 });
 
+app.patch("/funcionarios/:id/ativo", async (req, res) => {
+  const { id } = req.params;
+  const { ativo } = req.body || {};
+
+  if (typeof ativo !== "boolean") {
+    return res.status(400).json({ error: "ativo deve ser booleano" });
+  }
+
+  try {
+    const funcionarioAtualizado = await setFuncionarioAtivo(id, ativo);
+
+    if (!funcionarioAtualizado) {
+      return res.status(404).json({ error: "Funcionario nao encontrado" });
+    }
+
+    return res.json(funcionarioAtualizado);
+  } catch (error) {
+    console.error("Failed to update funcionario active status:", error);
+    return res.status(400).json({ error: error.message });
+  }
+});
+
 /**
  * @swagger
  * /funcionarios/{id}:
@@ -2154,7 +2330,7 @@ app.delete("/funcionarios/:id", async (req, res) => {
     return res.json(result);
   } catch (error) {
     console.error("Failed to delete funcionario:", error);
-    return res.status(500).json({ error: "Failed to delete funcionario" });
+    return res.status(400).json({ error: error.message || "Failed to delete funcionario" });
   }
 });
 

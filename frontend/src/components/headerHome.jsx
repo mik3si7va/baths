@@ -9,6 +9,7 @@ export default function Header() {
     const navigate = useNavigate();
 
     const handleLogout = () => {
+        localStorage.removeItem('btUser');
         localStorage.removeItem('usernameB&T');
         navigate('/login');
     };
@@ -78,6 +79,17 @@ export default function Header() {
                         onClick={() => navigate('/calendar')}
                     >
                         Agenda
+                    </Button>
+                    <Button
+                        sx={{
+                            color: colors.black,
+                            fontSize: sizes.buttonFont,
+                            minWidth: 'auto',
+                            px: { xs: 1, sm: 2 }
+                        }}
+                        onClick={() => navigate('/perfil')}
+                    >
+                        Perfil
                     </Button>
                     <Button
                         variant="contained"
