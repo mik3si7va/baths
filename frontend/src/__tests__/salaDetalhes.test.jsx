@@ -3,7 +3,6 @@ import React from 'react';
 jest.mock('react-router-dom');
 
 import { render, screen, waitFor } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import SalaDetalhes from '../pages/salas/salaDetalhes';
 import { ThemeProvider } from '../contexts/ThemeContext';
@@ -48,14 +47,30 @@ const SALA_ATIVA_MOCK = {
 
 const SALA_INATIVA_MOCK = { ...SALA_ATIVA_MOCK, ativo: false };
 
-const EVENTS_MOCK = [
-    { id: 1, title: 'Banho Rex', startAt: '2026-06-10T09:00:00Z', endAt: '2026-06-10T10:00:00Z' },
+const AGENDAMENTOS_MOCK = [
+  {
+    id: 'agend-1',
+    estado: 'CONFIRMADO',
+    animal: { nome: 'Rex', cliente: { telefone: '900000000', utilizador: { nome: 'Dono' } } },
+    servicos: [
+      {
+        id: 'srv-1',
+        dataHoraInicio: '2026-06-10T09:00:00Z',
+        dataHoraFim: '2026-06-10T10:00:00Z',
+        precoNoMomento: '25',
+        duracaoNoMomento: 60,
+        tipoServico: { tipo: 'BANHO' },
+        funcionario: { utilizador: { nome: 'Sofia' } },
+        sala: { nome: 'Sala de Banho 1' },
+      },
+    ],
+  },
 ];
 
-function mockDefaultFetch(sala = SALA_ATIVA_MOCK, events = EVENTS_MOCK) {
+function mockDefaultFetch(sala = SALA_ATIVA_MOCK, agendamentos = AGENDAMENTOS_MOCK) {
     global.fetch
         .mockImplementationOnce(() => mockJsonResponse(sala))
-        .mockImplementationOnce(() => mockJsonResponse(events));
+        .mockImplementationOnce(() => mockJsonResponse(agendamentos));
 }
 
 describe('SalaDetalhes page', () => {
@@ -88,7 +103,7 @@ describe('SalaDetalhes page', () => {
         expect(screen.getByRole('progressbar')).toBeInTheDocument();
     });
 
-    test('faz dois pedidos — sala e eventos', async () => {
+    test('faz dois pedidos — sala e agendamentos', async () => {
         mockDefaultFetch();
 
         renderSalaDetalhes();
@@ -97,7 +112,7 @@ describe('SalaDetalhes page', () => {
 
         expect(global.fetch).toHaveBeenCalledTimes(2);
         expect(global.fetch).toHaveBeenNthCalledWith(1, `http://localhost:5000/salas/${SALA_ID}`);
-        expect(global.fetch).toHaveBeenNthCalledWith(2, 'http://localhost:5000/events');
+        expect(global.fetch).toHaveBeenNthCalledWith(2, `http://localhost:5000/agendamentos?salaId=${SALA_ID}`);
     });
 
     // ─── DETALHES DA SALA ────────────────────────────────────────────────────
