@@ -5,3 +5,6 @@ export { default as Salas } from './salas/salas';
 export { default as SalaDetalhes } from './salas/salaDetalhes';
 export { default as Users } from './admin/manageUsers/users';
 export { default as Pesquisa } from './pesquisa/pesquisa';
+export { default as AgendamentoNovo } from './agendamentos/agendamentoNovo';
+export { default as AgendamentoEditar } from './agendamentos/agendamentoEditar';
+export { default as FaturaDetalhe } from './faturas/faturaDetalhe';

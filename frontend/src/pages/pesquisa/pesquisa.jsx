@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Box,
   Typography,
@@ -19,82 +20,23 @@ import PhoneIcon from "@mui/icons-material/Phone";
 import LocationOnIcon from "@mui/icons-material/LocationOn";
 import ClearIcon from "@mui/icons-material/Clear";
 import { useThemeContext } from "../../contexts/ThemeContext";
+import { filtrarClientes, filtrarAnimais } from "../../utils/filtroClientes";
+import { ClienteCard, AnimalCard } from "../../components";
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || "http://localhost:5000";
 
-function ResultCard({
-  label,
-  icon: Icon,
-  subtitle,
-  onClick,
-  active,
-  chipColor,
-  detail,
-}) {
-  return (
-    <Paper
-      onMouseDown={onClick}
-      sx={{
-        p: 2,
-        mb: 1,
-        borderRadius: 3,
-        cursor: "pointer",
-        border: "1px solid",
-        borderColor: active ? "primary.main" : "divider",
-        backgroundColor: active
-          ? "rgba(25, 118, 210, 0.06)"
-          : "background.paper",
-        transition: "background-color 0.2s ease",
-        overflow: "hidden",
-      }}
-      elevation={active ? 3 : 1}
-    >
-      <Box
-        sx={{
-          display: "flex",
-          alignItems: "center",
-          gap: 1,
-          mb: 1.25,
-          minWidth: 0,
-        }}
-      >
-        <Icon sx={{ color: chipColor, fontSize: 18, flexShrink: 0 }} />
-        <Typography
-          variant="subtitle2"
-          sx={{
-            fontWeight: 700,
-            wordBreak: "break-word",
-            overflowWrap: "anywhere",
-            flex: 1,
-            minWidth: 0,
-          }}
-        >
-          {label}
-        </Typography>
-        <Chip
-          label={detail}
-          size="small"
-          sx={{ ml: "auto", fontSize: 11, fontWeight: 700 }}
-          color={chipColor === "primary" ? "primary" : "default"}
-        />
-      </Box>
-      <Typography
-        variant="body2"
-        sx={{
-          color: "text.secondary",
-          wordBreak: "break-word",
-          overflowWrap: "anywhere",
-          whiteSpace: "normal",
-        }}
-      >
-        {subtitle}
-      </Typography>
-    </Paper>
-  );
-}
+// Cor do chip por estado
+const COR_CHIP_POR_ESTADO = {
+  CONCLUIDO: 'success',
+  CANCELADO: 'error',
+  NAO_COMPARECEU: 'warning',
+  CONFIRMADO: 'info',
+  EM_ATENDIMENTO: 'info',
+};
 
 export default function Pesquisa() {
   const { colors } = useThemeContext();
+  const navigate = useNavigate();
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(false);
   const [clientes, setClientes] = useState([]);
@@ -192,23 +134,15 @@ export default function Pesquisa() {
 
   const termo = query.trim().toLowerCase();
 
-  const clientesFiltrados = useMemo(() => {
-    if (!termo) return clientes;
-    return clientes.filter((cliente) => {
-      return (
-        cliente.nome?.toLowerCase().includes(termo) ||
-        cliente.email?.toLowerCase().includes(termo) ||
-        cliente.telefone?.includes(termo)
-      );
-    });
-  }, [clientes, termo]);
+  const clientesFiltrados = useMemo(
+    () => filtrarClientes(clientes, query),
+    [clientes, query],
+  );
 
-  const animaisFiltrados = useMemo(() => {
-    if (!termo) return animais;
-    return animais.filter((animal) =>
-      animal.nome?.toLowerCase().includes(termo),
-    );
-  }, [animais, termo]);
+  const animaisFiltrados = useMemo(
+    () => filtrarAnimais(animais, query),
+    [animais, query],
+  );
 
   const handleSelectCliente = (cliente) => {
     setSelectedAnimal(null);
@@ -231,6 +165,8 @@ export default function Pesquisa() {
     setSelectedAnimal(null);
   };
 
+  // timeZone: "UTC" mantém a hora tal como gravada na BD - convenção end-to-end do projecto
+  // (backend roda com TZ=UTC; FullCalendar configurado com timeZone="UTC").
   const formatDateTime = (value) =>
     new Date(value).toLocaleString("pt-PT", {
       day: "2-digit",
@@ -238,8 +174,11 @@ export default function Pesquisa() {
       year: "numeric",
       hour: "2-digit",
       minute: "2-digit",
+      timeZone: "UTC",
     });
 
+  // Histórico flat com `estadoAgendamento` herdado do agendamento parent - usado pela UI para renderizar chip e estilo distinto consoante o estado.
+  // Cancelados e não-comparecidos aparecem aqui com o chip respectivo para audit trail (não foram prestados, mas a marcação existiu).
   const animalServiceHistory = useMemo(
     () =>
       animalAgendamentos.historico.flatMap((agendamento) =>
@@ -247,6 +186,7 @@ export default function Pesquisa() {
           ...servico,
           agendamentoId: agendamento.id,
           dataHoraInicio: agendamento.dataHoraInicio,
+          estadoAgendamento: agendamento.estado,
         })),
       ),
     [animalAgendamentos.historico],
@@ -354,7 +294,16 @@ export default function Pesquisa() {
             <PetsIcon sx={{ color: colors.primary }} />
             <Typography variant="h2">Ficha do Animal</Typography>
           </Box>
-          <Button variant="contained" sx={{ whiteSpace: "nowrap" }}>
+          <Button
+            variant="contained"
+            sx={{ whiteSpace: "nowrap" }}
+            disabled={!selectedAnimal.cliente}
+            onClick={() =>
+              navigate(
+                `/agendamentos/novo?clienteId=${selectedAnimal.cliente.id}&animalId=${selectedAnimal.id}`,
+              )
+            }
+          >
             Novo Agendamento
           </Button>
         </Box>
@@ -394,14 +343,10 @@ export default function Pesquisa() {
         </Typography>
         {selectedAnimal.cliente ? (
           <Box sx={{ mt: 1, mb: 3 }}>
-            <ResultCard
-              label={selectedAnimal.cliente.nome}
-              icon={PersonIcon}
-              subtitle={`${selectedAnimal.cliente.email || "--"} · ${selectedAnimal.cliente.telefone || "--"}`}
+            <ClienteCard
+              cliente={selectedAnimal.cliente}
               onClick={() => handleSelectCliente(selectedAnimal.cliente)}
               active={selectedCliente?.id === selectedAnimal.cliente.id}
-              chipColor="primary"
-              detail={`${selectedAnimal.cliente.animais?.length ?? 0} ${selectedAnimal.cliente.animais?.length === 1 ? "animal" : "animais"}`}
             />
           </Box>
         ) : (
@@ -467,30 +412,43 @@ export default function Pesquisa() {
             </Typography>
           ) : (
             <Box sx={{ display: "grid", gap: 1 }}>
-              {animalServiceHistory.map((servico) => (
-                <Paper
-                  key={`${servico.id}-${servico.agendamentoId}`}
-                  sx={{ p: 2, borderRadius: 2 }}
-                  elevation={0}
-                >
-                  <Typography variant="body2" sx={{ fontWeight: 700 }}>
-                    {servico.tipoServico}
-                  </Typography>
-                  <Typography
-                    variant="caption"
-                    sx={{ color: colors.textSecondary, display: "block" }}
+              {animalServiceHistory.map((servico) => {
+                const naoPrestado =
+                  servico.estadoAgendamento === "CANCELADO" ||
+                  servico.estadoAgendamento === "NAO_COMPARECEU";
+                return (
+                  <Paper
+                    key={`${servico.id}-${servico.agendamentoId}`}
+                    sx={{ p: 2, borderRadius: 2, opacity: naoPrestado ? 0.7 : 1 }}
+                    elevation={0}
                   >
-                    {formatDateTime(servico.dataHoraInicio)}
-                  </Typography>
-                  <Typography
-                    variant="caption"
-                    sx={{ color: colors.textSecondary }}
-                  >
-                    {servico.precoNoMomento.toFixed(2)}€ ·{" "}
-                    {servico.duracaoNoMomento} min
-                  </Typography>
-                </Paper>
-              ))}
+                    <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 0.5 }}>
+                      <Typography variant="body2" sx={{ fontWeight: 700, flex: 1 }}>
+                        {servico.tipoServico}
+                      </Typography>
+                      <Chip
+                        label={servico.estadoAgendamento}
+                        size="small"
+                        color={COR_CHIP_POR_ESTADO[servico.estadoAgendamento] ?? "default"}
+                        sx={{ fontWeight: 700 }}
+                      />
+                    </Box>
+                    <Typography
+                      variant="caption"
+                      sx={{ color: colors.textSecondary, display: "block" }}
+                    >
+                      {formatDateTime(servico.dataHoraInicio)}
+                    </Typography>
+                    <Typography
+                      variant="caption"
+                      sx={{ color: colors.textSecondary }}
+                    >
+                      {servico.precoNoMomento.toFixed(2)}€ ·{" "}
+                      {servico.duracaoNoMomento} min
+                    </Typography>
+                  </Paper>
+                );
+              })}
             </Box>
           )}
         </Box>
@@ -509,7 +467,7 @@ export default function Pesquisa() {
       </Typography>
       <Typography variant="body1" sx={{ mb: 4, color: colors.textSecondary }}>
         Pesquise por nome, email, telefone ou nome de animal para ver a ficha
-        completa de clientes e os seus animais asociados.
+        completa de clientes e os seus animais associados.
       </Typography>
 
       <Paper
@@ -527,7 +485,7 @@ export default function Pesquisa() {
         <SearchIcon sx={{ color: colors.textSecondary, mr: 1 }} />
         <InputBase
           fullWidth
-          placeholder="Pesquisar por nome, email, telefone ou nome de animal..."
+          placeholder="Pesquisar por nome, email, telefone, NIF ou nome de animal..."
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           sx={{ fontSize: 14 }}
@@ -595,9 +553,9 @@ export default function Pesquisa() {
             </Box>
 
             {!showClientes ||
-            clientesFiltrados.length > 0 ||
-            !showAnimais ||
-            animaisFiltrados.length > 0 ? (
+              clientesFiltrados.length > 0 ||
+              !showAnimais ||
+              animaisFiltrados.length > 0 ? (
               <>
                 {showClientes && (
                   <Box sx={{ mb: 3 }}>
@@ -613,15 +571,11 @@ export default function Pesquisa() {
                       </Typography>
                     ) : (
                       clientesFiltrados.map((cliente) => (
-                        <ResultCard
+                        <ClienteCard
                           key={cliente.id}
-                          label={cliente.nome}
-                          icon={PersonIcon}
-                          subtitle={`${cliente.email || "--"} · ${cliente.telefone || "--"}`}
+                          cliente={cliente}
                           onClick={() => handleSelectCliente(cliente)}
                           active={selectedCliente?.id === cliente.id}
-                          chipColor="primary"
-                          detail={`${cliente.animais?.length ?? 0} ${cliente.animais?.length === 1 ? "animal" : "animais"}`}
                         />
                       ))
                     )}
@@ -642,19 +596,11 @@ export default function Pesquisa() {
                       </Typography>
                     ) : (
                       animaisFiltrados.map((animal) => (
-                        <ResultCard
+                        <AnimalCard
                           key={`${animal.id}-${animal.cliente?.id || ""}`}
-                          label={animal.nome}
-                          icon={PetsIcon}
-                          subtitle={`${animal.especie || "--"} · ${animal.cliente?.nome || "--"}`}
+                          animal={animal}
                           onClick={() => handleSelectAnimal(animal)}
                           active={selectedAnimal?.id === animal.id}
-                          chipColor="default"
-                          detail={
-                            animal.cliente?.nome
-                              ? `Cliente: ${animal.cliente.nome}`
-                              : "Animal"
-                          }
                         />
                       ))
                     )}
