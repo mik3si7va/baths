@@ -258,7 +258,6 @@ async function updateSala(id, { nome, capacidade, equipamento, precoHora, tipoSe
   }
 }
 
-
 // Verifica se uma sala (ou um serviço específico dentro de uma sala) tem agendamentos futuros ou reservas temporárias por expirar.
 // Usado por:
 // - Subtask - BET-180: deleteSala — bloqueia inativação se houver agendamentos futuros
@@ -270,7 +269,7 @@ async function verificarAgendamentosFuturos({ salaId, tipoServicoId }) {
   //  - CONFIRMADO: marcado, ainda não começou
   //  - EM_ATENDIMENTO: em curso (cliente já entrou)
   // CANCELADO / NAO_COMPARECEU / CONCLUIDO não bloqueiam - a sala está livre.
-  const ESTADOS_VIVOS = ['CONFIRMADO', 'EM_ATENDIMENTO'];
+  const ESTADOS_AGENDAMENTO_ATIVOS = ['CONFIRMADO', 'EM_ATENDIMENTO'];
 
   const totalAgendamentos = await prisma.agendamentoServico.count({
     where: {
@@ -278,13 +277,13 @@ async function verificarAgendamentosFuturos({ salaId, tipoServicoId }) {
       // só agendamentos futuros (já aconteceram não bloqueiam)
       dataHoraInicio: { gt: agora },
       // só nos estados que ainda contam
-      agendamento: { estado: { in: ESTADOS_VIVOS } },
+      agendamento: { estado: { in: ESTADOS_AGENDAMENTO_ATIVOS } },
       // se foi pedido um serviço específico (BET-485), restringe a esse
       ...(tipoServicoId && { tipoServicoId }),
     },
   });
 
-  // ReservaTemporaria só faz sentido para validação da sala inteira (BET-180): o schema não tem tipoServicoId, só salaId+slot. 
+  // ReservaTemporaria só faz sentido para validação da sala inteira (BET-180): o schema não tem tipoServicoId, só salaId+slot.
   // Por isso, quando o caller passa tipoServicoId (BET-485), saltamos esta verificação.
   let totalReservas = 0;
   if (!tipoServicoId) {
@@ -430,6 +429,14 @@ async function getServicosBySala(salaId) {
 // US - BET-479: Subtask - BET-484/BET-485: desassociar serviço de sala
 // Bloqueado se combinação sala + serviço tiver agendamentos futuros (BET-485)
 async function removeServicoFromSala({ salaId, tipoServicoId }) {
+  if (!isUuid(salaId)) {
+    throw new Error('salaId inválido. Deve ser um UUID válido.');
+  }
+
+  if (!isUuid(tipoServicoId)) {
+    throw new Error('tipoServicoId inválido. Deve ser um UUID válido.');
+  }
+
   const { temAgendamentos, totalAgendamentos } = await verificarAgendamentosFuturos({
     salaId,
     tipoServicoId,
