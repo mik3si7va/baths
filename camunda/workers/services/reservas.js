@@ -3,8 +3,21 @@ const { log } = require('../utils/logger');
 const { formatDt } = require('../utils/utilsWorker');
 const { addMinutes } = require('date-fns');
 
+const TOPIC = 'reservas';
+
+// ajustes:
+// TTL (em minutos) das reservas temporárias criadas durante a escolha de uma opção.
+// 5 cobre o tempo entre "criar-reservas-temporarias-opcao" (BP101) e a confirmação final do agendamento - sem libertar slots a meio do utilizador escolher.
+// Reservas expiradas são limpas por `limparReservasExpiradas` (cron) e ignoradas automaticamente em `verificarDisponibilidade` via `expiresAt > agora`.
+//   const EXPIRACAO_MINUTOS = 10;  // tolerância para utilizadores mais lentos
+//   const EXPIRACAO_MINUTOS = 2;   // libertar slots mais cedo se UX permitir
+// Não baixar abaixo de 1 min sem cuidado - o scheduler pode demorar ~segundos a passar de BP101 -> BP138, e uma reserva expirada a meio leva a inconsistências.
 const EXPIRACAO_MINUTOS = 5;
-const ESTADOS_AGENDAMENTO_ATIVOS = { notIn: ['CANCELADO', 'NAO_COMPARECEU'] };
+
+// Estados de Agendamento que contam como "ocupar slot" em verificarDisponibilidade.
+// CANCELADO/NAO_COMPARECEU/CONCLUIDO libertam o slot - os primeiros porque a visita não vai acontecer, CONCLUIDO porque já aconteceu (o slot é só histórico).
+// Mexer aqui muda a semântica de domínio.
+const ESTADOS_AGENDAMENTO_ATIVOS = { notIn: ['CANCELADO', 'NAO_COMPARECEU', 'CONCLUIDO'] };
 
 function intervaloOverlap(inicio, fim) {
   return { dataHoraInicio: { lt: fim }, dataHoraFim: { gt: inicio } };
@@ -30,7 +43,7 @@ async function criarReservaTemporaria(payload) {
     },
   });
 
-  log('reservas', `Reserva temporária criada [${reserva.id}] expira em ${EXPIRACAO_MINUTOS}min`, 'success');
+  log(TOPIC, `Reserva temporária criada [${reserva.id}] expira em ${EXPIRACAO_MINUTOS}min`, 'success');
   return reserva;
 }
 
@@ -51,6 +64,11 @@ async function criarReservaTemporaria(payload) {
  *                                                  fornecida e houver `salaId`, é obtida da BD.
  *                                                  Callers que já tenham a sala em memória
  *                                                  (ex: scheduler) devem passar para evitar query.
+ * @param {string}      [opts.agendamentoIdIgnorar] - ID de um agendamento a excluir da query.
+ *                                                  Necessário no fluxo REAGENDAR: o agendamento
+ *                                                  original ainda está em CONFIRMADO enquanto o
+ *                                                  sub-processo procura novos slots - sem este
+ *                                                  filtro, bloquearia os seus próprios horários.
  */
 async function verificarDisponibilidade({
   salaId,
@@ -59,16 +77,22 @@ async function verificarDisponibilidade({
   dataHoraFim,
   processInstanceId,
   capacidade,
+  agendamentoIdIgnorar,
 }) {
+  // Filtro reutilizado nas 3 queries a agendamentoServico abaixo.
+  const filtroAgendamento = agendamentoIdIgnorar
+    ? { agendamentoId: { not: agendamentoIdIgnorar } }
+    : {};
   const inicio = new Date(dataHoraInicio);
   const fim = new Date(dataHoraFim);
   const agora = new Date();
 
-  // ── Funcionário (exclusivo) ─────────────────────────────────────
+  // Funcionário (exclusivo)
   if (funcionarioId) {
     const agendServico = await prisma.agendamentoServico.findFirst({
       where: {
         funcionarioId,
+        ...filtroAgendamento,
         ...intervaloOverlap(inicio, fim),
         agendamento: { estado: ESTADOS_AGENDAMENTO_ATIVOS },
       },
@@ -80,7 +104,7 @@ async function verificarDisponibilidade({
       const u = await prisma.utilizador.findUnique({ where: { id: funcionarioId }, select: { nome: true } });
       const ini = formatDt(agendServico.dataHoraInicio).slice(11);
       const fimStr = formatDt(agendServico.dataHoraFim).slice(11);
-      log('reservas', `Funcionário ${u?.nome ?? funcionarioId} ocupado (agendamento definitivo das ${ini} às ${fimStr}) — livre às ${formatDt(agendServico.dataHoraFim)}`, 'warn');
+      log(TOPIC, `Funcionário ${u?.nome ?? funcionarioId} ocupado (agendamento definitivo das ${ini} às ${fimStr}) - livre às ${formatDt(agendServico.dataHoraFim)}`, 'warn');
       return { ok: false, livreEm: agendServico.dataHoraFim };
     }
 
@@ -99,12 +123,12 @@ async function verificarDisponibilidade({
       const u = await prisma.utilizador.findUnique({ where: { id: funcionarioId }, select: { nome: true } });
       const ini = formatDt(temp.dataHoraInicio).slice(11);
       const fimStr = formatDt(temp.dataHoraFim).slice(11);
-      log('reservas', `Funcionário ${u?.nome ?? funcionarioId} ocupado (reserva temporária das ${ini} às ${fimStr}) — livre às ${formatDt(temp.dataHoraFim)}`, 'warn');
+      log(TOPIC, `Funcionário ${u?.nome ?? funcionarioId} ocupado (reserva temporária das ${ini} às ${fimStr}) - livre às ${formatDt(temp.dataHoraFim)}`, 'warn');
       return { ok: false, livreEm: temp.dataHoraFim };
     }
   }
 
-  // ── Sala (respeita capacidade) ───────────────────────────────────
+  // Sala (respeita capacidade)
   if (salaId) {
     // Se o caller não forneceu capacidade, obtê-la da BD. Evita bug silencioso de default=1.
     if (capacidade == null) {
@@ -118,6 +142,7 @@ async function verificarDisponibilidade({
     const agendServicosOcup = await prisma.agendamentoServico.findMany({
       where: {
         salaId,
+        ...filtroAgendamento,
         ...intervaloOverlap(inicio, fim),
         agendamento: { estado: ESTADOS_AGENDAMENTO_ATIVOS },
       },
@@ -143,6 +168,7 @@ async function verificarDisponibilidade({
       const bloqA = await prisma.agendamentoServico.findFirst({
         where: {
           salaId,
+          ...filtroAgendamento,
           ...intervaloOverlap(inicio, fim),
           agendamento: { estado: ESTADOS_AGENDAMENTO_ATIVOS },
         },
@@ -165,7 +191,7 @@ async function verificarDisponibilidade({
 
       const bloqIni = formatDt(bloqA?.dataHoraInicio ?? bloqT?.dataHoraInicio).slice(11);
       const bloqFim = livreEm ? formatDt(livreEm).slice(11) : '?';
-      log('reservas', `Sala ${s?.nome ?? salaId} sem capacidade (${totalOcupado}/${capacidade}, ocupada das ${bloqIni} às ${bloqFim}) — livre às ${livreEm ? formatDt(livreEm) : '?'}`, 'warn');
+      log(TOPIC, `Sala ${s?.nome ?? salaId} sem capacidade (${totalOcupado}/${capacidade}, ocupada das ${bloqIni} às ${bloqFim}) - livre às ${livreEm ? formatDt(livreEm) : '?'}`, 'warn');
 
       return { ok: false, livreEm };
     }
@@ -179,7 +205,7 @@ async function verificarDisponibilidade({
  */
 async function libertarReservas(processInstanceId) {
   if (!processInstanceId) {
-    log('reservas', 'libertarReservas: processInstanceId em falta', 'warn');
+    log(TOPIC, 'libertarReservas: processInstanceId em falta', 'warn');
     return 0;
   }
 
@@ -187,7 +213,7 @@ async function libertarReservas(processInstanceId) {
     where: { processInstanceId },
   });
 
-  log('reservas', `${count} reserva(s) temporária(s) libertada(s) [proc=${processInstanceId}]`, 'success');
+  log(TOPIC, `${count} reserva(s) temporária(s) libertada(s) [proc=${processInstanceId}]`, 'success');
   return count;
 }
 
@@ -198,7 +224,7 @@ async function libertarReservas(processInstanceId) {
  */
 async function libertarReservasPorIds(ids = []) {
   if (!ids.length) {
-    log('reservas', 'libertarReservasPorIds: lista de ids vazia', 'warn');
+    log(TOPIC, 'libertarReservasPorIds: lista de ids vazia', 'warn');
     return 0;
   }
 
@@ -206,31 +232,7 @@ async function libertarReservasPorIds(ids = []) {
     where: { id: { in: ids } },
   });
 
-  log('reservas', `${count} reserva(s) temporária(s) libertada(s) [ids=${ids.join(',')}]`, 'success');
-  return count;
-}
-
-/**
- * Liberta os recursos (AgendamentoServico) associados a um agendamento definitivo.
- * Usado no cancelamento e não-comparência.
- * Não apaga o agendamento — apenas liberta os slots para reutilização.
- * (Na prática, o estado CANCELADO/NAO_COMPARECEU já exclui estes registos das queries de disponibilidade;
- * esta função é um no-op para manter a API simétrica com libertarReservas.)
- */
-async function libertarRecursosAgendamento(agendamentoId) {
-  if (!agendamentoId) {
-    log('reservas', 'libertarRecursosAgendamento: agendamentoId em falta', 'warn');
-    return 0;
-  }
-
-  // Os recursos ficam livres assim que o estado do agendamento passa a
-  // CANCELADO ou NAO_COMPARECEU (as queries de disponibilidade excluem esses estados).
-  // Registamos apenas para consistência de log.
-  const count = await prisma.agendamentoServico.count({
-    where: { agendamentoId },
-  });
-
-  log('reservas', `Recursos de agendamento ${agendamentoId} marcados como livres (${count} serviço(s))`, 'success');
+  log(TOPIC, `${count} reserva(s) temporária(s) libertada(s) [ids=${ids.join(',')}]`, 'success');
   return count;
 }
 
@@ -238,7 +240,7 @@ async function limparReservasExpiradas() {
   const { count } = await prisma.reservaTemporaria.deleteMany({
     where: { expiresAt: { lt: new Date() } }
   });
-  log('reservas', `${count} reserva(s) expirada(s) removida(s)`, 'info');
+  log(TOPIC, `${count} reserva(s) expirada(s) removida(s)`, 'info');
   return count;
 }
 
@@ -246,7 +248,7 @@ async function limparReservasExpiradas() {
  * Verifica em série a disponibilidade de cada serviço (sala+funcionário) de uma opção.
  * Faz early-exit no primeiro indisponível.
  */
-async function validarServicos(servicos, processInstanceId) {
+async function validarServicos(servicos, processInstanceId, agendamentoIdIgnorar) {
   for (const s of servicos) {
     const result = await verificarDisponibilidade({
       salaId: s.salaId,
@@ -254,6 +256,7 @@ async function validarServicos(servicos, processInstanceId) {
       dataHoraInicio: s.dataHoraInicio,
       dataHoraFim: s.dataHoraFim,
       processInstanceId,
+      agendamentoIdIgnorar,
     });
     if (!result.ok) return false;
   }
@@ -294,7 +297,6 @@ module.exports = {
   verificarDisponibilidade,
   libertarReservas,
   libertarReservasPorIds,
-  libertarRecursosAgendamento,
   limparReservasExpiradas,
   validarServicos,
   criarReservasParaServicos,

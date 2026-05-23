@@ -1,6 +1,24 @@
 const nodemailer = require('nodemailer');
 const { log } = require('../utils/logger');
 
+const TOPIC = 'notificacoes';
+
+// ajustes:
+// Configuração SMTP toda em variáveis de ambiente (backend/.env).
+// Os defaults pressupõem ambiente de desenvolvimento - envio real desactivado por defeito.
+//
+//   DISABLE_EMAILS    'true' (default) → não envia, só loga "[SIMULACAO] ..."
+//                     'false'          → envia via getTransporter() para o SMTP configurado
+//   MAIL_HOST         servidor SMTP (ex: sandbox.smtp.mailtrap.io)
+//   MAIL_PORT         porto SMTP (ex: 2525 para Mailtrap, 587 para envio real)
+//   MAIL_USER         credenciais
+//   MAIL_PASS         credenciais
+//   MAIL_FROM         remetente (default: noreply@bet.pt)
+//
+// Para envio em sandbox (ex: Mailtrap): preencher MAIL_* e pôr DISABLE_EMAILS=false.
+// Para o teste automatizado (test-single): manter DISABLE_EMAILS=true.
+// Para produção real: pôr DISABLE_EMAILS=false e usar SMTP de produção.
+
 let transporter;
 function getTransporter() {
     if (!transporter) {
@@ -60,10 +78,10 @@ const TEMPLATES = {
         `),
     },
     fatura: {
-        subject: ({ faturaId }) => `Fatura ${faturaId}`,
-        html: ({ nomeCliente, faturaId, faturaUrl }) => layout(nomeCliente, `
+        subject: ({ faturaNumero, faturaId }) => `Fatura ${faturaNumero ?? faturaId}`,
+        html: ({ nomeCliente, faturaNumero, faturaId, faturaUrl }) => layout(nomeCliente, `
             <p>Obrigado pela sua visita à B&T.</p>
-            <p>A sua fatura <strong>${faturaId}</strong> foi emitida com sucesso.</p>
+            <p>A sua fatura <strong>${faturaNumero ?? faturaId}</strong> foi emitida com sucesso.</p>
             ${faturaUrl ? `<p><a href="${faturaUrl}">Descarregar PDF</a></p>` : ''}
         `),
     },
@@ -75,13 +93,13 @@ const TEMPLATES = {
  */
 async function enviarEmail({ to, subject, html }) {
     if (!to) {
-        log('notificacoes', 'sem destinatário — ignorado', 'warn');
+        log(TOPIC, 'sem destinatário — ignorado', 'warn');
         return false;
     }
 
     const disabled = String(process.env.DISABLE_EMAILS ?? 'true').toLowerCase() !== 'false';
     if (disabled) {
-        log('notificacoes', `[SIMULACAO] ${to} | ${subject}`, 'info');
+        log(TOPIC, `[SIMULACAO] ${to} | ${subject}`, 'info');
         return true;
     }
 
@@ -94,7 +112,7 @@ async function enviarEmail({ to, subject, html }) {
         });
         return true;
     } catch (error) {
-        log('notificacoes', `falha para ${to}: ${error.message}`, 'error');
+        log(TOPIC, `falha para ${to}: ${error.message}`, 'error');
         return false;
     }
 }

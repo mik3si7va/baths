@@ -1,5 +1,6 @@
 const prisma = require('../utils/db');
 const { log } = require('../utils/logger');
+const { agoraNaiveLisboa } = require('../utils/horario');
 
 const TOPIC = 'agendamentos';
 
@@ -15,6 +16,10 @@ const AGENDAMENTO_COMPLETO_INCLUDE = {
         },
         orderBy: { ordem: 'asc' },
     },
+    // Trazer só id + numero - chega ao frontend para saber se existe fatura e para construir o link.
+    // O conteudoJson completo vai por outro endpoint (`GET /faturas/:id`) para evitar payloads pesados em listagens.
+    // Workers que precisem do conteúdo completo podem fazer override: `include: { ...AGENDAMENTO_COMPLETO_INCLUDE, fatura: true }`.
+    fatura: { select: { id: true, numero: true } },
 };
 
 // Monta as linhas de AgendamentoServico combinando a lista de serviços escolhidos
@@ -99,7 +104,7 @@ async function montarResumo({ servicosActualizados = [], opcaoSelecionada = {}, 
             funcionarioId: opcaoSelecionada.funcionarioId,
             salaId: opcaoSelecionada.salaId,
         },
-        dataResumo: new Date(),
+        dataResumo: agoraNaiveLisboa(),
     };
 
     log(TOPIC, `Resumo montado: ${duracaoTotal}min | ${valorEstimado}€`, 'success');
@@ -113,7 +118,13 @@ async function criarAgendamentoCompleto(payload) {
     } = payload || {};
 
     if (!animalId || !dataHoraInicio || !dataHoraFim || !processInstanceId) {
-        throw new Error('Faltam dados obrigatórios para criar agendamento');
+        const emFalta = [
+            !animalId && 'animalId',
+            !dataHoraInicio && 'dataHoraInicio',
+            !dataHoraFim && 'dataHoraFim',
+            !processInstanceId && 'processInstanceId',
+        ].filter(Boolean).join(', ');
+        throw new Error(`Faltam dados obrigatórios para criar agendamento: ${emFalta}`);
     }
     if (!opcao?.servicos?.length) {
         throw new Error('Opção escolhida em falta — sem dados de funcionário/sala por serviço');
@@ -196,8 +207,8 @@ async function atualizarEstadoAgendamento({ agendamentoId, estado, checkIn = fal
     log(TOPIC, `Atualizar estado [${agendamentoId}] → ${estado}`, 'info');
 
     const data = { estado };
-    if (checkIn) data.checkInRealizadoEm = new Date();
-    if (checkOut) data.checkOutRealizadoEm = new Date();
+    if (checkIn) data.checkInRealizadoEm = agoraNaiveLisboa();
+    if (checkOut) data.checkOutRealizadoEm = agoraNaiveLisboa();
 
     const agendamento = await prisma.agendamento.update({
         where: { id: agendamentoId },
@@ -240,35 +251,20 @@ async function carregarDadosAgendamento(agendamentoId) {
     const resultado = {
         clienteId: agendamento.animal?.clienteId ?? null,
         animalId: agendamento.animalId,
+        animalNome: agendamento.animal?.nome ?? null,
         porteAnimal,
         clienteEmail: agendamento.animal?.cliente?.utilizador?.email ?? null,
         nomeCliente: agendamento.animal?.cliente?.utilizador?.nome ?? null,
+        clienteNif: agendamento.animal?.cliente?.nif ?? null,
+        clienteTelefone: agendamento.animal?.cliente?.telefone ?? null,
+        dataHoraInicio: agendamento.dataHoraInicio.toISOString(),
+        dataHoraFim: agendamento.dataHoraFim.toISOString(),
         servicosIniciais,
         valorTotal: Number(agendamento.valorTotal),
     };
 
     log(TOPIC, `✓ Dados carregados — ${servicosIniciais.length} serviço(s)`, 'success');
     return resultado;
-}
-
-async function libertarRecursosAgendamento(agendamentoId) {
-    if (!agendamentoId) throw new Error('agendamentoId é obrigatório');
-
-    log(TOPIC, `Libertar recursos do agendamento [${agendamentoId}]`, 'info');
-
-    const agendamento = await prisma.agendamento.findUnique({
-        where: { id: agendamentoId },
-        select: { processInstanceId: true },
-    });
-
-    if (agendamento?.processInstanceId) {
-        await prisma.reservaTemporaria.deleteMany({
-            where: { processInstanceId: agendamento.processInstanceId },
-        });
-        log(TOPIC, `✓ Reservas temporárias limpas para processo [${agendamento.processInstanceId}]`, 'success');
-    } else {
-        log(TOPIC, `Sem processInstanceId — nada a limpar`, 'warn');
-    }
 }
 
 module.exports = {
@@ -278,6 +274,5 @@ module.exports = {
     atualizarAgendamentoCompleto,
     atualizarEstadoAgendamento,
     carregarDadosAgendamento,
-    libertarRecursosAgendamento,
     AGENDAMENTO_COMPLETO_INCLUDE,
 };
