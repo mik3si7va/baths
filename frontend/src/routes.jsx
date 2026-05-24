@@ -178,7 +178,7 @@ export default function AppRoutes() {
         <Route
           path="/funcionarios"
           element={
-            <AdminRoute
+            <PrivateRoute
               element={
                 <CompactLayout>
                   <Funcionarios />
@@ -190,7 +190,7 @@ export default function AppRoutes() {
         <Route
           path="/funcionarios/:id/:nome"
           element={
-            <AdminRoute
+            <PrivateRoute
               element={
                 <CompactLayout showBack>
                   <FuncionarioDetalhes />

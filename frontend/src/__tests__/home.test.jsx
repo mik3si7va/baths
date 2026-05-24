@@ -54,7 +54,9 @@ describe("Home page", () => {
     expect(await screen.findByText("Novo Agendamento")).toBeInTheDocument();
     expect(screen.getByText("Pesquisar Clientes")).toBeInTheDocument();
     expect(screen.getAllByText("Clientes").length).toBeGreaterThan(0);
-    expect(screen.getAllByText(/Funcion/).length).toBe(1);
+    expect(screen.getAllByText(/Funcion/).length).toBeGreaterThan(1);
+    expect(screen.getByText("Consultar equipa, horários, especialidades e agendas.")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Ver/i })).toHaveAttribute("href", "/funcionarios");
     expect(screen.getAllByText("Salas").length).toBe(1);
     expect(screen.queryByText("Contas")).not.toBeInTheDocument();
     expect(screen.queryByText(/Servi/)).not.toBeInTheDocument();

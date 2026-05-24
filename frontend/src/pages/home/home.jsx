@@ -179,9 +179,11 @@ export default function Home() {
     },
     {
       title: "Funcionários",
-      description: "Criar e gerir equipa, horários e especialidades.",
+      description: isAdmin
+        ? "Criar e gerir equipa, horários e especialidades."
+        : "Consultar equipa, horários, especialidades e agendas.",
       icon: BadgeIcon,
-      buttonText: "Gerir",
+      buttonText: isAdmin ? "Gerir" : "Ver",
       buttonIcon: PeopleIcon,
       href: "/funcionarios",
       height: 180,
@@ -211,7 +213,7 @@ export default function Home() {
   const visibleQuickAcessCardsData = isAdmin
     ? quickAcessCardsData
     : quickAcessCardsData.filter(
-        (card) => !["/servicos", "/funcionarios", "/contas", "/salas"].includes(card.href),
+        (card) => !["/servicos", "/contas", "/salas"].includes(card.href),
       );
 
   return (

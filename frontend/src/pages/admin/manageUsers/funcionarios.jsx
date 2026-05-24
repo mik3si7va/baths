@@ -76,9 +76,19 @@ const initialForm = {
   },
 };
 
+function getStoredUser() {
+  try {
+    return JSON.parse(localStorage.getItem('btUser') || 'null');
+  } catch (_error) {
+    return null;
+  }
+}
+
 export default function Funcionarios() {
   const { colors } = useThemeContext();
   const navigate = useNavigate();
+  const [user] = useState(() => getStoredUser());
+  const isAdmin = user?.tipoConta === 'ADMIN';
 
   const [form, setForm] = useState(initialForm);
   const [cargoOptions, setCargoOptions] = useState(DEFAULT_CARGO_OPTIONS);
@@ -369,9 +379,12 @@ export default function Funcionarios() {
         Gestao de Funcionarios
       </Typography>
       <Typography variant="body1" sx={{ mb: 4, color: colors.textSecondary }}>
-        Cria funcionarios com horario de trabalho, contactos, porte de animais e servicos que pode realizar.
+        {isAdmin
+          ? 'Cria funcionarios com horario de trabalho, contactos, porte de animais e servicos que pode realizar.'
+          : 'Consulta a equipa, horarios, especialidades e agendas pessoais.'}
       </Typography>
 
+      {isAdmin && (
       <Paper elevation={2} sx={{ borderRadius: 3, p: 3, mb: 4 }}>
         <Box component="form" onSubmit={handleSubmit} sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
           {sucesso && <Alert severity="success">{sucesso}</Alert>}
@@ -547,6 +560,7 @@ export default function Funcionarios() {
           </Box>
         </Box>
       </Paper>
+      )}
 
       <Paper elevation={2} sx={{ borderRadius: 3, p: 3 }}>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
@@ -597,37 +611,39 @@ export default function Funcionarios() {
                     sx={{ color: colors.white, fontSize: '11px', height: 24 }}
                   />
                 </Box>
-                <Box sx={{ display: 'flex', gap: 1 }}>
-                  <IconButton
-                    size="small"
-                    onClick={(e) => { e.stopPropagation(); handleEdit(f); }}
-                    sx={{ color: colors.primary }}
-                    title="Editar funcionario"
-                    aria-label="Editar"
-                  >
-                    <EditIcon fontSize="small" />
-                  </IconButton>
-                  <IconButton
-                    size="small"
-                    disabled={loadingStatusId === f.id}
-                    onClick={(e) => { e.stopPropagation(); handleToggleAtivo(f); }}
-                    sx={{ color: colors.textSecondary }}
-                    title={f.ativo ? 'Desativar funcionario' : 'Ativar funcionario'}
-                    aria-label={f.ativo ? 'Desativar' : 'Ativar'}
-                  >
-                    {f.ativo ? <BlockIcon fontSize="small" /> : <RestoreIcon fontSize="small" />}
-                  </IconButton>
-                  <IconButton
-                    size="small"
-                    disabled={loadingDeleteId === f.id}
-                    onClick={(e) => { e.stopPropagation(); handleDelete(f); }}
-                    sx={{ color: colors.textSecondary }}
-                    title="Eliminar funcionario"
-                    aria-label="Eliminar"
-                  >
-                    <DeleteIcon fontSize="small" />
-                  </IconButton>
-                </Box>
+                {isAdmin && (
+                  <Box sx={{ display: 'flex', gap: 1 }}>
+                    <IconButton
+                      size="small"
+                      onClick={(e) => { e.stopPropagation(); handleEdit(f); }}
+                      sx={{ color: colors.primary }}
+                      title="Editar funcionario"
+                      aria-label="Editar"
+                    >
+                      <EditIcon fontSize="small" />
+                    </IconButton>
+                    <IconButton
+                      size="small"
+                      disabled={loadingStatusId === f.id}
+                      onClick={(e) => { e.stopPropagation(); handleToggleAtivo(f); }}
+                      sx={{ color: colors.textSecondary }}
+                      title={f.ativo ? 'Desativar funcionario' : 'Ativar funcionario'}
+                      aria-label={f.ativo ? 'Desativar' : 'Ativar'}
+                    >
+                      {f.ativo ? <BlockIcon fontSize="small" /> : <RestoreIcon fontSize="small" />}
+                    </IconButton>
+                    <IconButton
+                      size="small"
+                      disabled={loadingDeleteId === f.id}
+                      onClick={(e) => { e.stopPropagation(); handleDelete(f); }}
+                      sx={{ color: colors.textSecondary }}
+                      title="Eliminar funcionario"
+                      aria-label="Eliminar"
+                    >
+                      <DeleteIcon fontSize="small" />
+                    </IconButton>
+                  </Box>
+                )}
               </Box>
               <Typography variant="body2" sx={{ color: colors.textSecondary }}>
                 {enumLabel(cargoOptions, f.cargo)} | {f.email} | {f.telefone}

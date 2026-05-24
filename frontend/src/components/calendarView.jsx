@@ -102,6 +102,7 @@ export default function CalendarView({
           ]}
           selectConstraint="businessHours"
           eventConstraint="businessHours"
+          eventDisplay="block"
           headerToolbar={{
             left: 'prev,next today',
             center: 'title',

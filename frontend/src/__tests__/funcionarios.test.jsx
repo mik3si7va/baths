@@ -11,7 +11,8 @@ jest.mock("react-router-dom", () => ({
   useNavigate: () => mockNavigate,
 }));
 
-function renderFuncionarios() {
+function renderFuncionarios(user = { id: "admin-1", tipoConta: "ADMIN" }) {
+  localStorage.setItem("btUser", JSON.stringify(user));
   return render(
     <ThemeProvider>
       <Funcionarios />
@@ -62,11 +63,13 @@ describe("Funcionarios page", () => {
   beforeEach(() => {
     global.fetch = jest.fn();
     window.confirm = jest.fn(() => true);
+    localStorage.clear();
     mockNavigate.mockClear();
   });
 
   afterEach(() => {
     jest.resetAllMocks();
+    localStorage.clear();
   });
 
   afterAll(() => {
@@ -548,5 +551,39 @@ describe("Funcionarios page", () => {
 
     expect(mockNavigate).not.toHaveBeenCalled();
     expect(screen.getByDisplayValue("Sofia Ramalho")).toBeInTheDocument();
+  });
+
+  test("funcionario ve lista e agenda mas nao ve formulario nem botoes de gestao", async () => {
+    global.fetch
+      .mockImplementationOnce(() => mockJsonResponse(mockOpcoes))
+      .mockImplementationOnce(() =>
+        mockJsonResponse([{ id: "srv-1", tipo: "BANHO" }]),
+      )
+      .mockImplementationOnce(() =>
+        mockJsonResponse([
+          {
+            id: "f-1",
+            nomeCompleto: "Sofia Ramalho",
+            cargo: "BANHISTA",
+            telefone: "912345678",
+            email: "sofia.r@bet.com",
+            ativo: true,
+            horariosTrabalho: [{ diasSemana: ["TERCA"] }],
+            servicos: [{ tipoServicoId: "srv-1", tipo: "BANHO" }],
+          },
+        ]),
+      );
+
+    renderFuncionarios({ id: "func-1", tipoConta: "FUNCIONARIO" });
+
+    const nome = await screen.findByText("Sofia Ramalho");
+
+    expect(screen.queryByRole("button", { name: /Criar Funcionario/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Editar" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Desativar" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Eliminar" })).not.toBeInTheDocument();
+
+    fireEvent.click(nome.closest(".MuiPaper-root"));
+    expect(mockNavigate).toHaveBeenCalledWith("/funcionarios/f-1/Sofia_Ramalho");
   });
 });
