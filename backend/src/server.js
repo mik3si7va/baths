@@ -2313,6 +2313,12 @@ app.patch("/funcionarios/:id/ativo", async (req, res) => {
     return res.json(funcionarioAtualizado);
   } catch (error) {
     console.error("Failed to update funcionario active status:", error);
+
+    // 409 Conflict se o funcionario tiver agendamentos futuros activos
+    if (error.code === "FUNCIONARIO_TEM_AGENDAMENTOS_FUTUROS") {
+      return res.status(409).json({ error: error.message });
+    }
+
     return res.status(400).json({ error: error.message });
   }
 });
@@ -2375,6 +2381,12 @@ app.delete("/funcionarios/:id", async (req, res) => {
     return res.json(result);
   } catch (error) {
     console.error("Failed to delete funcionario:", error);
+
+    // 409 Conflict se houver registos associados (FK violation) — coerente com salas e servicos
+    if (error.message?.startsWith("Nao e possivel eliminar definitivamente")) {
+      return res.status(409).json({ error: error.message });
+    }
+
     return res.status(400).json({ error: error.message || "Failed to delete funcionario" });
   }
 });

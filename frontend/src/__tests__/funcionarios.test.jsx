@@ -421,17 +421,21 @@ describe("Funcionarios page", () => {
     expect(screen.getByText("Ativo")).toBeInTheDocument();
     expect(screen.getByText("Inativo")).toBeInTheDocument();
 
+    // Clicar no botão IconButton "Eliminar" do card abre o ConfirmDialog
     await userEvent.click(screen.getAllByRole("button", { name: "Eliminar" })[0]);
+
+    expect(
+      await screen.findByText("Eliminar Funcionário definitivamente"),
+    ).toBeInTheDocument();
+
+    // Confirmar no dialog
+    await userEvent.click(await screen.findByTestId("confirm-dialog-confirm"));
 
     await waitFor(() => {
       expect(
-        screen.getByText("Funcionario eliminado com sucesso."),
+        screen.getByText(/Funcionario "Funcionario Ativo" eliminado com sucesso/i),
       ).toBeInTheDocument();
     });
-
-    expect(window.confirm).toHaveBeenCalledWith(
-      expect.stringContaining('Eliminar definitivamente "Funcionario Ativo"?'),
-    );
 
     const deleteCall = global.fetch.mock.calls[3];
     expect(deleteCall[0]).toBe("http://localhost:5000/funcionarios/f-1");
@@ -477,17 +481,22 @@ describe("Funcionarios page", () => {
     renderFuncionarios();
 
     expect(await screen.findByText("Funcionario Ativo")).toBeInTheDocument();
+
+    // Clicar no botão IconButton "Desativar" do card abre o ConfirmDialog
     await userEvent.click(screen.getByRole("button", { name: "Desativar" }));
+
+    expect(
+      await screen.findByText("Desativar Funcionário"),
+    ).toBeInTheDocument();
+
+    // Confirmar no dialog
+    await userEvent.click(await screen.findByTestId("confirm-dialog-confirm"));
 
     await waitFor(() => {
       expect(
         screen.getByText("Funcionario desativado com sucesso."),
       ).toBeInTheDocument();
     });
-
-    expect(window.confirm).toHaveBeenCalledWith(
-      expect.stringContaining('Desativar "Funcionario Ativo"?'),
-    );
 
     const patchCall = global.fetch.mock.calls[3];
     expect(patchCall[0]).toBe("http://localhost:5000/funcionarios/f-1/ativo");

@@ -480,8 +480,7 @@ describe("Salas page", () => {
 
   // ─── INATIVAR SALA ────────────────────────────────────────────────────────
 
-  test("clicar em inativar pede confirmacao por alert", async () => {
-    window.confirm.mockReturnValue(false);
+  test("clicar em inativar abre o dialogo de confirmação", async () => {
     mockDefaultFetch();
     renderSalas();
 
@@ -489,10 +488,10 @@ describe("Salas page", () => {
 
     fireEvent.click(screen.getByTitle("Inativar sala"));
 
-    expect(window.confirm).toHaveBeenCalledWith(
-      expect.stringContaining('Desativar "Sala de Banho 1"?'),
-    );
-    expect(global.fetch).toHaveBeenCalledTimes(2);
+    expect(await screen.findByText("Inativar Sala")).toBeInTheDocument();
+    expect(
+      screen.getByText(/A sala ficará indisponível para novos agendamentos/i),
+    ).toBeInTheDocument();
   });
 
   test("confirmar inativação chama DELETE e atualiza lista", async () => {
@@ -510,6 +509,9 @@ describe("Salas page", () => {
     await screen.findByText("Sala de Banho 1");
 
     fireEvent.click(screen.getByTitle("Inativar sala"));
+    expect(await screen.findByText("Inativar Sala")).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: /^Inativar$/ }));
 
     await waitFor(() => {
       expect(
@@ -522,14 +524,20 @@ describe("Salas page", () => {
     expect(deleteCall[1].method).toBe("DELETE");
   });
 
-  test("cancelar no alert nao chama DELETE", async () => {
-    window.confirm.mockReturnValue(false);
+  test("cancelar no dialogo não chama DELETE", async () => {
     mockDefaultFetch();
     renderSalas();
 
     await screen.findByText("Sala de Banho 1");
 
     fireEvent.click(screen.getByTitle("Inativar sala"));
+    expect(await screen.findByText("Inativar Sala")).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: /Cancelar/i }));
+
+    await waitFor(() => {
+      expect(screen.queryByText("Inativar Sala")).not.toBeInTheDocument();
+    });
 
     expect(global.fetch).toHaveBeenCalledTimes(2);
   });
@@ -543,7 +551,7 @@ describe("Salas page", () => {
     expect(screen.queryByTitle("Inativar sala")).not.toBeInTheDocument();
   });
 
-  test("eliminar sala pede confirmacao e chama endpoint permanente", async () => {
+  test("eliminar sala abre dialogo e chama endpoint permanente", async () => {
     global.fetch
       .mockImplementationOnce(() => mockJsonResponse([SERVICO_MOCK]))
       .mockImplementationOnce(() => mockJsonResponse([SALA_ATIVA_MOCK]))
@@ -557,8 +565,16 @@ describe("Salas page", () => {
 
     fireEvent.click(screen.getByTitle("Eliminar sala"));
 
+    expect(
+      await screen.findByText("Eliminar Sala definitivamente"),
+    ).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: /^Eliminar$/ }));
+
     await waitFor(() => {
-      expect(screen.getByText("Sala eliminada com sucesso.")).toBeInTheDocument();
+      expect(
+        screen.getByText(/Sala "Sala de Banho 1" eliminada com sucesso/i),
+      ).toBeInTheDocument();
     });
 
     const deleteCall = global.fetch.mock.calls[2];
@@ -584,8 +600,16 @@ describe("Salas page", () => {
     renderSalas();
     await screen.findByText("Sala de Banho 1");
 
-    // Confirmar no alert e tentar inativar
+    // Abrir diálogo de confirmação e tentar inativar
     fireEvent.click(screen.getByTitle("Inativar sala"));
+    expect(await screen.findByText("Inativar Sala")).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: /^Inativar$/ }));
+
+    // O diálogo de confirmação fecha
+    await waitFor(() => {
+      expect(screen.queryByText("Inativar Sala")).not.toBeInTheDocument();
+    });
 
     // O diálogo de erro abre com a mensagem do backend
     expect(

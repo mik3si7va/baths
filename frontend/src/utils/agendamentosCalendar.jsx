@@ -12,14 +12,15 @@ import { Box, Typography } from '@mui/material';
 // e adicionar uma entrada em COR_POR_ESTADO (senão cai no fallback de CONFIRMADO em mapAgendamentosToEvents).
 export const ESTADOS_VISIVEIS = ['CONFIRMADO', 'EM_ATENDIMENTO', 'CONCLUIDO'];
 
+// As cores são diferentes de B&T para facilitar a identificação visual do estado do agendamento.
 // ajustes:
 // Cor de fundo (bg) + borda por estado do agendamento.
-// Paleta alinhada com o verde B&T usado no header/calendario.
+// Cores alinhadas com os semantics do MUI (primary/warning/success).
 // Mudar afecta blocos no calendário E chips em ListaAgendamentos.
 export const COR_POR_ESTADO = {
-    CONFIRMADO: { bg: '#475C51', border: '#32433b', text: '#ffffff' },
-    EM_ATENDIMENTO: { bg: '#6f7f73', border: '#475C51', text: '#ffffff' },
-    CONCLUIDO: { bg: '#2f6b4f', border: '#24523d', text: '#ffffff' },
+    CONFIRMADO: { bg: '#1976d2', border: '#0d47a1' },  // azul (primary)
+    EM_ATENDIMENTO: { bg: '#ed6c02', border: '#b85300' },  // laranja (warning)
+    CONCLUIDO: { bg: '#2e7d32', border: '#1b5e20' },  // verde (success)
 };
 
 // Formata uma Date como HH:MM em UTC (consistente com cross-env TZ=UTC do backend).
@@ -58,7 +59,6 @@ export function mapAgendamentosToEvents(agendamentos) {
                 end: s.dataHoraFim,
                 backgroundColor: cor.bg,
                 borderColor: cor.border,
-                textColor: cor.text,
                 extendedProps: {
                     agendamentoId: ag.id,
                     estado: ag.estado,

@@ -16,6 +16,7 @@ import {
   Typography,
 } from '@mui/material';
 import { useThemeContext } from '../../../contexts/ThemeContext';
+import { ConfirmDialog } from '../../../components';
 import BlockIcon from '@mui/icons-material/Block';
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
@@ -103,6 +104,16 @@ export default function Funcionarios() {
   const [loadingStatusId, setLoadingStatusId] = useState(null);
   const [erro, setErro] = useState('');
   const [sucesso, setSucesso] = useState('');
+
+  // Estados para diálogos de confirmação
+  const [dialogoDesativarAberto, setDialogoDesativarAberto] = useState(false);
+  const [funcionarioParaDesativar, setFuncionarioParaDesativar] = useState(null);
+  const [dialogoEliminarAberto, setDialogoEliminarAberto] = useState(false);
+  const [funcionarioParaEliminar, setFuncionarioParaEliminar] = useState(null);
+
+  // Diálogo de erro modal: quando o backend devolve 409 (ex: funcionario com agendamentos futuros)
+  const [dialogoErroAberto, setDialogoErroAberto] = useState(false);
+  const [dialogoErroMensagem, setDialogoErroMensagem] = useState('');
 
   const servicosById = useMemo(() => {
     return Object.fromEntries(servicos.map((s) => [s.id, s.tipo]));
@@ -307,49 +318,9 @@ export default function Funcionarios() {
     }
   };
 
-  const handleDelete = async (funcionario) => {
-    const confirmed = window.confirm(`Eliminar definitivamente "${funcionario.nomeCompleto}"? Esta acao remove o funcionario da base de dados.`);
-    if (!confirmed) {
-      return;
-    }
-
-    setErro('');
-    setSucesso('');
-    setLoadingDeleteId(funcionario.id);
-
-    try {
-      const response = await fetch(`${API_BASE_URL}/funcionarios/${funcionario.id}`, {
-        method: 'DELETE',
-      });
-      const body = await response.json();
-
-      if (!response.ok) {
-        throw new Error(body.error || `Erro ao eliminar funcionario (${response.status})`);
-      }
-
-      if (editingId === funcionario.id) {
-        resetForm();
-      }
-
-      setSucesso('Funcionario eliminado com sucesso.');
-      await loadData();
-    } catch (e) {
-      setErro(e.message || 'Erro ao eliminar funcionario.');
-    } finally {
-      setLoadingDeleteId(null);
-    }
-  };
-
-  const handleToggleAtivo = async (funcionario) => {
-    const nextAtivo = !funcionario.ativo;
-
-    if (!nextAtivo) {
-      const confirmed = window.confirm(`Desativar "${funcionario.nomeCompleto}"? O funcionario fica visivel, mas marcado como inativo.`);
-      if (!confirmed) {
-        return;
-      }
-    }
-
+  // Helper interno: muda o estado ativo (true ou false) sem confirmação.
+  // Usado directamente para activar; via dialog para desactivar.
+  const aplicarToggleAtivo = async (funcionario, nextAtivo) => {
     setErro('');
     setSucesso('');
     setLoadingStatusId(funcionario.id);
@@ -365,7 +336,13 @@ export default function Funcionarios() {
       const body = await response.json();
 
       if (!response.ok) {
-        throw new Error(body.error || `Erro ao ${nextAtivo ? 'ativar' : 'desativar'} funcionario (${response.status})`);
+        const message = body.error || `Erro ao ${nextAtivo ? 'ativar' : 'desativar'} funcionario (${response.status})`;
+        if (response.status === 409) {
+          setDialogoErroMensagem(message);
+          setDialogoErroAberto(true);
+          return;
+        }
+        throw new Error(message);
       }
 
       setSucesso(nextAtivo ? 'Funcionario ativado com sucesso.' : 'Funcionario desativado com sucesso.');
@@ -374,6 +351,72 @@ export default function Funcionarios() {
       setErro(e.message || `Erro ao ${nextAtivo ? 'ativar' : 'desativar'} funcionario.`);
     } finally {
       setLoadingStatusId(null);
+    }
+  };
+
+  // Activar não requer confirmação.
+  const handleAtivar = (funcionario) => aplicarToggleAtivo(funcionario, true);
+
+  // Desactivar pede confirmação via dialog.
+  const pedirDesativacao = (funcionario) => {
+    setFuncionarioParaDesativar(funcionario);
+    setDialogoDesativarAberto(true);
+  };
+
+  const confirmarDesativacao = async () => {
+    if (!funcionarioParaDesativar) return;
+    const alvo = funcionarioParaDesativar;
+    setDialogoDesativarAberto(false);
+    setFuncionarioParaDesativar(null);
+    await aplicarToggleAtivo(alvo, false);
+  };
+
+  // Eliminar definitivamente (hard delete) pede confirmação via dialog.
+  const pedirEliminacao = (funcionario) => {
+    setFuncionarioParaEliminar(funcionario);
+    setDialogoEliminarAberto(true);
+  };
+
+  const confirmarEliminacao = async () => {
+    if (!funcionarioParaEliminar) return;
+
+    const alvo = funcionarioParaEliminar;
+    setErro('');
+    setSucesso('');
+    setLoadingDeleteId(alvo.id);
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/funcionarios/${alvo.id}`, {
+        method: 'DELETE',
+      });
+      const body = await response.json();
+
+      if (!response.ok) {
+        const message = body.error || `Erro ao eliminar funcionario (${response.status})`;
+        if (response.status === 409) {
+          setDialogoEliminarAberto(false);
+          setFuncionarioParaEliminar(null);
+          setDialogoErroMensagem(message);
+          setDialogoErroAberto(true);
+          return;
+        }
+        throw new Error(message);
+      }
+
+      if (editingId === alvo.id) {
+        resetForm();
+      }
+
+      setSucesso(`Funcionario "${alvo.nomeCompleto}" eliminado com sucesso.`);
+      await loadData();
+      setDialogoEliminarAberto(false);
+      setFuncionarioParaEliminar(null);
+    } catch (e) {
+      setErro(e.message || 'Erro ao eliminar funcionario.');
+      setDialogoEliminarAberto(false);
+      setFuncionarioParaEliminar(null);
+    } finally {
+      setLoadingDeleteId(null);
     }
   };
 
@@ -629,7 +672,7 @@ export default function Funcionarios() {
                     <IconButton
                       size="small"
                       disabled={loadingStatusId === f.id}
-                      onClick={(e) => { e.stopPropagation(); handleToggleAtivo(f); }}
+                      onClick={(e) => { e.stopPropagation(); f.ativo ? pedirDesativacao(f) : handleAtivar(f); }}
                       sx={{ color: colors.textSecondary }}
                       title={f.ativo ? 'Desativar funcionario' : 'Ativar funcionario'}
                       aria-label={f.ativo ? 'Desativar' : 'Ativar'}
@@ -639,7 +682,7 @@ export default function Funcionarios() {
                     <IconButton
                       size="small"
                       disabled={loadingDeleteId === f.id}
-                      onClick={(e) => { e.stopPropagation(); handleDelete(f); }}
+                      onClick={(e) => { e.stopPropagation(); pedirEliminacao(f); }}
                       sx={{ color: colors.textSecondary }}
                       title="Eliminar funcionario"
                       aria-label="Eliminar"
@@ -668,6 +711,66 @@ export default function Funcionarios() {
           ))}
         </Box>
       </Paper>
+
+      {/* ── DIÁLOGO: DESATIVAR ───────────────────────────────────────────── */}
+      <ConfirmDialog
+        open={dialogoDesativarAberto}
+        title="Desativar Funcionário"
+        message={
+          <>
+            <Typography>
+              Tem a certeza que pretende desativar o funcionário <strong>"{funcionarioParaDesativar?.nomeCompleto}"</strong>?
+            </Typography>
+            <Typography sx={{ mt: 1 }}>
+              O funcionário ficará indisponível para novos agendamentos. Pode reativá-lo a qualquer momento.
+            </Typography>
+            <Typography sx={{ mt: 1, fontSize: '0.875rem', color: 'warning.main' }}>
+              A operação será recusada se existirem agendamentos futuros associados a este funcionário.
+            </Typography>
+          </>
+        }
+        confirmLabel="Desativar"
+        confirmColor="warning"
+        onConfirm={confirmarDesativacao}
+        onClose={() => { setDialogoDesativarAberto(false); setFuncionarioParaDesativar(null); }}
+      />
+
+      {/* ── DIÁLOGO: ELIMINAR DEFINITIVAMENTE (hard delete) ───────────────── */}
+      <ConfirmDialog
+        open={dialogoEliminarAberto}
+        title="Eliminar Funcionário definitivamente"
+        message={
+          <>
+            <Typography>
+              Tem a certeza que pretende eliminar definitivamente o funcionário <strong>"{funcionarioParaEliminar?.nomeCompleto}"</strong>?
+            </Typography>
+            <Typography sx={{ mt: 1 }}>
+              Esta acção remove o funcionário da base de dados — não é reversível.
+            </Typography>
+            <Typography sx={{ mt: 1, fontSize: '0.875rem', color: 'error.main' }}>
+              A operação será recusada se existirem agendamentos (passados ou futuros).
+            </Typography>
+          </>
+        }
+        confirmLabel="Eliminar"
+        confirmColor="error"
+        onConfirm={confirmarEliminacao}
+        onClose={() => { setDialogoEliminarAberto(false); setFuncionarioParaEliminar(null); }}
+      />
+
+      {/* Diálogo modal de erro: backend bloqueou a operação (ex: funcionario com agendamentos futuros). */}
+      <ConfirmDialog
+        open={dialogoErroAberto}
+        title="Não é possível concluir a operação"
+        message={
+          <Typography>{dialogoErroMensagem}</Typography>
+        }
+        confirmLabel="OK"
+        confirmColor="primary"
+        hideCancel
+        onConfirm={() => { setDialogoErroAberto(false); setDialogoErroMensagem(''); }}
+        onClose={() => { setDialogoErroAberto(false); setDialogoErroMensagem(''); }}
+      />
     </Box>
   );
 }

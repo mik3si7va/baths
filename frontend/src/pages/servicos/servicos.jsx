@@ -76,9 +76,17 @@ export default function ServicosPage() {
   const [editServicoAtivo, setEditServicoAtivo] = useState(true);
 
   // Estados para Diálogos de Confirmação
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [servicoToDelete, setServicoToDelete] = useState(null);
+  const [hardDeleteDialogOpen, setHardDeleteDialogOpen] = useState(false);
+  const [servicoToHardDelete, setServicoToHardDelete] = useState(null);
   const [updateConfirmOpen, setUpdateConfirmOpen] = useState(false);
   const [reactivateConfirmOpen, setReactivateConfirmOpen] = useState(false);
+
+  // Diálogo de erro modal: quando o backend devolve 409 ao tentar inativar/eliminar
+  // um serviço com agendamentos futuros ou outros registos associados.
+  const [dialogoErroAberto, setDialogoErroAberto] = useState(false);
+  const [dialogoErroMensagem, setDialogoErroMensagem] = useState('');
 
   // Ref para timeout de sucesso
   const successTimeoutRef = useRef(null);
@@ -381,77 +389,88 @@ export default function ServicosPage() {
   };
 
   // ── INATIVAR (Execução após confirmação) ──────────────────────────────────
-  const handleConfirmDelete = async (targetServico = servicoToDelete) => {
-    if (!targetServico) return;
+  const handleConfirmDelete = async () => {
+    if (!servicoToDelete) return;
 
     try {
       const res = await fetch(
-        `${API_BASE_URL}/servicos/${targetServico.id}`,
+        `${API_BASE_URL}/servicos/${servicoToDelete.id}`,
         { method: "DELETE" },
       );
 
       if (!res.ok) {
         // Ler sempre o body para obter a mensagem da API
         const errData = await res.json().catch(() => ({}));
+        const message = errData.error || "Erro ao inativar serviço.";
 
         if (res.status === 409) {
-          // Agendamentos futuros — mensagem descritiva vinda do servidor
-          throw new Error(
-            errData.error ||
-              "Não é possível inativar o serviço porque tem agendamentos futuros associados.",
-          );
+          setDeleteDialogOpen(false);
+          setServicoToDelete(null);
+          setDialogoErroMensagem(message);
+          setDialogoErroAberto(true);
+          return;
         }
 
-        throw new Error(errData.error || "Erro ao inativar serviço.");
+        throw new Error(message);
       }
 
-      if (editMode && editServicoId === targetServico.id) {
+      if (editMode && editServicoId === servicoToDelete.id) {
         resetForm();
       }
 
-      setSucesso(`Serviço "${targetServico.tipo}" inativado com sucesso!`);
+      setSucesso(`Serviço "${servicoToDelete.tipo}" inativado com sucesso!`);
       await loadData();
+      setDeleteDialogOpen(false);
+      setServicoToDelete(null);
     } catch (err) {
       setErro(err.message);
-    } finally {
+      setDeleteDialogOpen(false);
       setServicoToDelete(null);
     }
   };
 
-  // ── RENDER ─────────────────────────────────────────────────────────────────
-
-  const handleInativarClick = (servico) => {
-    const confirmed = window.confirm(`Desativar "${servico.tipo}"? O servico fica visivel para administradores, mas indisponivel para novos agendamentos.`);
-    if (!confirmed) return;
-
-    setServicoToDelete(servico);
-    handleConfirmDelete(servico);
-  };
-
-  const handleHardDelete = async (servico) => {
-    const confirmed = window.confirm(`Eliminar definitivamente "${servico.tipo}"? Esta acao remove o servico da base de dados.`);
-    if (!confirmed) return;
+  // ── ELIMINAR DEFINITIVAMENTE (Execução após confirmação) ──────────────────
+  const handleConfirmHardDelete = async () => {
+    if (!servicoToHardDelete) return;
 
     try {
-      const res = await fetch(`${API_BASE_URL}/servicos/${servico.id}/permanente`, {
-        method: "DELETE",
-      });
+      const res = await fetch(
+        `${API_BASE_URL}/servicos/${servicoToHardDelete.id}/permanente`,
+        { method: "DELETE" },
+      );
 
       if (!res.ok) {
         const errData = await res.json().catch(() => ({}));
-        throw new Error(errData.error || "Erro ao eliminar serviço.");
+        const message = errData.error || "Erro ao eliminar serviço.";
+
+        if (res.status === 409) {
+          // Registos associados — mostrar em dialog modal de erro
+          setHardDeleteDialogOpen(false);
+          setServicoToHardDelete(null);
+          setDialogoErroMensagem(message);
+          setDialogoErroAberto(true);
+          return;
+        }
+
+        throw new Error(message);
       }
 
-      if (editMode && editServicoId === servico.id) {
+      if (editMode && editServicoId === servicoToHardDelete.id) {
         resetForm();
       }
 
-      setSucesso("Serviço eliminado com sucesso.");
+      setSucesso(`Serviço "${servicoToHardDelete.tipo}" eliminado com sucesso.`);
       await loadData();
+      setHardDeleteDialogOpen(false);
+      setServicoToHardDelete(null);
     } catch (err) {
       setErro(err.message);
+      setHardDeleteDialogOpen(false);
+      setServicoToHardDelete(null);
     }
   };
+
+  // ── RENDER ─────────────────────────────────────────────────────────────────
 
   return (
     <Box>
@@ -951,7 +970,10 @@ export default function ServicosPage() {
                           {s.ativo && (
                             <IconButton
                               size="small"
-                              onClick={() => handleInativarClick(s)}
+                              onClick={() => {
+                                setServicoToDelete(s);
+                                setDeleteDialogOpen(true);
+                              }}
                               sx={{ color: colors.textSecondary }}
                               title="Inativar serviço"
                               aria-label="Desativar"
@@ -961,7 +983,10 @@ export default function ServicosPage() {
                           )}
                           <IconButton
                             size="small"
-                            onClick={() => handleHardDelete(s)}
+                            onClick={() => {
+                              setServicoToHardDelete(s);
+                              setHardDeleteDialogOpen(true);
+                            }}
                             sx={{ color: colors.textSecondary }}
                             title="Eliminar serviço"
                             aria-label="Eliminar"
@@ -1017,6 +1042,83 @@ export default function ServicosPage() {
         confirmColor="success"
         onConfirm={handleConfirmReativar}
         onClose={() => setReactivateConfirmOpen(false)}
+      />
+
+      {/* ── DIÁLOGO: INATIVAR ─────────────────────────────────────────────── */}
+      <ConfirmDialog
+        open={deleteDialogOpen}
+        title="Inativar Serviço"
+        message={
+          <>
+            <Typography>
+              Tem a certeza que pretende inativar o serviço{" "}
+              <strong>"{servicoToDelete?.tipo}"</strong>?
+            </Typography>
+            <Typography sx={{ mt: 1 }}>
+              O serviço ficará indisponível para novos agendamentos. Pode
+              reativá-lo a qualquer momento.
+            </Typography>
+            <Typography
+              sx={{ mt: 1, fontSize: "0.875rem", color: "warning.main" }}
+            >
+              A operação será recusada se existirem agendamentos futuros
+              associados a este serviço.
+            </Typography>
+          </>
+        }
+        confirmLabel="Inativar"
+        confirmColor="warning"
+        onConfirm={handleConfirmDelete}
+        onClose={() => {
+          setDeleteDialogOpen(false);
+          setServicoToDelete(null);
+        }}
+      />
+
+      {/* ── DIÁLOGO: ELIMINAR DEFINITIVAMENTE (hard delete) ───────────────── */}
+      <ConfirmDialog
+        open={hardDeleteDialogOpen}
+        title="Eliminar Serviço definitivamente"
+        message={
+          <>
+            <Typography>
+              Tem a certeza que pretende eliminar definitivamente o serviço{" "}
+              <strong>"{servicoToHardDelete?.tipo}"</strong>?
+            </Typography>
+            <Typography sx={{ mt: 1 }}>
+              Esta acção remove o serviço da base de dados — não é reversível.
+            </Typography>
+            <Typography
+              sx={{ mt: 1, fontSize: "0.875rem", color: "error.main" }}
+            >
+              A operação será recusada se existirem agendamentos (passados ou
+              futuros) que tenham usado este serviço.
+            </Typography>
+          </>
+        }
+        confirmLabel="Eliminar"
+        confirmColor="error"
+        onConfirm={handleConfirmHardDelete}
+        onClose={() => {
+          setHardDeleteDialogOpen(false);
+          setServicoToHardDelete(null);
+        }}
+      />
+
+      {/* Diálogo modal de erro: quando o backend bloqueia a operação
+          (serviço com agendamentos futuros ou registos associados).
+          Reutiliza o ConfirmDialog em modo hideCancel — só botão "OK" fecha. */}
+      <ConfirmDialog
+        open={dialogoErroAberto}
+        title="Não é possível concluir a operação"
+        message={
+          <Typography>{dialogoErroMensagem}</Typography>
+        }
+        confirmLabel="OK"
+        confirmColor="primary"
+        hideCancel
+        onConfirm={() => { setDialogoErroAberto(false); setDialogoErroMensagem(''); }}
+        onClose={() => { setDialogoErroAberto(false); setDialogoErroMensagem(''); }}
       />
 
     </Box>

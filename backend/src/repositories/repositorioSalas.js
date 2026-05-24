@@ -311,7 +311,7 @@ async function verificarAgendamentosFuturos({ salaId, tipoServicoId }) {
 async function deleteSala(id) {
   const existing = await prisma.sala.findUnique({
     where: { id },
-    select: { id: true },
+    select: { id: true, nome: true },
   });
 
   if (!existing) {
@@ -334,7 +334,7 @@ async function deleteSala(id) {
     }
     // Erro com prefixo distintivo para a rota poder mapear para 409 Conflict
     const erro = new Error(
-      `Não é possível inativar a sala: existem ${partes.join(' e ')}.`
+      `Não é possível inativar a sala "${existing.nome}": existe(m) ${partes.join(' e ')}.`
     );
     erro.code = 'SALA_TEM_AGENDAMENTOS_FUTUROS';
     throw erro;

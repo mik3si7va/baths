@@ -57,6 +57,10 @@ export default function Sala() {
     const [dialogoInativarAberto, setDialogoInativarAberto] = useState(false);
     const [salaParaInativar, setSalaParaInativar] = useState(null);
 
+    // Estado para o diálogo de eliminação definitiva (hard delete)
+    const [dialogoEliminarAberto, setDialogoEliminarAberto] = useState(false);
+    const [salaParaEliminar, setSalaParaEliminar] = useState(null);
+
     // Diálogo de erro modal (BET-180): quando o backend devolve 409 ao tentar inativar uma sala com agendamentos futuros
     const [dialogoErroAberto, setDialogoErroAberto] = useState(false);
     const [dialogoErroMensagem, setDialogoErroMensagem] = useState('');
@@ -344,23 +348,29 @@ export default function Sala() {
         setSalaParaInativar(null);
     };
 
-    const confirmarInativacao = async (sala) => {
-        const confirmed = window.confirm(`Desativar "${sala.nome}"? A sala fica visivel para administradores, mas indisponivel para novos agendamentos.`);
-        if (!confirmed) return;
+    // Abrir diálogo de confirmação para eliminar definitivamente (hard delete)
+    const pedirEliminacao = (sala) => {
+        setSalaParaEliminar(sala);
+        setDialogoEliminarAberto(true);
+    };
 
-        setSalaParaInativar(sala);
+    // Confirmar e eliminar definitivamente (hard delete via DELETE /salas/:id/permanente)
+    const eliminarSala = async () => {
+        if (!salaParaEliminar) return;
 
         try {
-            const res = await fetch(`${API_BASE_URL}/salas/${sala.id}`, {
+            const res = await fetch(`${API_BASE_URL}/salas/${salaParaEliminar.id}/permanente`, {
                 method: 'DELETE',
             });
 
             if (!res.ok) {
                 const err = await res.json().catch(() => ({}));
-                const message = err.error || 'Erro ao inativar sala';
+                const message = err.error || 'Erro ao eliminar sala.';
 
+                // 409 = registos associados (agendamentos) — abrir dialog modal de erro
                 if (res.status === 409) {
-                    setSalaParaInativar(null);
+                    setDialogoEliminarAberto(false);
+                    setSalaParaEliminar(null);
                     setDialogoErroMensagem(message);
                     setDialogoErroAberto(true);
                     return;
@@ -369,42 +379,25 @@ export default function Sala() {
                 throw new Error(message);
             }
 
-            if (modoEdicao && idSalaEmEdicao === sala.id) {
+            if (modoEdicao && idSalaEmEdicao === salaParaEliminar.id) {
                 resetForm();
             }
 
             await carregarSalas();
-            setSucesso(`Sala "${sala.nome}" inativada com sucesso!`);
+            setSucesso(`Sala "${salaParaEliminar.nome}" eliminada com sucesso.`);
+            setDialogoEliminarAberto(false);
+            setSalaParaEliminar(null);
         } catch (err) {
             setErro(err.message);
-        } finally {
-            setSalaParaInativar(null);
+            setDialogoEliminarAberto(false);
+            setSalaParaEliminar(null);
         }
     };
 
-    const eliminarSala = async (sala) => {
-        const confirmed = window.confirm(`Eliminar definitivamente "${sala.nome}"? Esta acao remove a sala da base de dados.`);
-        if (!confirmed) return;
-
-        try {
-            const res = await fetch(`${API_BASE_URL}/salas/${sala.id}/permanente`, {
-                method: 'DELETE',
-            });
-
-            if (!res.ok) {
-                const err = await res.json().catch(() => ({}));
-                throw new Error(err.error || 'Erro ao eliminar sala.');
-            }
-
-            if (modoEdicao && idSalaEmEdicao === sala.id) {
-                resetForm();
-            }
-
-            await carregarSalas();
-            setSucesso('Sala eliminada com sucesso.');
-        } catch (err) {
-            setErro(err.message);
-        }
+    // Fechar diálogo de eliminação
+    const fecharDialogoEliminar = () => {
+        setDialogoEliminarAberto(false);
+        setSalaParaEliminar(null);
     };
 
     return (
@@ -669,7 +662,7 @@ export default function Sala() {
                                     {sala.ativo && (
                                         <IconButton
                                             size="small"
-                                            onClick={(e) => { e.stopPropagation(); confirmarInativacao(sala); }}
+                                            onClick={(e) => { e.stopPropagation(); pedirInativacao(sala); }}
                                             sx={{ color: colors.textSecondary }}
                                             title="Inativar sala"
                                             aria-label="Desativar"
@@ -679,7 +672,7 @@ export default function Sala() {
                                     )}
                                     <IconButton
                                         size="small"
-                                        onClick={(e) => { e.stopPropagation(); eliminarSala(sala); }}
+                                        onClick={(e) => { e.stopPropagation(); pedirEliminacao(sala); }}
                                         sx={{ color: colors.textSecondary }}
                                         title="Eliminar sala"
                                         aria-label="Eliminar"
@@ -705,12 +698,39 @@ export default function Sala() {
                         <Typography sx={{ mt: 1 }}>
                             A sala ficará indisponível para novos agendamentos. Pode reativá-la a qualquer momento através do botão de edição.
                         </Typography>
+                        <Typography sx={{ mt: 1, fontSize: '0.875rem', color: 'warning.main' }}>
+                            A operação será recusada se existirem agendamentos futuros associados a esta sala.
+                        </Typography>
                     </>
                 }
                 confirmLabel="Inativar"
                 confirmColor="warning"
                 onConfirm={inativarSala}
                 onClose={fecharDialogo}
+            />
+
+            {/* Diálogo de eliminação definitiva (hard delete). A operação é
+                recusada pelo backend se existirem registos associados (FK). */}
+            <ConfirmDialog
+                open={dialogoEliminarAberto}
+                title="Eliminar Sala definitivamente"
+                message={
+                    <>
+                        <Typography>
+                            Tem a certeza que pretende eliminar definitivamente a sala <strong>"{salaParaEliminar?.nome}"</strong>?
+                        </Typography>
+                        <Typography sx={{ mt: 1 }}>
+                            Esta acção remove a sala da base de dados — não é reversível.
+                        </Typography>
+                        <Typography sx={{ mt: 1, fontSize: '0.875rem', color: 'error.main' }}>
+                            A operação será recusada se existirem agendamentos (passados ou futuros) que tenham usado esta sala.
+                        </Typography>
+                    </>
+                }
+                confirmLabel="Eliminar"
+                confirmColor="error"
+                onConfirm={eliminarSala}
+                onClose={fecharDialogoEliminar}
             />
 
             {/* BET-180: diálogo modal de erro quando o backend bloqueia a inativação

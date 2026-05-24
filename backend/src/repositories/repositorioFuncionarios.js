@@ -405,10 +405,47 @@ async function updateFuncionario(
   }
 }
 
+// Conta agendamentos futuros activos (CONFIRMADO ou EM_ATENDIMENTO) + reservas temporarias activas
+// (com TTL ainda valido) que envolvem este funcionario.
+// Usado por:
+//  - setFuncionarioAtivo: bloqueia desativacao se houver
+//  - (futuro) updateFuncionario/removeServicoFromFuncionario: bloqueia desassociacao
+// Mesma logica e contrato de repositorioSalas.verificarAgendamentosFuturos.
+async function verificarAgendamentosFuturos(funcionarioId) {
+  const agora = new Date();
+
+  // CANCELADO / NAO_COMPARECEU / CONCLUIDO nao bloqueiam
+  const ESTADOS_AGENDAMENTO_ATIVOS = ['CONFIRMADO', 'EM_ATENDIMENTO'];
+
+  const totalAgendamentos = await prisma.agendamentoServico.count({
+    where: {
+      funcionarioId,
+      dataHoraInicio: { gt: agora },
+      agendamento: { estado: { in: ESTADOS_AGENDAMENTO_ATIVOS } },
+    },
+  });
+
+  // Reservas temporarias activas: bloqueiam porque um cliente esta a meio de marcarcação com este funcionario. Se a reserva ja expirou (TTL ~5min), nao bloqueia.
+  const totalReservas = await prisma.reservaTemporaria.count({
+    where: {
+      funcionarioId,
+      dataHoraInicio: { gt: agora },
+      expiresAt: { gt: agora },
+    },
+  });
+
+  return {
+    temAgendamentos: totalAgendamentos > 0,
+    temReservas: totalReservas > 0,
+    totalAgendamentos,
+    totalReservas,
+  };
+}
+
 async function deleteFuncionario(id) {
   const existing = await prisma.funcionario.findUnique({
     where: { id },
-    select: { id: true },
+    select: { id: true, utilizador: { select: { nome: true } } },
   });
 
   if (!existing) {
@@ -421,7 +458,11 @@ async function deleteFuncionario(id) {
     });
   } catch (error) {
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2003') {
-      throw new Error('Nao e possivel eliminar este funcionario porque existem registos associados.', { cause: error });
+      const nome = existing.utilizador?.nome || 'funcionario';
+      throw new Error(
+        `Nao e possivel eliminar definitivamente o funcionario "${nome}" porque existem registos associados.`,
+        { cause: error }
+      );
     }
 
     throw error;
@@ -433,11 +474,34 @@ async function deleteFuncionario(id) {
 async function setFuncionarioAtivo(id, ativo) {
   const existing = await prisma.funcionario.findUnique({
     where: { id },
-    select: { id: true },
+    select: { id: true, utilizador: { select: { nome: true } } },
   });
 
   if (!existing) {
     return null;
+  }
+
+  // Bloqueia desactivacao se houver agendamentos futuros activos (CONFIRMADO/EM_ATENDIMENTO)
+  // ou reservas temporarias activas (cliente a meio de marcarcação).
+  if (!ativo) {
+    const { temAgendamentos, temReservas, totalAgendamentos, totalReservas } =
+      await verificarAgendamentosFuturos(id);
+
+    if (temAgendamentos || temReservas) {
+      const partes = [];
+      if (temAgendamentos) {
+        partes.push(`${totalAgendamentos} agendamento(s) futuro(s)`);
+      }
+      if (temReservas) {
+        partes.push(`${totalReservas} reserva(s) temporária(s) activa(s)`);
+      }
+      const nome = existing.utilizador?.nome || 'funcionário';
+      const erro = new Error(
+        `Não é possível desativar o funcionário "${nome}": existe(m) ${partes.join(' e ')}.`
+      );
+      erro.code = 'FUNCIONARIO_TEM_AGENDAMENTOS_FUTUROS';
+      throw erro;
+    }
   }
 
   const funcionario = await prisma.$transaction(async (tx) => {
@@ -483,4 +547,5 @@ module.exports = {
   updateFuncionario,
   deleteFuncionario,
   setFuncionarioAtivo,
+  verificarAgendamentosFuturos,
 };
