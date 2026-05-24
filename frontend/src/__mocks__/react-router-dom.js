@@ -62,6 +62,7 @@ const useParams = () => {
         '/funcionarios/:id',
         '/salas/:id/:nome',
         '/salas/:id',
+        '/faturas/:faturaId',
         '/:id/:nome',
         '/:id',
     ];

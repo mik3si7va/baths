@@ -10,6 +10,7 @@ jest.mock("../pages/salas/salaDetalhes", () => () => <div>Sala Detalhes Page</di
 jest.mock("../pages/admin/manageUsers/funcionarios", () => () => <div>Funcionarios Page</div>);
 jest.mock("../pages/admin/manageUsers/funcionarioDetalhes", () => () => <div>Funcionario Detalhes Page</div>);
 jest.mock("../pages/home/home", () => () => <div>Home Page</div>);
+jest.mock("../pages/faturas/faturas", () => () => <div>Faturas Page</div>);
 jest.mock("../App", () => () => <div>Landing Page</div>);
 
 function renderRoutes(path, user) {
@@ -77,5 +78,11 @@ describe("AppRoutes authorization", () => {
     renderRoutes("/servicos", { id: "func-1", tipoConta: "FUNCIONARIO" });
 
     expect(screen.getByText("Servicos Page")).toBeInTheDocument();
+  });
+
+  test("permite rota de faturas para funcionario autenticado", () => {
+    renderRoutes("/faturas", { id: "func-1", tipoConta: "FUNCIONARIO" });
+
+    expect(screen.getByText("Faturas Page")).toBeInTheDocument();
   });
 });
