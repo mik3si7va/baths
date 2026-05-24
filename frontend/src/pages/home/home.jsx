@@ -139,7 +139,7 @@ export default function Home() {
     },
     {
       title: "Pesquisar Clientes",
-      description: "Encontre clientes e animais registados no sistema.",
+      description: "Procurar clientes e animais registados no sistema.",
       icon: SearchIcon,
       buttonText: "Pesquisar",
       buttonIcon: SearchIcon,
@@ -159,11 +159,11 @@ export default function Home() {
     },
     {
       title: "Faturação",
-      description: "Gerir faturas e pagamentos pendentes.",
+      description: "Consultar, pesquisar e imprimir faturas emitidas.",
       icon: PaymentIcon,
-      buttonText: "Pagar",
+      buttonText: "Pesquisar",
       buttonIcon: PaymentIcon,
-      href: "/billing",
+      href: "/faturas",
       height: 180,
       width: 328,
     },
@@ -192,16 +192,6 @@ export default function Home() {
       width: 328,
     },
     {
-      title: "Contas",
-      description: "Ativar, desativar e preparar acessos ao backoffice.",
-      icon: ManageAccountsIcon,
-      buttonText: "Gerir",
-      buttonIcon: ManageAccountsIcon,
-      href: "/contas",
-      height: 180,
-      width: 328,
-    },
-    {
       title: "Salas",
       description: isAdmin
         ? "Criar e gerir salas, equipamentos, serviços e preço."
@@ -213,12 +203,22 @@ export default function Home() {
       height: 180,
       width: 328,
     },
+    {
+      title: "Contas",
+      description: "Ativar, desativar e preparar acessos ao backoffice.",
+      icon: ManageAccountsIcon,
+      buttonText: "Gerir",
+      buttonIcon: ManageAccountsIcon,
+      href: "/contas",
+      height: 180,
+      width: 328,
+    },
   ];
   const visibleQuickAcessCardsData = isAdmin
     ? quickAcessCardsData
     : quickAcessCardsData.filter(
-        (card) => !["/contas"].includes(card.href),
-      );
+      (card) => !["/contas"].includes(card.href),
+    );
 
   return (
     <>

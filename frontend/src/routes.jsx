@@ -18,6 +18,7 @@ import {
   Pesquisa,
   AgendamentoNovo,
   AgendamentoEditar,
+  Faturas,
   FaturaDetalhe,
 } from "./pages";
 import App from "./App";
@@ -134,6 +135,18 @@ export default function AppRoutes() {
               element={
                 <CompactLayout showBack>
                   <AgendamentoEditar />
+                </CompactLayout>
+              }
+            />
+          }
+        />
+        <Route
+          path="/faturas"
+          element={
+            <PrivateRoute
+              element={
+                <CompactLayout showBack>
+                  <Faturas />
                 </CompactLayout>
               }
             />
