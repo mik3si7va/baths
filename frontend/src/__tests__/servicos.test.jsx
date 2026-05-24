@@ -12,7 +12,8 @@ import { ThemeProvider } from "../contexts/ThemeContext";
 
 let consoleErrorSpy;
 
-function renderServicos() {
+function renderServicos(user = { id: "admin-1", tipoConta: "ADMIN" }) {
+  localStorage.setItem("btUser", JSON.stringify(user));
   return render(
     <ThemeProvider>
       <ServicosPage />
@@ -122,9 +123,11 @@ describe("ServicosPage — carregamento inicial", () => {
   });
   beforeEach(() => {
     global.fetch = jest.fn();
+    localStorage.clear();
   });
   afterEach(() => {
     jest.resetAllMocks();
+    localStorage.clear();
   });
   afterAll(() => {
     consoleErrorSpy.mockRestore();
@@ -173,6 +176,17 @@ describe("ServicosPage — carregamento inicial", () => {
     expect(allText.indexOf("Corte de unhas")).toBeLessThan(
       allText.indexOf("Banho antigo"),
     );
+  });
+
+  test("funcionario ve lista mas nao ve formulario nem botoes de gestao", async () => {
+    mockDefaultFetch([SERVICO_ATIVO_MOCK, SERVICO_INATIVO_MOCK]);
+    renderServicos({ id: "func-1", tipoConta: "FUNCIONARIO" });
+
+    expect(await screen.findByText("Corte de unhas")).toBeInTheDocument();
+    expect(screen.queryByText("Banho antigo")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Criar Serviço/i })).not.toBeInTheDocument();
+    expect(screen.queryByTitle("Editar serviço")).not.toBeInTheDocument();
+    expect(screen.queryByTitle("Inativar serviço")).not.toBeInTheDocument();
   });
 });
 

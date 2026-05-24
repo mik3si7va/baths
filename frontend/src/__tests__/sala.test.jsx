@@ -634,11 +634,12 @@ describe("Salas page", () => {
     expect(payload.tipoServicoIds).toEqual([SERVICO_MOCK.id]);
   });
   test("funcionario ve lista e agenda mas nao ve formulario nem botoes de gestao", async () => {
-    mockDefaultFetch();
+    mockDefaultFetch([SALA_ATIVA_MOCK, SALA_INATIVA_MOCK]);
 
     renderSalas({ id: "func-1", tipoConta: "FUNCIONARIO" });
 
     expect(await screen.findByText("Sala de Banho 1")).toBeInTheDocument();
+    expect(screen.queryByText("Sala Inativa")).not.toBeInTheDocument();
 
     expect(screen.queryByRole("button", { name: /Criar Sala/i })).not.toBeInTheDocument();
     expect(screen.queryByTitle("Editar sala")).not.toBeInTheDocument();

@@ -94,7 +94,7 @@ export default function AppRoutes() {
         <Route
           path="/servicos"
           element={
-            <AdminRoute
+            <PrivateRoute
               element={
                 <CompactLayout showBack>
                   <ServicosPage />

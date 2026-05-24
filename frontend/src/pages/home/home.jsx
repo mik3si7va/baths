@@ -169,9 +169,11 @@ export default function Home() {
     },
     {
       title: "Serviços",
-      description: "Criar e gerir serviços, portes e regras de preço.",
+      description: isAdmin
+        ? "Criar e gerir serviços, portes e regras de preço."
+        : "Consultar serviços, portes, preços e duração.",
       icon: ContentCutIcon,
-      buttonText: "Gerir",
+      buttonText: isAdmin ? "Gerir" : "Ver",
       buttonIcon: ShoppingCartIcon,
       href: "/servicos",
       height: 180,
@@ -215,7 +217,7 @@ export default function Home() {
   const visibleQuickAcessCardsData = isAdmin
     ? quickAcessCardsData
     : quickAcessCardsData.filter(
-        (card) => !["/servicos", "/contas"].includes(card.href),
+        (card) => !["/contas"].includes(card.href),
       );
 
   return (

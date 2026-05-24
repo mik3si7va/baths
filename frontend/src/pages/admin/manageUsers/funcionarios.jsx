@@ -108,6 +108,10 @@ export default function Funcionarios() {
     return Object.fromEntries(servicos.map((s) => [s.id, s.tipo]));
   }, [servicos]);
 
+  const funcionariosVisiveis = useMemo(() => {
+    return isAdmin ? funcionarios : funcionarios.filter((f) => f.ativo);
+  }, [funcionarios, isAdmin]);
+
   const loadData = async () => {
     setLoadingInitial(true);
     setErro('');
@@ -577,7 +581,7 @@ export default function Funcionarios() {
         )}
 
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-          {funcionarios.map((f) => (
+          {funcionariosVisiveis.map((f) => (
             <Paper
               key={f.id}
               variant="outlined"

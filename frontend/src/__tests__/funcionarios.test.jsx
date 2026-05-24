@@ -94,6 +94,16 @@ describe("Funcionarios page", () => {
             horariosTrabalho: [{ diasSemana: ["TERCA"] }],
             servicos: [{ tipoServicoId: "srv-1", tipo: "BANHO" }],
           },
+          {
+            id: "f-2",
+            nomeCompleto: "Funcionario Inativo",
+            cargo: "BANHISTA",
+            telefone: "912345679",
+            email: "inativo@bet.com",
+            ativo: false,
+            horariosTrabalho: [{ diasSemana: ["TERCA"] }],
+            servicos: [{ tipoServicoId: "srv-1", tipo: "BANHO" }],
+          },
         ]),
       );
 
@@ -578,6 +588,7 @@ describe("Funcionarios page", () => {
 
     const nome = await screen.findByText("Sofia Ramalho");
 
+    expect(screen.queryByText("Funcionario Inativo")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Criar Funcionario/i })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Editar" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Desativar" })).not.toBeInTheDocument();

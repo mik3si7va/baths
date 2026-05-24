@@ -47,8 +47,18 @@ const initialForm = {
   regrasPorPorte: initRegrasPorPorte(),
 };
 
+function getStoredUser() {
+  try {
+    return JSON.parse(localStorage.getItem("btUser") || "null");
+  } catch (_error) {
+    return null;
+  }
+}
+
 export default function ServicosPage() {
   const { colors } = useThemeContext();
+  const [user] = useState(() => getStoredUser());
+  const isAdmin = user?.tipoConta === "ADMIN";
 
   const [form, setForm] = useState(initialForm);
   const [servicos, setServicos] = useState([]);
@@ -138,11 +148,12 @@ export default function ServicosPage() {
   };
 
   const servicosOrdenados = useMemo(() => {
-    return [...servicos].sort((a, b) => {
+    const visiveis = isAdmin ? servicos : servicos.filter((s) => s.ativo);
+    return [...visiveis].sort((a, b) => {
       if (a.ativo === b.ativo) return a.tipo.localeCompare(b.tipo);
       return a.ativo ? -1 : 1;
     });
-  }, [servicos]);
+  }, [servicos, isAdmin]);
 
   const updateRegraPorte = (porte, field, value) => {
     setForm((prev) => ({
@@ -414,8 +425,9 @@ export default function ServicosPage() {
         Gestão de Serviços
       </Typography>
       <Typography variant="body1" sx={{ mb: 4, color: colors.textSecondary }}>
-        Cria e edita serviços, define se o preço varia por porte e configura as
-        regras de preço e duração.
+        {isAdmin
+          ? "Cria e edita serviços, define se o preço varia por porte e configura as regras de preço e duração."
+          : "Consulta os serviços disponíveis, preços por porte e duração estimada."}
       </Typography>
 
       {loadingInitial ? (
@@ -436,6 +448,7 @@ export default function ServicosPage() {
       ) : (
         <>
           {/* ── FORMULÁRIO DE CRIAÇÃO / EDIÇÃO ─────────────────────────────── */}
+          {isAdmin && (
           <Paper elevation={2} sx={{ borderRadius: 3, p: 3, mb: 4 }}>
             <Box
               component="form"
@@ -728,6 +741,7 @@ export default function ServicosPage() {
               </Box>
             </Box>
           </Paper>
+          )}
 
           {/* ── LISTA DE SERVIÇOS REGISTADOS ───────────────────────────────── */}
           <Paper elevation={2} sx={{ borderRadius: 3, p: 3 }}>
@@ -890,29 +904,31 @@ export default function ServicosPage() {
                       </Box>
 
                       {/* Botões de ação */}
-                      <Box sx={{ display: "flex", gap: 1, ml: 1 }}>
-                        <IconButton
-                          size="small"
-                          onClick={() => handleEditClick(s)}
-                          sx={{ color: colors.primary }}
-                          title="Editar serviço"
-                        >
-                          <EditIcon fontSize="small" />
-                        </IconButton>
-                        {s.ativo && (
+                      {isAdmin && (
+                        <Box sx={{ display: "flex", gap: 1, ml: 1 }}>
                           <IconButton
                             size="small"
-                            onClick={() => {
-                              setServicoToDelete(s);
-                              setDeleteDialogOpen(true);
-                            }}
-                            sx={{ color: colors.textSecondary }}
-                            title="Inativar serviço"
+                            onClick={() => handleEditClick(s)}
+                            sx={{ color: colors.primary }}
+                            title="Editar serviço"
                           >
-                            <DeleteIcon fontSize="small" />
+                            <EditIcon fontSize="small" />
                           </IconButton>
-                        )}
-                      </Box>
+                          {s.ativo && (
+                            <IconButton
+                              size="small"
+                              onClick={() => {
+                                setServicoToDelete(s);
+                                setDeleteDialogOpen(true);
+                              }}
+                              sx={{ color: colors.textSecondary }}
+                              title="Inativar serviço"
+                            >
+                              <DeleteIcon fontSize="small" />
+                            </IconButton>
+                          )}
+                        </Box>
+                      )}
                     </Box>
                   </Paper>
                 );

@@ -121,11 +121,12 @@ export default function Sala() {
 
     // Salas ordenadas: ativas primeiro, inativas no final
     const salasOrdenadas = useMemo(() => {
-        return [...salas].sort((a, b) => {
+        const visiveis = isAdmin ? salas : salas.filter((sala) => sala.ativo);
+        return [...visiveis].sort((a, b) => {
             if (a.ativo === b.ativo) return a.nome.localeCompare(b.nome);
             return a.ativo ? -1 : 1;
         });
-    }, [salas]);
+    }, [salas, isAdmin]);
 
     const toggleServico = (id) => {
         setServicosSelecionados(prev =>
