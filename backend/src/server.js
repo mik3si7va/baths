@@ -12,6 +12,7 @@ const {
   createTipoServico,
   updateTipoServico,
   deleteTipoServico,
+  hardDeleteTipoServico,
   reativarTipoServico,
   getAllRegrasPreco,
   createRegraPreco,
@@ -23,6 +24,7 @@ const {
   createSala,
   updateSala,
   deleteSala,
+  hardDeleteSala,
   addServicoToSala,
   getServicosBySala,
   removeServicoFromSala,
@@ -1153,6 +1155,28 @@ app.delete("/servicos/:id", async (req, res) => {
   }
 });
 
+app.delete("/servicos/:id/permanente", async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const result = await hardDeleteTipoServico(id);
+
+    if (!result) {
+      return res.status(404).json({ error: "Servico nao encontrado" });
+    }
+
+    return res.json(result);
+  } catch (error) {
+    console.error("Failed to hard delete servico:", error);
+
+    if (error.message?.startsWith("Nao e possivel eliminar definitivamente")) {
+      return res.status(409).json({ error: error.message });
+    }
+
+    return res.status(500).json({ error: "Failed to hard delete servico" });
+  }
+});
+
 /**
  * @swagger
  * /servicos/{id}/reativar:
@@ -1639,6 +1663,27 @@ app.delete("/salas/:id", async (req, res) => {
     }
 
     return res.status(500).json({ error: "Erro ao eliminar a sala" });
+  }
+});
+
+app.delete("/salas/:id/permanente", async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const result = await hardDeleteSala(id);
+    if (!result) {
+      return res.status(404).json({ error: "Sala nao encontrada" });
+    }
+
+    return res.json(result);
+  } catch (error) {
+    console.error("Erro ao eliminar definitivamente a sala:", error);
+
+    if (error.message?.startsWith("Nao e possivel eliminar definitivamente")) {
+      return res.status(409).json({ error: error.message });
+    }
+
+    return res.status(500).json({ error: "Erro ao eliminar definitivamente a sala" });
   }
 });
 

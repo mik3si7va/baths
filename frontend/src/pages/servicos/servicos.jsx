@@ -15,6 +15,7 @@ import {
 import { ConfirmDialog } from "../../components";
 import { useThemeContext } from "../../contexts/ThemeContext";
 import DeleteIcon from "@mui/icons-material/Delete";
+import BlockIcon from "@mui/icons-material/Block";
 import EditIcon from "@mui/icons-material/Edit";
 import CancelIcon from "@mui/icons-material/Cancel";
 import SaveIcon from "@mui/icons-material/Save";
@@ -75,7 +76,6 @@ export default function ServicosPage() {
   const [editServicoAtivo, setEditServicoAtivo] = useState(true);
 
   // Estados para Diálogos de Confirmação
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [servicoToDelete, setServicoToDelete] = useState(null);
   const [updateConfirmOpen, setUpdateConfirmOpen] = useState(false);
   const [reactivateConfirmOpen, setReactivateConfirmOpen] = useState(false);
@@ -381,10 +381,12 @@ export default function ServicosPage() {
   };
 
   // ── INATIVAR (Execução após confirmação) ──────────────────────────────────
-  const handleConfirmDelete = async () => {
+  const handleConfirmDelete = async (targetServico = servicoToDelete) => {
+    if (!targetServico) return;
+
     try {
       const res = await fetch(
-        `${API_BASE_URL}/servicos/${servicoToDelete.id}`,
+        `${API_BASE_URL}/servicos/${targetServico.id}`,
         { method: "DELETE" },
       );
 
@@ -403,21 +405,53 @@ export default function ServicosPage() {
         throw new Error(errData.error || "Erro ao inativar serviço.");
       }
 
-      if (editMode && editServicoId === servicoToDelete.id) {
+      if (editMode && editServicoId === targetServico.id) {
         resetForm();
       }
 
-      setSucesso(`Serviço "${servicoToDelete.tipo}" inativado com sucesso!`);
+      setSucesso(`Serviço "${targetServico.tipo}" inativado com sucesso!`);
       await loadData();
     } catch (err) {
       setErro(err.message);
     } finally {
-      setDeleteDialogOpen(false);
       setServicoToDelete(null);
     }
   };
 
   // ── RENDER ─────────────────────────────────────────────────────────────────
+
+  const handleInativarClick = (servico) => {
+    const confirmed = window.confirm(`Desativar "${servico.tipo}"? O servico fica visivel para administradores, mas indisponivel para novos agendamentos.`);
+    if (!confirmed) return;
+
+    setServicoToDelete(servico);
+    handleConfirmDelete(servico);
+  };
+
+  const handleHardDelete = async (servico) => {
+    const confirmed = window.confirm(`Eliminar definitivamente "${servico.tipo}"? Esta acao remove o servico da base de dados.`);
+    if (!confirmed) return;
+
+    try {
+      const res = await fetch(`${API_BASE_URL}/servicos/${servico.id}/permanente`, {
+        method: "DELETE",
+      });
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || "Erro ao eliminar serviço.");
+      }
+
+      if (editMode && editServicoId === servico.id) {
+        resetForm();
+      }
+
+      setSucesso("Serviço eliminado com sucesso.");
+      await loadData();
+    } catch (err) {
+      setErro(err.message);
+    }
+  };
 
   return (
     <Box>
@@ -917,16 +951,23 @@ export default function ServicosPage() {
                           {s.ativo && (
                             <IconButton
                               size="small"
-                              onClick={() => {
-                                setServicoToDelete(s);
-                                setDeleteDialogOpen(true);
-                              }}
+                              onClick={() => handleInativarClick(s)}
                               sx={{ color: colors.textSecondary }}
                               title="Inativar serviço"
+                              aria-label="Desativar"
                             >
-                              <DeleteIcon fontSize="small" />
+                              <BlockIcon fontSize="small" />
                             </IconButton>
                           )}
+                          <IconButton
+                            size="small"
+                            onClick={() => handleHardDelete(s)}
+                            sx={{ color: colors.textSecondary }}
+                            title="Eliminar serviço"
+                            aria-label="Eliminar"
+                          >
+                            <DeleteIcon fontSize="small" />
+                          </IconButton>
                         </Box>
                       )}
                     </Box>
@@ -978,36 +1019,6 @@ export default function ServicosPage() {
         onClose={() => setReactivateConfirmOpen(false)}
       />
 
-      {/* ── DIÁLOGO: INATIVAR ─────────────────────────────────────────────── */}
-      <ConfirmDialog
-        open={deleteDialogOpen}
-        title="Inativar Serviço"
-        message={
-          <>
-            <Typography>
-              Tem a certeza que pretende inativar o serviço{" "}
-              <strong>"{servicoToDelete?.tipo}"</strong>?
-            </Typography>
-            <Typography sx={{ mt: 1 }}>
-              O serviço ficará indisponível para novos agendamentos. Pode
-              consultar o histórico existente normalmente.
-            </Typography>
-            <Typography
-              sx={{ mt: 1, fontSize: "0.875rem", color: "warning.main" }}
-            >
-              A operação será recusada se existirem agendamentos futuros
-              associados a este serviço.
-            </Typography>
-          </>
-        }
-        confirmLabel="Inativar"
-        confirmColor="warning"
-        onConfirm={handleConfirmDelete}
-        onClose={() => {
-          setDeleteDialogOpen(false);
-          setServicoToDelete(null);
-        }}
-      />
     </Box>
   );
 }

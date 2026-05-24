@@ -9,6 +9,7 @@ import { ConfirmDialog } from '../../components';
 import { useThemeContext } from '../../contexts/ThemeContext';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
+import BlockIcon from '@mui/icons-material/Block';
 import MeetingRoomIcon from '@mui/icons-material/MeetingRoom';
 import CancelIcon from '@mui/icons-material/Cancel';
 import SaveIcon from '@mui/icons-material/Save';
@@ -343,6 +344,69 @@ export default function Sala() {
         setSalaParaInativar(null);
     };
 
+    const confirmarInativacao = async (sala) => {
+        const confirmed = window.confirm(`Desativar "${sala.nome}"? A sala fica visivel para administradores, mas indisponivel para novos agendamentos.`);
+        if (!confirmed) return;
+
+        setSalaParaInativar(sala);
+
+        try {
+            const res = await fetch(`${API_BASE_URL}/salas/${sala.id}`, {
+                method: 'DELETE',
+            });
+
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({}));
+                const message = err.error || 'Erro ao inativar sala';
+
+                if (res.status === 409) {
+                    setSalaParaInativar(null);
+                    setDialogoErroMensagem(message);
+                    setDialogoErroAberto(true);
+                    return;
+                }
+
+                throw new Error(message);
+            }
+
+            if (modoEdicao && idSalaEmEdicao === sala.id) {
+                resetForm();
+            }
+
+            await carregarSalas();
+            setSucesso(`Sala "${sala.nome}" inativada com sucesso!`);
+        } catch (err) {
+            setErro(err.message);
+        } finally {
+            setSalaParaInativar(null);
+        }
+    };
+
+    const eliminarSala = async (sala) => {
+        const confirmed = window.confirm(`Eliminar definitivamente "${sala.nome}"? Esta acao remove a sala da base de dados.`);
+        if (!confirmed) return;
+
+        try {
+            const res = await fetch(`${API_BASE_URL}/salas/${sala.id}/permanente`, {
+                method: 'DELETE',
+            });
+
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({}));
+                throw new Error(err.error || 'Erro ao eliminar sala.');
+            }
+
+            if (modoEdicao && idSalaEmEdicao === sala.id) {
+                resetForm();
+            }
+
+            await carregarSalas();
+            setSucesso('Sala eliminada com sucesso.');
+        } catch (err) {
+            setErro(err.message);
+        }
+    };
+
     return (
         <Box>
             <Typography variant="h1" sx={{ mb: 1, color: colors.text }}>
@@ -605,13 +669,23 @@ export default function Sala() {
                                     {sala.ativo && (
                                         <IconButton
                                             size="small"
-                                            onClick={(e) => { e.stopPropagation(); pedirInativacao(sala); }}
+                                            onClick={(e) => { e.stopPropagation(); confirmarInativacao(sala); }}
                                             sx={{ color: colors.textSecondary }}
                                             title="Inativar sala"
+                                            aria-label="Desativar"
                                         >
-                                            <DeleteIcon fontSize="small" />
+                                            <BlockIcon fontSize="small" />
                                         </IconButton>
                                     )}
+                                    <IconButton
+                                        size="small"
+                                        onClick={(e) => { e.stopPropagation(); eliminarSala(sala); }}
+                                        sx={{ color: colors.textSecondary }}
+                                        title="Eliminar sala"
+                                        aria-label="Eliminar"
+                                    >
+                                        <DeleteIcon fontSize="small" />
+                                    </IconButton>
                                 </Box>
                                 )}
                             </Box>

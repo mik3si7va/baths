@@ -593,6 +593,7 @@ describe("ServicosPage — inativar serviço", () => {
   });
   beforeEach(() => {
     global.fetch = jest.fn();
+    window.confirm = jest.fn(() => true);
   });
   afterEach(() => {
     jest.resetAllMocks();
@@ -601,33 +602,38 @@ describe("ServicosPage — inativar serviço", () => {
     consoleErrorSpy.mockRestore();
   });
 
-  test("clicar em inativar abre o diálogo de confirmação", async () => {
+  test("clicar em inativar pede confirmacao por alert", async () => {
+    window.confirm.mockReturnValue(false);
     mockDefaultFetch();
     renderServicos();
     await screen.findByText("Corte de unhas");
     fireEvent.click(getButtonInCard("Corte de unhas", "Inativar serviço"));
-    expect(await screen.findByText("Inativar Serviço")).toBeInTheDocument();
+    expect(window.confirm).toHaveBeenCalledWith(
+      expect.stringContaining('Desativar "Corte de unhas"?'),
+    );
+    expect(global.fetch).toHaveBeenCalledTimes(2);
   });
 
-  test("diálogo de inativação mostra o nome do serviço", async () => {
+  test("alert de inativação mostra o nome do serviço", async () => {
+    window.confirm.mockReturnValue(false);
     mockDefaultFetch();
     renderServicos();
     await screen.findByText("Corte de unhas");
     fireEvent.click(getButtonInCard("Corte de unhas", "Inativar serviço"));
-    expect(await screen.findByText(/"Corte de unhas"/)).toBeInTheDocument();
+    expect(window.confirm).toHaveBeenCalledWith(
+      expect.stringContaining('"Corte de unhas"'),
+    );
   });
 
-  test("diálogo de inativação inclui aviso sobre agendamentos futuros", async () => {
+  test("alert de inativação avisa que fica indisponivel", async () => {
+    window.confirm.mockReturnValue(false);
     mockDefaultFetch();
     renderServicos();
     await screen.findByText("Corte de unhas");
     fireEvent.click(getButtonInCard("Corte de unhas", "Inativar serviço"));
-    await screen.findByText("Inativar Serviço");
-    expect(
-      screen.getByText(
-        /A operação será recusada se existirem agendamentos futuros/i,
-      ),
-    ).toBeInTheDocument();
+    expect(window.confirm).toHaveBeenCalledWith(
+      expect.stringContaining("indisponivel para novos agendamentos"),
+    );
   });
 
   test("confirmar inativação chama DELETE e mostra mensagem de sucesso", async () => {
@@ -645,7 +651,6 @@ describe("ServicosPage — inativar serviço", () => {
     renderServicos();
     await screen.findByText("Corte de unhas");
     fireEvent.click(getButtonInCard("Corte de unhas", "Inativar serviço"));
-    await userEvent.click(await screen.findByTestId("confirm-dialog-confirm"));
 
     await waitFor(() =>
       expect(screen.getByText(/inativado com sucesso!/i)).toBeInTheDocument(),
@@ -656,16 +661,14 @@ describe("ServicosPage — inativar serviço", () => {
     expect(deleteCall[1].method).toBe("DELETE");
   });
 
-  test("cancelar no diálogo não chama DELETE", async () => {
+  test("cancelar no alert nao chama DELETE", async () => {
+    window.confirm.mockReturnValue(false);
     mockDefaultFetch();
     renderServicos();
     await screen.findByText("Corte de unhas");
     fireEvent.click(getButtonInCard("Corte de unhas", "Inativar serviço"));
-    await userEvent.click(
-      await screen.findByRole("button", { name: /Cancelar/i }),
-    );
-    await waitFor(() =>
-      expect(screen.queryByText("Inativar Serviço")).not.toBeInTheDocument(),
+    expect(window.confirm).toHaveBeenCalledWith(
+      expect.stringContaining('Desativar "Corte de unhas"?'),
     );
     expect(global.fetch).toHaveBeenCalledTimes(2);
   });
@@ -684,7 +687,6 @@ describe("ServicosPage — inativar serviço", () => {
     renderServicos();
     await screen.findByText("Corte de unhas");
     fireEvent.click(getButtonInCard("Corte de unhas", "Inativar serviço"));
-    await userEvent.click(await screen.findByTestId("confirm-dialog-confirm"));
 
     expect(await screen.findByText(msgErro)).toBeInTheDocument();
   });
@@ -703,7 +705,6 @@ describe("ServicosPage — inativar serviço", () => {
     renderServicos();
     await screen.findByText("Corte de unhas");
     fireEvent.click(getButtonInCard("Corte de unhas", "Inativar serviço"));
-    await userEvent.click(await screen.findByTestId("confirm-dialog-confirm"));
 
     await screen.findByText(msgErro);
     expect(screen.getByText("Ativo")).toBeInTheDocument();
@@ -725,7 +726,6 @@ describe("ServicosPage — inativar serviço", () => {
     renderServicos();
     await screen.findByText("Corte de unhas");
     fireEvent.click(getButtonInCard("Corte de unhas", "Inativar serviço"));
-    await userEvent.click(await screen.findByTestId("confirm-dialog-confirm"));
 
     // O componente usa errData.error como mensagem, por isso o utilizador vê "Erro interno"
     expect(await screen.findByText("Erro interno")).toBeInTheDocument();
@@ -736,6 +736,29 @@ describe("ServicosPage — inativar serviço", () => {
     renderServicos();
     await screen.findByText("Banho antigo");
     expect(screen.queryByTitle("Inativar serviço")).not.toBeInTheDocument();
+  });
+
+  test("eliminar serviço pede confirmacao e chama endpoint permanente", async () => {
+    global.fetch
+      .mockImplementationOnce(() => mockJsonResponse([SERVICO_ATIVO_MOCK]))
+      .mockImplementationOnce(() => mockJsonResponse([REGRA_MOCK]))
+      .mockImplementationOnce(() =>
+        mockJsonResponse({ removed: true, id: SERVICO_ATIVO_MOCK.id }),
+      )
+      .mockImplementationOnce(() => mockJsonResponse([]))
+      .mockImplementationOnce(() => mockJsonResponse([]));
+
+    renderServicos();
+    await screen.findByText("Corte de unhas");
+    fireEvent.click(getButtonInCard("Corte de unhas", "Eliminar serviço"));
+
+    await waitFor(() =>
+      expect(screen.getByText("Serviço eliminado com sucesso.")).toBeInTheDocument(),
+    );
+
+    const deleteCall = global.fetch.mock.calls[2];
+    expect(deleteCall[0]).toContain(`/servicos/${SERVICO_ATIVO_MOCK.id}/permanente`);
+    expect(deleteCall[1].method).toBe("DELETE");
   });
 });
 

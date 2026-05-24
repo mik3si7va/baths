@@ -348,6 +348,34 @@ async function deleteSala(id) {
   return { removed: true, id };
 }
 
+async function hardDeleteSala(id) {
+  const existing = await prisma.sala.findUnique({
+    where: { id },
+    select: { id: true, nome: true },
+  });
+
+  if (!existing) {
+    return null;
+  }
+
+  try {
+    await prisma.sala.delete({
+      where: { id },
+    });
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2003') {
+      throw new Error(
+        `Nao e possivel eliminar definitivamente a sala "${existing.nome}" porque existem registos associados.`,
+        { cause: error }
+      );
+    }
+
+    throw error;
+  }
+
+  return { removed: true, id };
+}
+
 // US - BET-479: Como administrador, quero gerir quais os serviços disponíveis em cada sala, para que os agendamentos considerem apenas salas compatíveis com o serviço pretendido.
 // Subtask - BET-484: API para atualizar associações sala <-> serviço (rota standalone — o form de edição usa updateSala)
 // Nota: No frontend optamos por checklbox no formulário de criação/edição. Logo, é mais simples passar a lista completa de serviços ao updateSala do que tentar identificar as diferenças no frontend.
@@ -469,6 +497,7 @@ module.exports = {
   createSala,
   updateSala,
   deleteSala,
+  hardDeleteSala,
   addServicoToSala,
   getServicosBySala,
   removeServicoFromSala,
