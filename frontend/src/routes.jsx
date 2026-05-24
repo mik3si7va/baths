@@ -154,7 +154,7 @@ export default function AppRoutes() {
         <Route
           path="/salas"
           element={
-            <AdminRoute
+            <PrivateRoute
               element={
                 <CompactLayout showBack>
                   <Salas />
@@ -166,7 +166,7 @@ export default function AppRoutes() {
         <Route
           path="/salas/:id/:nome"
           element={
-            <AdminRoute
+            <PrivateRoute
               element={
                 <CompactLayout showBack>
                   <SalaDetalhes />

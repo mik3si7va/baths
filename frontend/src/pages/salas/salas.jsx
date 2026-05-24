@@ -19,9 +19,19 @@ import TextareaAutosize from "@mui/material/TextareaAutosize";
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
 
+function getStoredUser() {
+    try {
+        return JSON.parse(localStorage.getItem('btUser') || 'null');
+    } catch (_error) {
+        return null;
+    }
+}
+
 export default function Sala() {
     const { colors } = useThemeContext();
     const navigate = useNavigate();
+    const [user] = useState(() => getStoredUser());
+    const isAdmin = user?.tipoConta === 'ADMIN';
 
     const [form, setForm] = useState({
         nome: '',
@@ -338,10 +348,13 @@ export default function Sala() {
                 Gestão de Salas
             </Typography>
             <Typography variant="body1" sx={{ mb: 4, color: colors.textSecondary }}>
-                Criar novas salas com nome, capacidade, equipamento, serviços associados e preço por hora.
+                {isAdmin
+                    ? 'Criar novas salas com nome, capacidade, equipamento, servicos associados e preco por hora.'
+                    : 'Consulta salas, servicos compativeis e agendas de disponibilidade.'}
             </Typography>
 
             {/* Formulário de criação/edição */}
+            {isAdmin && (
             <Paper elevation={2} sx={{ borderRadius: 3, p: 3, mb: 4 }}>
                 <Box component="form" onSubmit={submeter} noValidate sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                     {sucesso && <Alert severity="success">{sucesso}</Alert>}
@@ -501,6 +514,8 @@ export default function Sala() {
                 </Box>
             </Paper>
 
+            )}
+
             {/* Lista de salas existentes */}
             <Paper elevation={2} sx={{ borderRadius: 3, p: 3 }}>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
@@ -576,6 +591,7 @@ export default function Sala() {
                                     </Box>
                                 </Box>
 
+                                {isAdmin && (
                                 <Box sx={{ display: 'flex', gap: 1 }}>
                                     <IconButton
                                         size="small"
@@ -596,6 +612,7 @@ export default function Sala() {
                                         </IconButton>
                                     )}
                                 </Box>
+                                )}
                             </Box>
                         </Paper>
                     ))}

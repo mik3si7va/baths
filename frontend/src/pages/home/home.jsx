@@ -201,9 +201,11 @@ export default function Home() {
     },
     {
       title: "Salas",
-      description: "Criar e gerir salas, equipamentos, serviços e preço.",
+      description: isAdmin
+        ? "Criar e gerir salas, equipamentos, serviços e preço."
+        : "Consultar salas, serviços compatíveis e disponibilidade.",
       icon: MeetingRoomIcon,
-      buttonText: "Gerir",
+      buttonText: isAdmin ? "Gerir" : "Ver",
       buttonIcon: AddBusinessIcon,
       href: "/salas",
       height: 180,
@@ -213,7 +215,7 @@ export default function Home() {
   const visibleQuickAcessCardsData = isAdmin
     ? quickAcessCardsData
     : quickAcessCardsData.filter(
-        (card) => !["/servicos", "/contas", "/salas"].includes(card.href),
+        (card) => !["/servicos", "/contas"].includes(card.href),
       );
 
   return (

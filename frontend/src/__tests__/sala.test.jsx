@@ -10,7 +10,8 @@ import { ThemeProvider } from "../contexts/ThemeContext";
 
 let consoleErrorSpy;
 
-function renderSalas() {
+function renderSalas(user = { id: "admin-1", tipoConta: "ADMIN" }) {
+  localStorage.setItem("btUser", JSON.stringify(user));
   return render(
     <MemoryRouter>
       <ThemeProvider>
@@ -72,10 +73,12 @@ describe("Salas page", () => {
 
   beforeEach(() => {
     global.fetch = jest.fn();
+    localStorage.clear();
   });
 
   afterEach(() => {
     jest.resetAllMocks();
+    localStorage.clear();
   });
 
   afterAll(() => {
@@ -629,5 +632,16 @@ describe("Salas page", () => {
     expect(payload.equipamento).toBe(SALA_INATIVA_MOCK.equipamento);
     expect(payload.precoHora).toBe(SALA_INATIVA_MOCK.precoHora);
     expect(payload.tipoServicoIds).toEqual([SERVICO_MOCK.id]);
+  });
+  test("funcionario ve lista e agenda mas nao ve formulario nem botoes de gestao", async () => {
+    mockDefaultFetch();
+
+    renderSalas({ id: "func-1", tipoConta: "FUNCIONARIO" });
+
+    expect(await screen.findByText("Sala de Banho 1")).toBeInTheDocument();
+
+    expect(screen.queryByRole("button", { name: /Criar Sala/i })).not.toBeInTheDocument();
+    expect(screen.queryByTitle("Editar sala")).not.toBeInTheDocument();
+    expect(screen.queryByTitle("Inativar sala")).not.toBeInTheDocument();
   });
 });
