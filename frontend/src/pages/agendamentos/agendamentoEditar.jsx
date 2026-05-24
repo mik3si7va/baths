@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Alert, Box, Button, Chip, CircularProgress, Paper, Typography } from '@mui/material';
 import { arrancarGestao, completarTarefa, completarCadeia, aguardarTarefa, getVariaveis, cancelarProcesso, aguardarFimGestao } from '../../utils/camundaWizard';
-import { PassoServicos, PassoHorario, PassoConfirmacao } from './agendamentoNovo';
+import { PassoServicos, PassoHorario, PassoConfirmacao, PassoFinalizado } from './agendamentoNovo';
 
 // US - BET-35: Como funcionário, quero reagendar (alterar serviços, data, hora, funcionário ou sala) um agendamento existente.
 //
@@ -110,9 +110,11 @@ export default function AgendamentoEditar() {
     const [camundaLoading, setCamundaLoading] = useState(false);
     const [camundaErro, setCamundaErro] = useState('');
 
-    // Confirmação: nome do cliente vem das vars Camunda (seedadas pelo backend em arrancarGestao). 
+    // Confirmação: nome do cliente vem das vars Camunda (seedadas pelo backend em arrancarGestao).
+    // Nome do animal vem do GET /agendamentos/:id (não é seedado pelo worker carregar-dados-agendamento).
     // resumoFinal é construído localmente a partir da opção escolhida quando o user passa para o passo 'confirmacao'.
     const [nomeCliente, setNomeCliente] = useState('');
+    const [nomeAnimal, setNomeAnimal] = useState('');
     const [resumoFinal, setResumoFinal] = useState(null);
 
     // Guarda contra duplo arranque (React Strict Mode).
@@ -154,6 +156,11 @@ export default function AgendamentoEditar() {
         (async () => {
             setCamundaLoading(true);
             try {
+                fetch(`${API_BASE_URL}/agendamentos/${agendamentoId}`)
+                    .then((r) => (r.ok ? r.json() : null))
+                    .then((ag) => { if (ag?.animal?.nome) setNomeAnimal(ag.animal.nome); })
+                    .catch(() => { /* best-effort - resumo cai em fallback 'Animal' */ });
+
                 const procId = await arrancarGestao(agendamentoId);
                 setProcessInstanceId(procId);
 
@@ -407,6 +414,7 @@ export default function AgendamentoEditar() {
         if (!op) return;
         setResumoFinal({
             clienteNome: nomeCliente,
+            animalNome: nomeAnimal || 'Animal',
             opcaoSelecionada: {
                 dataHoraInicio: op.dataHoraInicio,
                 dataHoraFim: op.dataHoraFim,
@@ -543,18 +551,12 @@ export default function AgendamentoEditar() {
             )}
 
             {passoActual === 'finalizado' && (
-                <Paper sx={{ p: 4, textAlign: 'center' }}>
-                    <Typography variant="h5" sx={{ color: 'success.main', mb: 1 }}>
-                        ✓ Reagendamento confirmado!
-                    </Typography>
-                    <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
-                        O agendamento foi actualizado com sucesso. Se o cliente tem email,
-                        foi enviada uma notificação de reagendamento automaticamente.
-                    </Typography>
-                    <Button variant="contained" onClick={() => navigate('/calendar')}>
-                        Ver agenda
-                    </Button>
-                </Paper>
+                <PassoFinalizado
+                    resumoFinal={resumoFinal}
+                    onIrParaAgenda={() => navigate('/calendar')}
+                    titulo="✓ Reagendamento confirmado!"
+                    subtitulo="O agendamento foi actualizado com sucesso. Se o cliente tem email, foi enviada uma notificação de reagendamento automaticamente."
+                />
             )}
         </Box>
     );

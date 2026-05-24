@@ -68,17 +68,19 @@ async function obterPrecoEDuracao(tipoServicoId, porteAnimal) {
 }
 
 async function montarResumo({ servicosActualizados = [], opcaoSelecionada = {}, animalId, clienteNome }) {
-    if (!clienteNome && animalId) {
+    let animalNome = null;
+    if (animalId) {
         // Best-effort: no ramo de cliente não-registado o animal pode ainda não existir em BD.
-        // Se a query falhar (ID inválido, não encontrado, etc.), seguimos sem nome — fallback 'Cliente'.
+        // Se a query falhar (ID inválido, não encontrado, etc.), seguimos sem nomes — fallbacks 'Animal'/'Cliente'.
         try {
             const animal = await prisma.animal.findUnique({
                 where: { id: animalId },
-                select: { cliente: { select: { utilizador: { select: { nome: true } } } } },
+                select: { nome: true, cliente: { select: { utilizador: { select: { nome: true } } } } },
             });
-            clienteNome = animal?.cliente?.utilizador?.nome || null;
+            animalNome = animal?.nome || null;
+            if (!clienteNome) clienteNome = animal?.cliente?.utilizador?.nome || null;
         } catch (err) {
-            log(TOPIC, `lookup de nomeCliente falhou (animalId=${animalId}): ${err.message}`, 'warn');
+            log(TOPIC, `lookup de nomeAnimal/nomeCliente falhou (animalId=${animalId}): ${err.message}`, 'warn');
         }
     }
 
@@ -94,6 +96,7 @@ async function montarResumo({ servicosActualizados = [], opcaoSelecionada = {}, 
 
     const resumo = {
         animalId,
+        animalNome: animalNome || 'Animal',
         clienteNome: clienteNome || 'Cliente',
         servicos: servicosFormatados,
         duracaoTotalMinutos: duracaoTotal,
