@@ -1339,6 +1339,11 @@ export function PassoConfirmacao({
                     </Box>
 
                     <Box>
+                        <Typography variant="caption" color="text.secondary">Animal</Typography>
+                        <Typography variant="body1" sx={{ fontWeight: 600 }}>{resumoFinal.animalNome || '--'}</Typography>
+                    </Box>
+
+                    <Box>
                         <Typography variant="caption" color="text.secondary">Data e hora</Typography>
                         <Typography variant="body1">
                             <b>{fmtDataPT(op.dataHoraInicio)}</b> · {fmtHoraUTC(op.dataHoraInicio)} → {fmtHoraUTC(op.dataHoraFim)}
@@ -1388,22 +1393,26 @@ export function PassoConfirmacao({
     );
 }
 
-function PassoFinalizado({ resumoFinal, onIrParaAgenda }) {
+export function PassoFinalizado({
+    resumoFinal,
+    onIrParaAgenda,
+    titulo = '✓ Agendamento confirmado!',
+    subtitulo = 'O agendamento foi gravado com sucesso. Se o cliente tem email, foi enviada uma confirmação por e-mail.',
+}) {
     const op = resumoFinal?.opcaoSelecionada || {};
     return (
         <Paper sx={{ p: 4, textAlign: 'center' }}>
             <Typography variant="h5" sx={{ color: 'success.main', mb: 1 }}>
-                ✓ Agendamento confirmado!
+                {titulo}
             </Typography>
             <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
-                O agendamento foi gravado com sucesso. Se o cliente tem email, foi enviada
-                uma confirmação por e-mail.
+                {subtitulo}
             </Typography>
 
             {resumoFinal && (
                 <Paper variant="outlined" sx={{ p: 2, mb: 3, textAlign: 'left', backgroundColor: '#f6fbf6' }}>
                     <Typography variant="body2">
-                        <b>{resumoFinal.clienteNome}</b> - {fmtDataPT(op.dataHoraInicio)} às {fmtHoraUTC(op.dataHoraInicio)}
+                        <b>{resumoFinal.clienteNome}</b> · <b>{resumoFinal.animalNome}</b> - {fmtDataPT(op.dataHoraInicio)} às {fmtHoraUTC(op.dataHoraInicio)}
                     </Typography>
                     <Typography variant="body2" color="text.secondary">
                         {(resumoFinal.servicos || []).map((s) => s.nome).join(' → ')} · {resumoFinal.duracaoTotalMinutos} min · {resumoFinal.valorEstimado}€

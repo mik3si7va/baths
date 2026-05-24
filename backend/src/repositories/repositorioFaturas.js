@@ -9,6 +9,12 @@ function isUuid(value) {
 // US - BET-44 (futuro): fatura de aluguer de sala (1 por entidade + mês).
 // Entidade Fatura partilhada - o `tipo` distingue o conteúdo dentro de `conteudoJson`.
 
+async function getAllFaturas() {
+    return prisma.fatura.findMany({
+        orderBy: { dataEmissao: 'desc' },
+    });
+}
+
 async function getFaturaById(id) {
     if (!isUuid(id)) return null;
 
@@ -26,6 +32,7 @@ async function getFaturaByAgendamentoId(agendamentoId) {
 }
 
 module.exports = {
+    getAllFaturas,
     getFaturaById,
     getFaturaByAgendamentoId,
 };

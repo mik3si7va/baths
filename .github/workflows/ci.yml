@@ -105,6 +105,9 @@ jobs:
         working-directory: ./backend
         run: npm ci --include=dev
 
+      - name: Instalar dependencias root (camunda services partilhados — date-fns, etc.)
+        run: npm ci
+
       - name: Preparar base de dados
         working-directory: ./backend
         run: node src/db/prepareDatabases.js

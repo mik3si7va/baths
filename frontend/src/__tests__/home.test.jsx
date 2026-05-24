@@ -70,4 +70,12 @@ describe("Home page", () => {
       expect(global.fetch).toHaveBeenCalledWith("http://localhost:5000/salas");
     });
   });
+
+  test("o card Faturação aponta para /faturas", async () => {
+    renderHome({ id: "func-1", tipoConta: "FUNCIONARIO" });
+
+    await screen.findByText("Faturação");
+    const links = screen.getAllByRole("link", { name: /Pesquisar/i });
+    expect(links.some((link) => link.getAttribute("href") === "/faturas")).toBe(true);
+  });
 });

@@ -59,6 +59,7 @@ const {
   getAgendamentoById,
 } = require("./repositories/repositorioAgendamentos");
 const {
+  getAllFaturas,
   getFaturaById,
   getFaturaByAgendamentoId,
 } = require("./repositories/repositorioFaturas");
@@ -2594,6 +2595,40 @@ app.get("/agendamentos/:id", async (req, res) => {
   } catch (error) {
     console.error("Erro ao obter agendamento:", error);
     return res.status(500).json({ error: "Erro ao obter agendamento" });
+  }
+});
+
+// US - BET-43: listagem de todas as faturas ordenada por data de emissão descendente.
+// Frontend filtra/pesquisa client-side - volume previsivelmente baixo (1 fatura por agendamento concluído).
+/**
+ * @swagger
+ * /faturas:
+ *   get:
+ *     summary: Lista todas as faturas (mais recentes primeiro)
+ *     tags: [Faturas]
+ *     responses:
+ *       200:
+ *         description: Lista de faturas
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/Fatura'
+ *       500:
+ *         description: Erro interno
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ */
+app.get("/faturas", async (_req, res) => {
+  try {
+    const faturas = await getAllFaturas();
+    return res.json(faturas);
+  } catch (error) {
+    console.error("Erro ao listar faturas:", error);
+    return res.status(500).json({ error: "Erro ao listar faturas" });
   }
 });
 
