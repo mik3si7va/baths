@@ -2,6 +2,7 @@
   "name": "baths",
   "private": true,
   "scripts": {
+    "install:all": "npm install && npm install --prefix backend && npm install --prefix frontend",
     "start": "npm run camunda:boot && npm run workers",
     "project": "npm run project:db && npm run camunda:boot && npm run project:apps",
     "project:db": "npm run db:full --prefix backend",

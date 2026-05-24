@@ -5,8 +5,14 @@ import Funcionarios from "../pages/admin/manageUsers/funcionarios";
 import { ThemeProvider } from "../contexts/ThemeContext";
 
 let consoleErrorSpy;
+const mockNavigate = jest.fn();
 
-function renderFuncionarios() {
+jest.mock("react-router-dom", () => ({
+  useNavigate: () => mockNavigate,
+}));
+
+function renderFuncionarios(user = { id: "admin-1", tipoConta: "ADMIN" }) {
+  localStorage.setItem("btUser", JSON.stringify(user));
   return render(
     <ThemeProvider>
       <Funcionarios />
@@ -57,10 +63,13 @@ describe("Funcionarios page", () => {
   beforeEach(() => {
     global.fetch = jest.fn();
     window.confirm = jest.fn(() => true);
+    localStorage.clear();
+    mockNavigate.mockClear();
   });
 
   afterEach(() => {
     jest.resetAllMocks();
+    localStorage.clear();
   });
 
   afterAll(() => {
@@ -82,6 +91,16 @@ describe("Funcionarios page", () => {
             telefone: "912345678",
             email: "sofia.r@bet.com",
             ativo: true,
+            horariosTrabalho: [{ diasSemana: ["TERCA"] }],
+            servicos: [{ tipoServicoId: "srv-1", tipo: "BANHO" }],
+          },
+          {
+            id: "f-2",
+            nomeCompleto: "Funcionario Inativo",
+            cargo: "BANHISTA",
+            telefone: "912345679",
+            email: "inativo@bet.com",
+            ativo: false,
             horariosTrabalho: [{ diasSemana: ["TERCA"] }],
             servicos: [{ tipoServicoId: "srv-1", tipo: "BANHO" }],
           },
@@ -402,17 +421,21 @@ describe("Funcionarios page", () => {
     expect(screen.getByText("Ativo")).toBeInTheDocument();
     expect(screen.getByText("Inativo")).toBeInTheDocument();
 
+    // Clicar no botão IconButton "Eliminar" do card abre o ConfirmDialog
     await userEvent.click(screen.getAllByRole("button", { name: "Eliminar" })[0]);
+
+    expect(
+      await screen.findByText("Eliminar Funcionário definitivamente"),
+    ).toBeInTheDocument();
+
+    // Confirmar no dialog
+    await userEvent.click(await screen.findByTestId("confirm-dialog-confirm"));
 
     await waitFor(() => {
       expect(
-        screen.getByText("Funcionario eliminado com sucesso."),
+        screen.getByText(/Funcionario "Funcionario Ativo" eliminado com sucesso/i),
       ).toBeInTheDocument();
     });
-
-    expect(window.confirm).toHaveBeenCalledWith(
-      expect.stringContaining('Eliminar definitivamente "Funcionario Ativo"?'),
-    );
 
     const deleteCall = global.fetch.mock.calls[3];
     expect(deleteCall[0]).toBe("http://localhost:5000/funcionarios/f-1");
@@ -458,7 +481,16 @@ describe("Funcionarios page", () => {
     renderFuncionarios();
 
     expect(await screen.findByText("Funcionario Ativo")).toBeInTheDocument();
+
+    // Clicar no botão IconButton "Desativar" do card abre o ConfirmDialog
     await userEvent.click(screen.getByRole("button", { name: "Desativar" }));
+
+    expect(
+      await screen.findByText("Desativar Funcionário"),
+    ).toBeInTheDocument();
+
+    // Confirmar no dialog
+    await userEvent.click(await screen.findByTestId("confirm-dialog-confirm"));
 
     await waitFor(() => {
       expect(
@@ -466,13 +498,112 @@ describe("Funcionarios page", () => {
       ).toBeInTheDocument();
     });
 
-    expect(window.confirm).toHaveBeenCalledWith(
-      expect.stringContaining('Desativar "Funcionario Ativo"?'),
-    );
-
     const patchCall = global.fetch.mock.calls[3];
     expect(patchCall[0]).toBe("http://localhost:5000/funcionarios/f-1/ativo");
     expect(patchCall[1].method).toBe("PATCH");
     expect(JSON.parse(patchCall[1].body)).toEqual({ ativo: false });
+  });
+
+  test("clicar no card do funcionario navega para a agenda pessoal", async () => {
+    global.fetch
+      .mockImplementationOnce(() => mockJsonResponse(mockOpcoes))
+      .mockImplementationOnce(() =>
+        mockJsonResponse([{ id: "srv-1", tipo: "BANHO" }]),
+      )
+      .mockImplementationOnce(() =>
+        mockJsonResponse([
+          {
+            id: "f-1",
+            nomeCompleto: "Sofia Ramalho",
+            cargo: "BANHISTA",
+            telefone: "912345678",
+            email: "sofia.r@bet.com",
+            ativo: true,
+            horariosTrabalho: [{ diasSemana: ["TERCA"] }],
+            servicos: [{ tipoServicoId: "srv-1", tipo: "BANHO" }],
+          },
+        ]),
+      );
+
+    renderFuncionarios();
+
+    const nome = await screen.findByText("Sofia Ramalho");
+    fireEvent.click(nome.closest(".MuiPaper-root"));
+
+    expect(mockNavigate).toHaveBeenCalledWith("/funcionarios/f-1/Sofia_Ramalho");
+  });
+
+  test("clicar no botao editar nao navega para a agenda pessoal", async () => {
+    global.fetch
+      .mockImplementationOnce(() => mockJsonResponse(mockOpcoes))
+      .mockImplementationOnce(() =>
+        mockJsonResponse([{ id: "srv-1", tipo: "BANHO" }]),
+      )
+      .mockImplementationOnce(() =>
+        mockJsonResponse([
+          {
+            id: "f-1",
+            nomeCompleto: "Sofia Ramalho",
+            cargo: "BANHISTA",
+            telefone: "912345678",
+            email: "sofia.r@bet.com",
+            porteAnimais: ["MEDIO"],
+            ativo: true,
+            horariosTrabalho: [
+              {
+                diasSemana: ["TERCA"],
+                horaInicio: "09:00",
+                horaFim: "18:00",
+                pausaInicio: "13:00",
+                pausaFim: "14:00",
+              },
+            ],
+            servicos: [{ tipoServicoId: "srv-1", tipo: "BANHO" }],
+          },
+        ]),
+      );
+
+    renderFuncionarios();
+
+    await screen.findByText("Sofia Ramalho");
+    await userEvent.click(screen.getByRole("button", { name: "Editar" }));
+
+    expect(mockNavigate).not.toHaveBeenCalled();
+    expect(screen.getByDisplayValue("Sofia Ramalho")).toBeInTheDocument();
+  });
+
+  test("funcionario ve lista e agenda mas nao ve formulario nem botoes de gestao", async () => {
+    global.fetch
+      .mockImplementationOnce(() => mockJsonResponse(mockOpcoes))
+      .mockImplementationOnce(() =>
+        mockJsonResponse([{ id: "srv-1", tipo: "BANHO" }]),
+      )
+      .mockImplementationOnce(() =>
+        mockJsonResponse([
+          {
+            id: "f-1",
+            nomeCompleto: "Sofia Ramalho",
+            cargo: "BANHISTA",
+            telefone: "912345678",
+            email: "sofia.r@bet.com",
+            ativo: true,
+            horariosTrabalho: [{ diasSemana: ["TERCA"] }],
+            servicos: [{ tipoServicoId: "srv-1", tipo: "BANHO" }],
+          },
+        ]),
+      );
+
+    renderFuncionarios({ id: "func-1", tipoConta: "FUNCIONARIO" });
+
+    const nome = await screen.findByText("Sofia Ramalho");
+
+    expect(screen.queryByText("Funcionario Inativo")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Criar Funcionario/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Editar" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Desativar" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Eliminar" })).not.toBeInTheDocument();
+
+    fireEvent.click(nome.closest(".MuiPaper-root"));
+    expect(mockNavigate).toHaveBeenCalledWith("/funcionarios/f-1/Sofia_Ramalho");
   });
 });

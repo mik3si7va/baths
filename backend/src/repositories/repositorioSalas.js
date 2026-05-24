@@ -311,7 +311,7 @@ async function verificarAgendamentosFuturos({ salaId, tipoServicoId }) {
 async function deleteSala(id) {
   const existing = await prisma.sala.findUnique({
     where: { id },
-    select: { id: true },
+    select: { id: true, nome: true },
   });
 
   if (!existing) {
@@ -334,7 +334,7 @@ async function deleteSala(id) {
     }
     // Erro com prefixo distintivo para a rota poder mapear para 409 Conflict
     const erro = new Error(
-      `Não é possível inativar a sala: existem ${partes.join(' e ')}.`
+      `Não é possível inativar a sala "${existing.nome}": existe(m) ${partes.join(' e ')}.`
     );
     erro.code = 'SALA_TEM_AGENDAMENTOS_FUTUROS';
     throw erro;
@@ -344,6 +344,34 @@ async function deleteSala(id) {
     where: { id },
     data: { ativo: false, updatedAt: new Date() },
   });
+
+  return { removed: true, id };
+}
+
+async function hardDeleteSala(id) {
+  const existing = await prisma.sala.findUnique({
+    where: { id },
+    select: { id: true, nome: true },
+  });
+
+  if (!existing) {
+    return null;
+  }
+
+  try {
+    await prisma.sala.delete({
+      where: { id },
+    });
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2003') {
+      throw new Error(
+        `Nao e possivel eliminar definitivamente a sala "${existing.nome}" porque existem registos associados.`,
+        { cause: error }
+      );
+    }
+
+    throw error;
+  }
 
   return { removed: true, id };
 }
@@ -469,6 +497,7 @@ module.exports = {
   createSala,
   updateSala,
   deleteSala,
+  hardDeleteSala,
   addServicoToSala,
   getServicosBySala,
   removeServicoFromSala,

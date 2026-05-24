@@ -169,9 +169,11 @@ export default function Home() {
     },
     {
       title: "Serviços",
-      description: "Criar e gerir serviços, portes e regras de preço.",
+      description: isAdmin
+        ? "Criar e gerir serviços, portes e regras de preço."
+        : "Consultar serviços, portes, preços e duração.",
       icon: ContentCutIcon,
-      buttonText: "Gerir",
+      buttonText: isAdmin ? "Gerir" : "Ver",
       buttonIcon: ShoppingCartIcon,
       href: "/servicos",
       height: 180,
@@ -179,9 +181,11 @@ export default function Home() {
     },
     {
       title: "Funcionários",
-      description: "Criar e gerir equipa, horários e especialidades.",
+      description: isAdmin
+        ? "Criar e gerir equipa, horários e especialidades."
+        : "Consultar equipa, horários, especialidades e agendas.",
       icon: BadgeIcon,
-      buttonText: "Gerir",
+      buttonText: isAdmin ? "Gerir" : "Ver",
       buttonIcon: PeopleIcon,
       href: "/funcionarios",
       height: 180,
@@ -199,9 +203,11 @@ export default function Home() {
     },
     {
       title: "Salas",
-      description: "Criar e gerir salas, equipamentos, serviços e preço.",
+      description: isAdmin
+        ? "Criar e gerir salas, equipamentos, serviços e preço."
+        : "Consultar salas, serviços compatíveis e disponibilidade.",
       icon: MeetingRoomIcon,
-      buttonText: "Gerir",
+      buttonText: isAdmin ? "Gerir" : "Ver",
       buttonIcon: AddBusinessIcon,
       href: "/salas",
       height: 180,
@@ -211,7 +217,7 @@ export default function Home() {
   const visibleQuickAcessCardsData = isAdmin
     ? quickAcessCardsData
     : quickAcessCardsData.filter(
-        (card) => !["/servicos", "/funcionarios", "/contas", "/salas"].includes(card.href),
+        (card) => !["/contas"].includes(card.href),
       );
 
   return (

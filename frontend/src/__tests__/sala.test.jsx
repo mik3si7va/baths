@@ -10,7 +10,8 @@ import { ThemeProvider } from "../contexts/ThemeContext";
 
 let consoleErrorSpy;
 
-function renderSalas() {
+function renderSalas(user = { id: "admin-1", tipoConta: "ADMIN" }) {
+  localStorage.setItem("btUser", JSON.stringify(user));
   return render(
     <MemoryRouter>
       <ThemeProvider>
@@ -72,10 +73,13 @@ describe("Salas page", () => {
 
   beforeEach(() => {
     global.fetch = jest.fn();
+    jest.spyOn(window, "confirm").mockReturnValue(true);
+    localStorage.clear();
   });
 
   afterEach(() => {
     jest.resetAllMocks();
+    localStorage.clear();
   });
 
   afterAll(() => {
@@ -547,6 +551,37 @@ describe("Salas page", () => {
     expect(screen.queryByTitle("Inativar sala")).not.toBeInTheDocument();
   });
 
+  test("eliminar sala abre dialogo e chama endpoint permanente", async () => {
+    global.fetch
+      .mockImplementationOnce(() => mockJsonResponse([SERVICO_MOCK]))
+      .mockImplementationOnce(() => mockJsonResponse([SALA_ATIVA_MOCK]))
+      .mockImplementationOnce(() =>
+        mockJsonResponse({ removed: true, id: SALA_ATIVA_MOCK.id }),
+      )
+      .mockImplementationOnce(() => mockJsonResponse([]));
+
+    renderSalas();
+    await screen.findByText("Sala de Banho 1");
+
+    fireEvent.click(screen.getByTitle("Eliminar sala"));
+
+    expect(
+      await screen.findByText("Eliminar Sala definitivamente"),
+    ).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: /^Eliminar$/ }));
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(/Sala "Sala de Banho 1" eliminada com sucesso/i),
+      ).toBeInTheDocument();
+    });
+
+    const deleteCall = global.fetch.mock.calls[2];
+    expect(deleteCall[0]).toContain(`/salas/${SALA_ATIVA_MOCK.id}/permanente`);
+    expect(deleteCall[1].method).toBe("DELETE");
+  });
+
   test("mostra errorDialog quando backend bloqueia inativação", async () => {
     global.fetch
       .mockImplementationOnce(() => mockJsonResponse([SERVICO_MOCK]))
@@ -629,5 +664,17 @@ describe("Salas page", () => {
     expect(payload.equipamento).toBe(SALA_INATIVA_MOCK.equipamento);
     expect(payload.precoHora).toBe(SALA_INATIVA_MOCK.precoHora);
     expect(payload.tipoServicoIds).toEqual([SERVICO_MOCK.id]);
+  });
+  test("funcionario ve lista e agenda mas nao ve formulario nem botoes de gestao", async () => {
+    mockDefaultFetch([SALA_ATIVA_MOCK, SALA_INATIVA_MOCK]);
+
+    renderSalas({ id: "func-1", tipoConta: "FUNCIONARIO" });
+
+    expect(await screen.findByText("Sala de Banho 1")).toBeInTheDocument();
+    expect(screen.queryByText("Sala Inativa")).not.toBeInTheDocument();
+
+    expect(screen.queryByRole("button", { name: /Criar Sala/i })).not.toBeInTheDocument();
+    expect(screen.queryByTitle("Editar sala")).not.toBeInTheDocument();
+    expect(screen.queryByTitle("Inativar sala")).not.toBeInTheDocument();
   });
 });

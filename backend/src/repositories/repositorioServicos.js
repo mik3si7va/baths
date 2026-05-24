@@ -1,4 +1,5 @@
 const { randomUUID } = require("node:crypto");
+const { Prisma } = require("@prisma/client");
 const { prisma } = require("../db/prismaClient");
 const PorteEnum = require("../domain/enums/PorteEnum");
 
@@ -127,6 +128,34 @@ async function deleteTipoServico(id) {
     where: { id },
     data: { ativo: false },
   });
+
+  return { removed: true, id };
+}
+
+async function hardDeleteTipoServico(id) {
+  const existing = await prisma.tipoServico.findUnique({
+    where: { id },
+    select: { id: true, tipo: true },
+  });
+
+  if (!existing) {
+    return null;
+  }
+
+  try {
+    await prisma.tipoServico.delete({
+      where: { id },
+    });
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2003") {
+      throw new Error(
+        `Nao e possivel eliminar definitivamente o servico "${existing.tipo}" porque existem registos associados.`,
+        { cause: error },
+      );
+    }
+
+    throw error;
+  }
 
   return { removed: true, id };
 }
@@ -306,6 +335,7 @@ module.exports = {
   createTipoServico,
   updateTipoServico,
   deleteTipoServico,
+  hardDeleteTipoServico,
   reativarTipoServico,
   getAllRegrasPreco,
   createRegraPreco,

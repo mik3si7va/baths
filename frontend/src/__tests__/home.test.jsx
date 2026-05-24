@@ -54,10 +54,15 @@ describe("Home page", () => {
     expect(await screen.findByText("Novo Agendamento")).toBeInTheDocument();
     expect(screen.getByText("Pesquisar Clientes")).toBeInTheDocument();
     expect(screen.getAllByText("Clientes").length).toBeGreaterThan(0);
-    expect(screen.getAllByText(/Funcion/).length).toBe(1);
-    expect(screen.getAllByText("Salas").length).toBe(1);
+    expect(screen.getAllByText(/Funcion/).length).toBeGreaterThan(1);
+    expect(screen.getByText("Consultar equipa, horários, especialidades e agendas.")).toBeInTheDocument();
+    expect(screen.getAllByRole("link", { name: /Ver/i }).some((link) => link.getAttribute("href") === "/funcionarios")).toBe(true);
+    expect(screen.getAllByText("Salas").length).toBeGreaterThan(1);
+    expect(screen.getByText("Consultar salas, serviços compatíveis e disponibilidade.")).toBeInTheDocument();
+    expect(screen.getAllByRole("link", { name: /Ver/i }).some((link) => link.getAttribute("href") === "/salas")).toBe(true);
+    expect(screen.getByText("Consultar serviços, portes, preços e duração.")).toBeInTheDocument();
+    expect(screen.getAllByRole("link", { name: /Ver/i }).some((link) => link.getAttribute("href") === "/servicos")).toBe(true);
     expect(screen.queryByText("Contas")).not.toBeInTheDocument();
-    expect(screen.queryByText(/Servi/)).not.toBeInTheDocument();
 
     await waitFor(() => {
       expect(global.fetch).toHaveBeenCalledWith("http://localhost:5000/clientes");

@@ -12,6 +12,7 @@ import {
   Salas,
   SalaDetalhes,
   Funcionarios,
+  FuncionarioDetalhes,
   Contas,
   Perfil,
   Pesquisa,
@@ -93,7 +94,7 @@ export default function AppRoutes() {
         <Route
           path="/servicos"
           element={
-            <AdminRoute
+            <PrivateRoute
               element={
                 <CompactLayout showBack>
                   <ServicosPage />
@@ -153,7 +154,7 @@ export default function AppRoutes() {
         <Route
           path="/salas"
           element={
-            <AdminRoute
+            <PrivateRoute
               element={
                 <CompactLayout showBack>
                   <Salas />
@@ -165,7 +166,7 @@ export default function AppRoutes() {
         <Route
           path="/salas/:id/:nome"
           element={
-            <AdminRoute
+            <PrivateRoute
               element={
                 <CompactLayout showBack>
                   <SalaDetalhes />
@@ -177,10 +178,22 @@ export default function AppRoutes() {
         <Route
           path="/funcionarios"
           element={
-            <AdminRoute
+            <PrivateRoute
               element={
                 <CompactLayout>
                   <Funcionarios />
+                </CompactLayout>
+              }
+            />
+          }
+        />
+        <Route
+          path="/funcionarios/:id/:nome"
+          element={
+            <PrivateRoute
+              element={
+                <CompactLayout showBack>
+                  <FuncionarioDetalhes />
                 </CompactLayout>
               }
             />

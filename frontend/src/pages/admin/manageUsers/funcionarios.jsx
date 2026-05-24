@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Alert,
   Box,
@@ -15,10 +16,12 @@ import {
   Typography,
 } from '@mui/material';
 import { useThemeContext } from '../../../contexts/ThemeContext';
+import { ConfirmDialog } from '../../../components';
 import BlockIcon from '@mui/icons-material/Block';
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
 import RestoreIcon from '@mui/icons-material/Restore';
+import WorkIcon from '@mui/icons-material/Work';
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
 
@@ -74,8 +77,19 @@ const initialForm = {
   },
 };
 
+function getStoredUser() {
+  try {
+    return JSON.parse(localStorage.getItem('btUser') || 'null');
+  } catch (_error) {
+    return null;
+  }
+}
+
 export default function Funcionarios() {
   const { colors } = useThemeContext();
+  const navigate = useNavigate();
+  const [user] = useState(() => getStoredUser());
+  const isAdmin = user?.tipoConta === 'ADMIN';
 
   const [form, setForm] = useState(initialForm);
   const [cargoOptions, setCargoOptions] = useState(DEFAULT_CARGO_OPTIONS);
@@ -91,9 +105,23 @@ export default function Funcionarios() {
   const [erro, setErro] = useState('');
   const [sucesso, setSucesso] = useState('');
 
+  // Estados para diálogos de confirmação
+  const [dialogoDesativarAberto, setDialogoDesativarAberto] = useState(false);
+  const [funcionarioParaDesativar, setFuncionarioParaDesativar] = useState(null);
+  const [dialogoEliminarAberto, setDialogoEliminarAberto] = useState(false);
+  const [funcionarioParaEliminar, setFuncionarioParaEliminar] = useState(null);
+
+  // Diálogo de erro modal: quando o backend devolve 409 (ex: funcionario com agendamentos futuros)
+  const [dialogoErroAberto, setDialogoErroAberto] = useState(false);
+  const [dialogoErroMensagem, setDialogoErroMensagem] = useState('');
+
   const servicosById = useMemo(() => {
     return Object.fromEntries(servicos.map((s) => [s.id, s.tipo]));
   }, [servicos]);
+
+  const funcionariosVisiveis = useMemo(() => {
+    return isAdmin ? funcionarios : funcionarios.filter((f) => f.ativo);
+  }, [funcionarios, isAdmin]);
 
   const loadData = async () => {
     setLoadingInitial(true);
@@ -290,49 +318,9 @@ export default function Funcionarios() {
     }
   };
 
-  const handleDelete = async (funcionario) => {
-    const confirmed = window.confirm(`Eliminar definitivamente "${funcionario.nomeCompleto}"? Esta acao remove o funcionario da base de dados.`);
-    if (!confirmed) {
-      return;
-    }
-
-    setErro('');
-    setSucesso('');
-    setLoadingDeleteId(funcionario.id);
-
-    try {
-      const response = await fetch(`${API_BASE_URL}/funcionarios/${funcionario.id}`, {
-        method: 'DELETE',
-      });
-      const body = await response.json();
-
-      if (!response.ok) {
-        throw new Error(body.error || `Erro ao eliminar funcionario (${response.status})`);
-      }
-
-      if (editingId === funcionario.id) {
-        resetForm();
-      }
-
-      setSucesso('Funcionario eliminado com sucesso.');
-      await loadData();
-    } catch (e) {
-      setErro(e.message || 'Erro ao eliminar funcionario.');
-    } finally {
-      setLoadingDeleteId(null);
-    }
-  };
-
-  const handleToggleAtivo = async (funcionario) => {
-    const nextAtivo = !funcionario.ativo;
-
-    if (!nextAtivo) {
-      const confirmed = window.confirm(`Desativar "${funcionario.nomeCompleto}"? O funcionario fica visivel, mas marcado como inativo.`);
-      if (!confirmed) {
-        return;
-      }
-    }
-
+  // Helper interno: muda o estado ativo (true ou false) sem confirmação.
+  // Usado directamente para activar; via dialog para desactivar.
+  const aplicarToggleAtivo = async (funcionario, nextAtivo) => {
     setErro('');
     setSucesso('');
     setLoadingStatusId(funcionario.id);
@@ -348,7 +336,13 @@ export default function Funcionarios() {
       const body = await response.json();
 
       if (!response.ok) {
-        throw new Error(body.error || `Erro ao ${nextAtivo ? 'ativar' : 'desativar'} funcionario (${response.status})`);
+        const message = body.error || `Erro ao ${nextAtivo ? 'ativar' : 'desativar'} funcionario (${response.status})`;
+        if (response.status === 409) {
+          setDialogoErroMensagem(message);
+          setDialogoErroAberto(true);
+          return;
+        }
+        throw new Error(message);
       }
 
       setSucesso(nextAtivo ? 'Funcionario ativado com sucesso.' : 'Funcionario desativado com sucesso.');
@@ -360,15 +354,84 @@ export default function Funcionarios() {
     }
   };
 
+  // Activar não requer confirmação.
+  const handleAtivar = (funcionario) => aplicarToggleAtivo(funcionario, true);
+
+  // Desactivar pede confirmação via dialog.
+  const pedirDesativacao = (funcionario) => {
+    setFuncionarioParaDesativar(funcionario);
+    setDialogoDesativarAberto(true);
+  };
+
+  const confirmarDesativacao = async () => {
+    if (!funcionarioParaDesativar) return;
+    const alvo = funcionarioParaDesativar;
+    setDialogoDesativarAberto(false);
+    setFuncionarioParaDesativar(null);
+    await aplicarToggleAtivo(alvo, false);
+  };
+
+  // Eliminar definitivamente (hard delete) pede confirmação via dialog.
+  const pedirEliminacao = (funcionario) => {
+    setFuncionarioParaEliminar(funcionario);
+    setDialogoEliminarAberto(true);
+  };
+
+  const confirmarEliminacao = async () => {
+    if (!funcionarioParaEliminar) return;
+
+    const alvo = funcionarioParaEliminar;
+    setErro('');
+    setSucesso('');
+    setLoadingDeleteId(alvo.id);
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/funcionarios/${alvo.id}`, {
+        method: 'DELETE',
+      });
+      const body = await response.json();
+
+      if (!response.ok) {
+        const message = body.error || `Erro ao eliminar funcionario (${response.status})`;
+        if (response.status === 409) {
+          setDialogoEliminarAberto(false);
+          setFuncionarioParaEliminar(null);
+          setDialogoErroMensagem(message);
+          setDialogoErroAberto(true);
+          return;
+        }
+        throw new Error(message);
+      }
+
+      if (editingId === alvo.id) {
+        resetForm();
+      }
+
+      setSucesso(`Funcionario "${alvo.nomeCompleto}" eliminado com sucesso.`);
+      await loadData();
+      setDialogoEliminarAberto(false);
+      setFuncionarioParaEliminar(null);
+    } catch (e) {
+      setErro(e.message || 'Erro ao eliminar funcionario.');
+      setDialogoEliminarAberto(false);
+      setFuncionarioParaEliminar(null);
+    } finally {
+      setLoadingDeleteId(null);
+    }
+  };
+
   return (
     <Box>
       <Typography variant="h1" sx={{ mb: 1, color: colors.text }}>
         Gestao de Funcionarios
       </Typography>
       <Typography variant="body1" sx={{ mb: 4, color: colors.textSecondary }}>
-        Cria funcionarios com horario de trabalho, contactos, porte de animais e servicos que pode realizar.
+        {isAdmin
+          ? 'Cria funcionarios com horario de trabalho, contactos, porte de animais e servicos que pode realizar.'
+          : 'Consulta a equipa, horarios, especialidades e agendas pessoais.'}
       </Typography>
 
+      {isAdmin && (
       <Paper elevation={2} sx={{ borderRadius: 3, p: 3, mb: 4 }}>
         <Box component="form" onSubmit={handleSubmit} sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
           {sucesso && <Alert severity="success">{sucesso}</Alert>}
@@ -544,6 +607,7 @@ export default function Funcionarios() {
           </Box>
         </Box>
       </Paper>
+      )}
 
       <Paper elevation={2} sx={{ borderRadius: 3, p: 3 }}>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
@@ -560,10 +624,30 @@ export default function Funcionarios() {
         )}
 
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-          {funcionarios.map((f) => (
-            <Paper key={f.id} variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
+          {funcionariosVisiveis.map((f) => (
+            <Paper
+              key={f.id}
+              variant="outlined"
+              onClick={() => {
+                const nomeUrl = encodeURIComponent((f.nomeCompleto || 'funcionario').replace(/\s+/g, '_'));
+                navigate(`/funcionarios/${f.id}/${nomeUrl}`);
+              }}
+              sx={{
+                p: 2,
+                borderRadius: 2,
+                cursor: 'pointer',
+                opacity: f.ativo ? 1 : 0.55,
+                borderStyle: f.ativo ? 'solid' : 'dashed',
+                transition: 'all 0.2s',
+                '&:hover': {
+                  boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                  borderColor: colors.primary,
+                },
+              }}
+            >
               <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2, flexWrap: 'wrap' }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+                  <WorkIcon sx={{ fontSize: 20, color: colors.primary }} />
                   <Typography variant="subtitle1" sx={{ fontWeight: 700, color: colors.text }}>
                     {f.nomeCompleto}
                   </Typography>
@@ -574,37 +658,39 @@ export default function Funcionarios() {
                     sx={{ color: colors.white, fontSize: '11px', height: 24 }}
                   />
                 </Box>
-                <Box sx={{ display: 'flex', gap: 1 }}>
-                  <IconButton
-                    size="small"
-                    onClick={() => handleEdit(f)}
-                    sx={{ color: colors.primary }}
-                    title="Editar funcionario"
-                    aria-label="Editar"
-                  >
-                    <EditIcon fontSize="small" />
-                  </IconButton>
-                  <IconButton
-                    size="small"
-                    disabled={loadingStatusId === f.id}
-                    onClick={() => handleToggleAtivo(f)}
-                    sx={{ color: colors.textSecondary }}
-                    title={f.ativo ? 'Desativar funcionario' : 'Ativar funcionario'}
-                    aria-label={f.ativo ? 'Desativar' : 'Ativar'}
-                  >
-                    {f.ativo ? <BlockIcon fontSize="small" /> : <RestoreIcon fontSize="small" />}
-                  </IconButton>
-                  <IconButton
-                    size="small"
-                    disabled={loadingDeleteId === f.id}
-                    onClick={() => handleDelete(f)}
-                    sx={{ color: colors.textSecondary }}
-                    title="Eliminar funcionario"
-                    aria-label="Eliminar"
-                  >
-                    <DeleteIcon fontSize="small" />
-                  </IconButton>
-                </Box>
+                {isAdmin && (
+                  <Box sx={{ display: 'flex', gap: 1 }}>
+                    <IconButton
+                      size="small"
+                      onClick={(e) => { e.stopPropagation(); handleEdit(f); }}
+                      sx={{ color: colors.primary }}
+                      title="Editar funcionario"
+                      aria-label="Editar"
+                    >
+                      <EditIcon fontSize="small" />
+                    </IconButton>
+                    <IconButton
+                      size="small"
+                      disabled={loadingStatusId === f.id}
+                      onClick={(e) => { e.stopPropagation(); f.ativo ? pedirDesativacao(f) : handleAtivar(f); }}
+                      sx={{ color: colors.textSecondary }}
+                      title={f.ativo ? 'Desativar funcionario' : 'Ativar funcionario'}
+                      aria-label={f.ativo ? 'Desativar' : 'Ativar'}
+                    >
+                      {f.ativo ? <BlockIcon fontSize="small" /> : <RestoreIcon fontSize="small" />}
+                    </IconButton>
+                    <IconButton
+                      size="small"
+                      disabled={loadingDeleteId === f.id}
+                      onClick={(e) => { e.stopPropagation(); pedirEliminacao(f); }}
+                      sx={{ color: colors.textSecondary }}
+                      title="Eliminar funcionario"
+                      aria-label="Eliminar"
+                    >
+                      <DeleteIcon fontSize="small" />
+                    </IconButton>
+                  </Box>
+                )}
               </Box>
               <Typography variant="body2" sx={{ color: colors.textSecondary }}>
                 {enumLabel(cargoOptions, f.cargo)} | {f.email} | {f.telefone}
@@ -625,6 +711,66 @@ export default function Funcionarios() {
           ))}
         </Box>
       </Paper>
+
+      {/* ── DIÁLOGO: DESATIVAR ───────────────────────────────────────────── */}
+      <ConfirmDialog
+        open={dialogoDesativarAberto}
+        title="Desativar Funcionário"
+        message={
+          <>
+            <Typography>
+              Tem a certeza que pretende desativar o funcionário <strong>"{funcionarioParaDesativar?.nomeCompleto}"</strong>?
+            </Typography>
+            <Typography sx={{ mt: 1 }}>
+              O funcionário ficará indisponível para novos agendamentos. Pode reativá-lo a qualquer momento.
+            </Typography>
+            <Typography sx={{ mt: 1, fontSize: '0.875rem', color: 'warning.main' }}>
+              A operação será recusada se existirem agendamentos futuros associados a este funcionário.
+            </Typography>
+          </>
+        }
+        confirmLabel="Desativar"
+        confirmColor="warning"
+        onConfirm={confirmarDesativacao}
+        onClose={() => { setDialogoDesativarAberto(false); setFuncionarioParaDesativar(null); }}
+      />
+
+      {/* ── DIÁLOGO: ELIMINAR DEFINITIVAMENTE (hard delete) ───────────────── */}
+      <ConfirmDialog
+        open={dialogoEliminarAberto}
+        title="Eliminar Funcionário definitivamente"
+        message={
+          <>
+            <Typography>
+              Tem a certeza que pretende eliminar definitivamente o funcionário <strong>"{funcionarioParaEliminar?.nomeCompleto}"</strong>?
+            </Typography>
+            <Typography sx={{ mt: 1 }}>
+              Esta acção remove o funcionário da base de dados — não é reversível.
+            </Typography>
+            <Typography sx={{ mt: 1, fontSize: '0.875rem', color: 'error.main' }}>
+              A operação será recusada se existirem agendamentos (passados ou futuros).
+            </Typography>
+          </>
+        }
+        confirmLabel="Eliminar"
+        confirmColor="error"
+        onConfirm={confirmarEliminacao}
+        onClose={() => { setDialogoEliminarAberto(false); setFuncionarioParaEliminar(null); }}
+      />
+
+      {/* Diálogo modal de erro: backend bloqueou a operação (ex: funcionario com agendamentos futuros). */}
+      <ConfirmDialog
+        open={dialogoErroAberto}
+        title="Não é possível concluir a operação"
+        message={
+          <Typography>{dialogoErroMensagem}</Typography>
+        }
+        confirmLabel="OK"
+        confirmColor="primary"
+        hideCancel
+        onConfirm={() => { setDialogoErroAberto(false); setDialogoErroMensagem(''); }}
+        onClose={() => { setDialogoErroAberto(false); setDialogoErroMensagem(''); }}
+      />
     </Box>
   );
 }

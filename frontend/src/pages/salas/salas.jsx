@@ -9,6 +9,7 @@ import { ConfirmDialog } from '../../components';
 import { useThemeContext } from '../../contexts/ThemeContext';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
+import BlockIcon from '@mui/icons-material/Block';
 import MeetingRoomIcon from '@mui/icons-material/MeetingRoom';
 import CancelIcon from '@mui/icons-material/Cancel';
 import SaveIcon from '@mui/icons-material/Save';
@@ -19,9 +20,19 @@ import TextareaAutosize from "@mui/material/TextareaAutosize";
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
 
+function getStoredUser() {
+    try {
+        return JSON.parse(localStorage.getItem('btUser') || 'null');
+    } catch (_error) {
+        return null;
+    }
+}
+
 export default function Sala() {
     const { colors } = useThemeContext();
     const navigate = useNavigate();
+    const [user] = useState(() => getStoredUser());
+    const isAdmin = user?.tipoConta === 'ADMIN';
 
     const [form, setForm] = useState({
         nome: '',
@@ -45,6 +56,10 @@ export default function Sala() {
     // Estado para o diálogo de confirmação
     const [dialogoInativarAberto, setDialogoInativarAberto] = useState(false);
     const [salaParaInativar, setSalaParaInativar] = useState(null);
+
+    // Estado para o diálogo de eliminação definitiva (hard delete)
+    const [dialogoEliminarAberto, setDialogoEliminarAberto] = useState(false);
+    const [salaParaEliminar, setSalaParaEliminar] = useState(null);
 
     // Diálogo de erro modal (BET-180): quando o backend devolve 409 ao tentar inativar uma sala com agendamentos futuros
     const [dialogoErroAberto, setDialogoErroAberto] = useState(false);
@@ -111,11 +126,12 @@ export default function Sala() {
 
     // Salas ordenadas: ativas primeiro, inativas no final
     const salasOrdenadas = useMemo(() => {
-        return [...salas].sort((a, b) => {
+        const visiveis = isAdmin ? salas : salas.filter((sala) => sala.ativo);
+        return [...visiveis].sort((a, b) => {
             if (a.ativo === b.ativo) return a.nome.localeCompare(b.nome);
             return a.ativo ? -1 : 1;
         });
-    }, [salas]);
+    }, [salas, isAdmin]);
 
     const toggleServico = (id) => {
         setServicosSelecionados(prev =>
@@ -332,16 +348,71 @@ export default function Sala() {
         setSalaParaInativar(null);
     };
 
+    // Abrir diálogo de confirmação para eliminar definitivamente (hard delete)
+    const pedirEliminacao = (sala) => {
+        setSalaParaEliminar(sala);
+        setDialogoEliminarAberto(true);
+    };
+
+    // Confirmar e eliminar definitivamente (hard delete via DELETE /salas/:id/permanente)
+    const eliminarSala = async () => {
+        if (!salaParaEliminar) return;
+
+        try {
+            const res = await fetch(`${API_BASE_URL}/salas/${salaParaEliminar.id}/permanente`, {
+                method: 'DELETE',
+            });
+
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({}));
+                const message = err.error || 'Erro ao eliminar sala.';
+
+                // 409 = registos associados (agendamentos) — abrir dialog modal de erro
+                if (res.status === 409) {
+                    setDialogoEliminarAberto(false);
+                    setSalaParaEliminar(null);
+                    setDialogoErroMensagem(message);
+                    setDialogoErroAberto(true);
+                    return;
+                }
+
+                throw new Error(message);
+            }
+
+            if (modoEdicao && idSalaEmEdicao === salaParaEliminar.id) {
+                resetForm();
+            }
+
+            await carregarSalas();
+            setSucesso(`Sala "${salaParaEliminar.nome}" eliminada com sucesso.`);
+            setDialogoEliminarAberto(false);
+            setSalaParaEliminar(null);
+        } catch (err) {
+            setErro(err.message);
+            setDialogoEliminarAberto(false);
+            setSalaParaEliminar(null);
+        }
+    };
+
+    // Fechar diálogo de eliminação
+    const fecharDialogoEliminar = () => {
+        setDialogoEliminarAberto(false);
+        setSalaParaEliminar(null);
+    };
+
     return (
         <Box>
             <Typography variant="h1" sx={{ mb: 1, color: colors.text }}>
                 Gestão de Salas
             </Typography>
             <Typography variant="body1" sx={{ mb: 4, color: colors.textSecondary }}>
-                Criar novas salas com nome, capacidade, equipamento, serviços associados e preço por hora.
+                {isAdmin
+                    ? 'Criar novas salas com nome, capacidade, equipamento, servicos associados e preco por hora.'
+                    : 'Consulta salas, servicos compativeis e agendas de disponibilidade.'}
             </Typography>
 
             {/* Formulário de criação/edição */}
+            {isAdmin && (
             <Paper elevation={2} sx={{ borderRadius: 3, p: 3, mb: 4 }}>
                 <Box component="form" onSubmit={submeter} noValidate sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                     {sucesso && <Alert severity="success">{sucesso}</Alert>}
@@ -501,6 +572,8 @@ export default function Sala() {
                 </Box>
             </Paper>
 
+            )}
+
             {/* Lista de salas existentes */}
             <Paper elevation={2} sx={{ borderRadius: 3, p: 3 }}>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
@@ -576,6 +649,7 @@ export default function Sala() {
                                     </Box>
                                 </Box>
 
+                                {isAdmin && (
                                 <Box sx={{ display: 'flex', gap: 1 }}>
                                     <IconButton
                                         size="small"
@@ -591,11 +665,22 @@ export default function Sala() {
                                             onClick={(e) => { e.stopPropagation(); pedirInativacao(sala); }}
                                             sx={{ color: colors.textSecondary }}
                                             title="Inativar sala"
+                                            aria-label="Desativar"
                                         >
-                                            <DeleteIcon fontSize="small" />
+                                            <BlockIcon fontSize="small" />
                                         </IconButton>
                                     )}
+                                    <IconButton
+                                        size="small"
+                                        onClick={(e) => { e.stopPropagation(); pedirEliminacao(sala); }}
+                                        sx={{ color: colors.textSecondary }}
+                                        title="Eliminar sala"
+                                        aria-label="Eliminar"
+                                    >
+                                        <DeleteIcon fontSize="small" />
+                                    </IconButton>
                                 </Box>
+                                )}
                             </Box>
                         </Paper>
                     ))}
@@ -613,12 +698,39 @@ export default function Sala() {
                         <Typography sx={{ mt: 1 }}>
                             A sala ficará indisponível para novos agendamentos. Pode reativá-la a qualquer momento através do botão de edição.
                         </Typography>
+                        <Typography sx={{ mt: 1, fontSize: '0.875rem', color: 'warning.main' }}>
+                            A operação será recusada se existirem agendamentos futuros associados a esta sala.
+                        </Typography>
                     </>
                 }
                 confirmLabel="Inativar"
                 confirmColor="warning"
                 onConfirm={inativarSala}
                 onClose={fecharDialogo}
+            />
+
+            {/* Diálogo de eliminação definitiva (hard delete). A operação é
+                recusada pelo backend se existirem registos associados (FK). */}
+            <ConfirmDialog
+                open={dialogoEliminarAberto}
+                title="Eliminar Sala definitivamente"
+                message={
+                    <>
+                        <Typography>
+                            Tem a certeza que pretende eliminar definitivamente a sala <strong>"{salaParaEliminar?.nome}"</strong>?
+                        </Typography>
+                        <Typography sx={{ mt: 1 }}>
+                            Esta acção remove a sala da base de dados — não é reversível.
+                        </Typography>
+                        <Typography sx={{ mt: 1, fontSize: '0.875rem', color: 'error.main' }}>
+                            A operação será recusada se existirem agendamentos (passados ou futuros) que tenham usado esta sala.
+                        </Typography>
+                    </>
+                }
+                confirmLabel="Eliminar"
+                confirmColor="error"
+                onConfirm={eliminarSala}
+                onClose={fecharDialogoEliminar}
             />
 
             {/* BET-180: diálogo modal de erro quando o backend bloqueia a inativação

@@ -12,6 +12,7 @@ const {
   createTipoServico,
   updateTipoServico,
   deleteTipoServico,
+  hardDeleteTipoServico,
   reativarTipoServico,
   getAllRegrasPreco,
   createRegraPreco,
@@ -23,6 +24,7 @@ const {
   createSala,
   updateSala,
   deleteSala,
+  hardDeleteSala,
   addServicoToSala,
   getServicosBySala,
   removeServicoFromSala,
@@ -1153,6 +1155,28 @@ app.delete("/servicos/:id", async (req, res) => {
   }
 });
 
+app.delete("/servicos/:id/permanente", async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const result = await hardDeleteTipoServico(id);
+
+    if (!result) {
+      return res.status(404).json({ error: "Servico nao encontrado" });
+    }
+
+    return res.json(result);
+  } catch (error) {
+    console.error("Failed to hard delete servico:", error);
+
+    if (error.message?.startsWith("Nao e possivel eliminar definitivamente")) {
+      return res.status(409).json({ error: error.message });
+    }
+
+    return res.status(500).json({ error: "Failed to hard delete servico" });
+  }
+});
+
 /**
  * @swagger
  * /servicos/{id}/reativar:
@@ -1639,6 +1663,27 @@ app.delete("/salas/:id", async (req, res) => {
     }
 
     return res.status(500).json({ error: "Erro ao eliminar a sala" });
+  }
+});
+
+app.delete("/salas/:id/permanente", async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const result = await hardDeleteSala(id);
+    if (!result) {
+      return res.status(404).json({ error: "Sala nao encontrada" });
+    }
+
+    return res.json(result);
+  } catch (error) {
+    console.error("Erro ao eliminar definitivamente a sala:", error);
+
+    if (error.message?.startsWith("Nao e possivel eliminar definitivamente")) {
+      return res.status(409).json({ error: error.message });
+    }
+
+    return res.status(500).json({ error: "Erro ao eliminar definitivamente a sala" });
   }
 });
 
@@ -2268,6 +2313,12 @@ app.patch("/funcionarios/:id/ativo", async (req, res) => {
     return res.json(funcionarioAtualizado);
   } catch (error) {
     console.error("Failed to update funcionario active status:", error);
+
+    // 409 Conflict se o funcionario tiver agendamentos futuros activos
+    if (error.code === "FUNCIONARIO_TEM_AGENDAMENTOS_FUTUROS") {
+      return res.status(409).json({ error: error.message });
+    }
+
     return res.status(400).json({ error: error.message });
   }
 });
@@ -2330,6 +2381,12 @@ app.delete("/funcionarios/:id", async (req, res) => {
     return res.json(result);
   } catch (error) {
     console.error("Failed to delete funcionario:", error);
+
+    // 409 Conflict se houver registos associados (FK violation) — coerente com salas e servicos
+    if (error.message?.startsWith("Nao e possivel eliminar definitivamente")) {
+      return res.status(409).json({ error: error.message });
+    }
+
     return res.status(400).json({ error: error.message || "Failed to delete funcionario" });
   }
 });

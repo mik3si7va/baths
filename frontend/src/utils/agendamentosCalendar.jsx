@@ -12,6 +12,7 @@ import { Box, Typography } from '@mui/material';
 // e adicionar uma entrada em COR_POR_ESTADO (senão cai no fallback de CONFIRMADO em mapAgendamentosToEvents).
 export const ESTADOS_VISIVEIS = ['CONFIRMADO', 'EM_ATENDIMENTO', 'CONCLUIDO'];
 
+// As cores são diferentes de B&T para facilitar a identificação visual do estado do agendamento.
 // ajustes:
 // Cor de fundo (bg) + borda por estado do agendamento.
 // Cores alinhadas com os semantics do MUI (primary/warning/success).

@@ -12,7 +12,8 @@ import { ThemeProvider } from "../contexts/ThemeContext";
 
 let consoleErrorSpy;
 
-function renderServicos() {
+function renderServicos(user = { id: "admin-1", tipoConta: "ADMIN" }) {
+  localStorage.setItem("btUser", JSON.stringify(user));
   return render(
     <ThemeProvider>
       <ServicosPage />
@@ -122,9 +123,11 @@ describe("ServicosPage — carregamento inicial", () => {
   });
   beforeEach(() => {
     global.fetch = jest.fn();
+    localStorage.clear();
   });
   afterEach(() => {
     jest.resetAllMocks();
+    localStorage.clear();
   });
   afterAll(() => {
     consoleErrorSpy.mockRestore();
@@ -173,6 +176,17 @@ describe("ServicosPage — carregamento inicial", () => {
     expect(allText.indexOf("Corte de unhas")).toBeLessThan(
       allText.indexOf("Banho antigo"),
     );
+  });
+
+  test("funcionario ve lista mas nao ve formulario nem botoes de gestao", async () => {
+    mockDefaultFetch([SERVICO_ATIVO_MOCK, SERVICO_INATIVO_MOCK]);
+    renderServicos({ id: "func-1", tipoConta: "FUNCIONARIO" });
+
+    expect(await screen.findByText("Corte de unhas")).toBeInTheDocument();
+    expect(screen.queryByText("Banho antigo")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Criar Serviço/i })).not.toBeInTheDocument();
+    expect(screen.queryByTitle("Editar serviço")).not.toBeInTheDocument();
+    expect(screen.queryByTitle("Inativar serviço")).not.toBeInTheDocument();
   });
 });
 
@@ -579,6 +593,7 @@ describe("ServicosPage — inativar serviço", () => {
   });
   beforeEach(() => {
     global.fetch = jest.fn();
+    window.confirm = jest.fn(() => true);
   });
   afterEach(() => {
     jest.resetAllMocks();
@@ -722,6 +737,37 @@ describe("ServicosPage — inativar serviço", () => {
     renderServicos();
     await screen.findByText("Banho antigo");
     expect(screen.queryByTitle("Inativar serviço")).not.toBeInTheDocument();
+  });
+
+  test("eliminar serviço abre dialogo e chama endpoint permanente", async () => {
+    global.fetch
+      .mockImplementationOnce(() => mockJsonResponse([SERVICO_ATIVO_MOCK]))
+      .mockImplementationOnce(() => mockJsonResponse([REGRA_MOCK]))
+      .mockImplementationOnce(() =>
+        mockJsonResponse({ removed: true, id: SERVICO_ATIVO_MOCK.id }),
+      )
+      .mockImplementationOnce(() => mockJsonResponse([]))
+      .mockImplementationOnce(() => mockJsonResponse([]));
+
+    renderServicos();
+    await screen.findByText("Corte de unhas");
+    fireEvent.click(getButtonInCard("Corte de unhas", "Eliminar serviço"));
+
+    expect(
+      await screen.findByText("Eliminar Serviço definitivamente"),
+    ).toBeInTheDocument();
+
+    await userEvent.click(await screen.findByTestId("confirm-dialog-confirm"));
+
+    await waitFor(() =>
+      expect(
+        screen.getByText(/Serviço "Corte de unhas" eliminado com sucesso/i),
+      ).toBeInTheDocument(),
+    );
+
+    const deleteCall = global.fetch.mock.calls[2];
+    expect(deleteCall[0]).toContain(`/servicos/${SERVICO_ATIVO_MOCK.id}/permanente`);
+    expect(deleteCall[1].method).toBe("DELETE");
   });
 });
 
