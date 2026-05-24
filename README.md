@@ -1,9 +1,8 @@
-# 🛁✂️ Baths & Trims — Project Backbone
+# 🛁✂️ Baths & Trims
 
-Este repositório contém o backbone inicial do projeto Baths & Trims.
-O objetivo não é entregar uma app final, mas sim fornecer uma base sólida sobre a qual o resto do trabalho vai evoluir.
+Sistema de gestão para uma clínica/spa de banhos e tosquias. Permite registar clientes e animais, marcar e gerir agendamentos (criar, reagendar, cancelar, marcar não-comparência, atender), faturar serviços prestados e consultar histórico.
 
-Pensa nisto como o chassis do projeto: rotas, autenticação fake, layout base e organização geral.
+A orquestração dos fluxos críticos (criação de agendamento, ciclo de vida do atendimento, faturação) é feita por processos BPMN no **Camunda 7**; o backend Node/Express expõe a API REST e fala com Postgres via Prisma; o frontend React serve o backoffice.
 
 ## Elementos da equipa
 
@@ -56,47 +55,29 @@ FRONTEND_BASE_URL=http://localhost:3000
 Em desenvolvimento, se `DISABLE_EMAILS=true`, o email nao e enviado e o link continua a aparecer na pagina para testes. Para enviar pelo Mailtrap/SMTP, muda para `DISABLE_EMAILS=false` e reinicia o backend.
 
 ## 🧭 Estrutura geral do projeto
+
 ```
-src/
- ├─ pages/
- │   ├─ home/
- │   │   ├─ home.js
- │   │   └─ home.css
- │   ├─ login/
- │   │   ├─ login.js
- │   │   └─ login.css
+baths/
+ ├─ backend/                  # Node/Express + Prisma + Postgres
+ │   ├─ prisma/               # schema, migrações, seed
+ │   └─ src/
+ │       ├─ repositories/     # acesso a dados (Prisma)
+ │       ├─ __tests__/        # Jest + supertest
+ │       └─ server.js         # routing REST + Swagger
  │
- ├─ routes.js  // definição das rotas + guards
- ├─ App.js
- ├─ index.js
- ```
-
-## 📌 Onde mexer
-
-Home page: src/pages/home
-
-Login page: src/pages/login
-
-Rotas / Guards: src/routes.js
-
-## 🛡️ Sistema de Rotas
-
-O projeto já inclui:
-
-- Rotas públicas:
-    - /login
-    - Se não estiver autenticado → mostra login
-    - Se já estiver autenticado → redireciona para /home
-- Rotas privadas:
-    - /home
-    - Só acessível se estiver autenticado
-    - Caso contrário → redireciona para /login
-
-Este comportamento está implementado em:
-- PrivateRoute
-- PublicLoginRoute
-
-no ficheiro routes.js.
+ ├─ frontend/                 # React (Create React App)
+ │   └─ src/
+ │       ├─ pages/            # uma pasta por área (calendar, agendamentos, faturas, clientes, ...)
+ │       ├─ components/       # dialogs, forms e widgets partilhados
+ │       ├─ utils/            # helpers puros (calendar, filtros, camundaWizard)
+ │       └─ routes.jsx        # mapa de rotas + guards (Private/Admin)
+ │
+ └─ camunda/                  # workflows BPMN + workers external task
+     ├─ workflows/            # .bpmn (agendamento, gestao_agendamento, sub_*)
+     └─ workers/
+         ├─ services/         # lógica de domínio (Prisma)
+         └─ workers/          # 1 ficheiro por topic, prefixado pela ordem no BPMN
+```
 
 ## ⚠️ Regras simples (importantes)
 
@@ -106,37 +87,9 @@ Para manter o projeto estável:
 
 - PR obrigatório para merge
 
-- Não mexer em routes.js sem avisar a equipa
+- Não mexer em `routes.jsx` (mapa de rotas) sem avisar a equipa
 
 Estas regras evitam conflitos e retrabalho.
-
-## 🎯 Objetivo desta fase
-
-Nesta fase o foco é:
-
-- Perceber a estrutura do projeto
-
-- Entender o fluxo de login → home
-
-- Explorar o código existente
-
-Não é esperado que tudo seja alterado de imediato.
-
-Primeiro “sink in”, depois evoluímos.
-
-## 🧠 Nota final
-
-Este backbone existe para:
-
-- Evitar começar do zero
-
-- Garantir que todos trabalham sobre a mesma base
-
-- Permitir evolução progressiva do projeto
-
-Mais funcionalidades virão de forma incremental.
-
-Boa exploração 👀🚀
 
 ## Docker + Camunda (guia rapido)
 
@@ -206,7 +159,7 @@ Na raiz do projeto (`\baths`):
 Nota: `npm run prisma:pull` fica apenas para introspecao pontual, nao faz parte do fluxo normal de migracoes.
 
 Backend API:
-- `http://localhost:5000/events`
+- `http://localhost:5000` (Swagger em `http://localhost:5000/api-docs`)
 
 ### Prisma Studio (interface grafica da BD)
 Na pasta `backend`:
@@ -257,18 +210,14 @@ Na pasta `frontend`:
 
 Não requerem backend nem base de dados a correr.
 
-### Testes de Aceitação (E2E)
+### Integração end-to-end de workflows Camunda
 
-Os testes de aceitação usam **Cypress** e testam fluxos completos no browser com o backend e frontend a correr.
+A pasta `camunda/` inclui o `test-single.mjs` que arranca o motor e exercita end-to-end o fluxo de criação de agendamento (`agendamento.bpmn`) seguido de **um** dos 4 caminhos do `gestao_agendamento.bpmn` — `ATENDER`, `CANCELAR`, `NAO_COMPARECEU` ou `REAGENDAR`. O caminho a testar selecciona-se na constante `GESTAO_ACCAO` no topo do ficheiro `camunda/test-single.mjs`; para cobrir todos basta alterar a constante e voltar a correr.
 
-Na pasta `frontend`:
-`npm run cypress:open`   # abre interface gráfica (desenvolvimento local)
-`npm run cypress:run`    # corre em modo headless (CI)
+Na raiz do projeto:
+`npm run camunda:test-single`
 
-**Requisitos antes de correr os testes E2E:**
-1. Backend a correr (`npm start` na pasta `backend`)
-2. Frontend a correr (`npm start` na pasta `frontend`)
-3. Ficheiro `.env` do backend com `NODE_ENV=test` (ver `.env.example`)
+Requer Camunda + Postgres a correr (`npm run camunda:boot` na raiz).
 
 
 ## Integração Contínua (CI)
