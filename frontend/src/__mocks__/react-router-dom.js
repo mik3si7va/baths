@@ -58,6 +58,8 @@ const Route = ({ element }) => element;
 // Hooks
 const useParams = () => {
     const patterns = [
+        '/funcionarios/:id/:nome',
+        '/funcionarios/:id',
         '/salas/:id/:nome',
         '/salas/:id',
         '/:id/:nome',

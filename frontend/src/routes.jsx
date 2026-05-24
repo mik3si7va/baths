@@ -12,6 +12,7 @@ import {
   Salas,
   SalaDetalhes,
   Funcionarios,
+  FuncionarioDetalhes,
   Contas,
   Perfil,
   Pesquisa,
@@ -181,6 +182,18 @@ export default function AppRoutes() {
               element={
                 <CompactLayout>
                   <Funcionarios />
+                </CompactLayout>
+              }
+            />
+          }
+        />
+        <Route
+          path="/funcionarios/:id/:nome"
+          element={
+            <AdminRoute
+              element={
+                <CompactLayout showBack>
+                  <FuncionarioDetalhes />
                 </CompactLayout>
               }
             />

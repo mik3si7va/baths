@@ -6,6 +6,7 @@ export { default as Calendar } from './calendar/calendar';
 export { default as Salas } from './salas/salas';
 export { default as SalaDetalhes } from './salas/salaDetalhes';
 export { default as Funcionarios } from './admin/manageUsers/funcionarios';
+export { default as FuncionarioDetalhes } from './admin/manageUsers/funcionarioDetalhes';
 export { default as Contas } from './contas/contas';
 export { default as Perfil } from './perfil/perfil';
 export { default as Pesquisa } from './pesquisa/pesquisa';

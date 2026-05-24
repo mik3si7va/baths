@@ -4,6 +4,7 @@ import AppRoutes from "../routes";
 import { ThemeProvider } from "../contexts/ThemeContext";
 
 jest.mock("../pages/contas/contas", () => () => <div>Contas Admin Page</div>);
+jest.mock("../pages/admin/manageUsers/funcionarioDetalhes", () => () => <div>Funcionario Detalhes Page</div>);
 jest.mock("../pages/home/home", () => () => <div>Home Page</div>);
 jest.mock("../App", () => () => <div>Landing Page</div>);
 
@@ -36,5 +37,11 @@ describe("AppRoutes authorization", () => {
     renderRoutes("/contas", { id: "admin-1", tipoConta: "ADMIN" });
 
     expect(screen.getByText("Contas Admin Page")).toBeInTheDocument();
+  });
+
+  test("permite rota de detalhe do funcionario para admin", () => {
+    renderRoutes("/funcionarios/f-1/Sofia_Ramalho", { id: "admin-1", tipoConta: "ADMIN" });
+
+    expect(screen.getByText("Funcionario Detalhes Page")).toBeInTheDocument();
   });
 });

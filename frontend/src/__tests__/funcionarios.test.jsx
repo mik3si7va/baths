@@ -5,6 +5,11 @@ import Funcionarios from "../pages/admin/manageUsers/funcionarios";
 import { ThemeProvider } from "../contexts/ThemeContext";
 
 let consoleErrorSpy;
+const mockNavigate = jest.fn();
+
+jest.mock("react-router-dom", () => ({
+  useNavigate: () => mockNavigate,
+}));
 
 function renderFuncionarios() {
   return render(
@@ -57,6 +62,7 @@ describe("Funcionarios page", () => {
   beforeEach(() => {
     global.fetch = jest.fn();
     window.confirm = jest.fn(() => true);
+    mockNavigate.mockClear();
   });
 
   afterEach(() => {
@@ -474,5 +480,73 @@ describe("Funcionarios page", () => {
     expect(patchCall[0]).toBe("http://localhost:5000/funcionarios/f-1/ativo");
     expect(patchCall[1].method).toBe("PATCH");
     expect(JSON.parse(patchCall[1].body)).toEqual({ ativo: false });
+  });
+
+  test("clicar no card do funcionario navega para a agenda pessoal", async () => {
+    global.fetch
+      .mockImplementationOnce(() => mockJsonResponse(mockOpcoes))
+      .mockImplementationOnce(() =>
+        mockJsonResponse([{ id: "srv-1", tipo: "BANHO" }]),
+      )
+      .mockImplementationOnce(() =>
+        mockJsonResponse([
+          {
+            id: "f-1",
+            nomeCompleto: "Sofia Ramalho",
+            cargo: "BANHISTA",
+            telefone: "912345678",
+            email: "sofia.r@bet.com",
+            ativo: true,
+            horariosTrabalho: [{ diasSemana: ["TERCA"] }],
+            servicos: [{ tipoServicoId: "srv-1", tipo: "BANHO" }],
+          },
+        ]),
+      );
+
+    renderFuncionarios();
+
+    const nome = await screen.findByText("Sofia Ramalho");
+    fireEvent.click(nome.closest(".MuiPaper-root"));
+
+    expect(mockNavigate).toHaveBeenCalledWith("/funcionarios/f-1/Sofia_Ramalho");
+  });
+
+  test("clicar no botao editar nao navega para a agenda pessoal", async () => {
+    global.fetch
+      .mockImplementationOnce(() => mockJsonResponse(mockOpcoes))
+      .mockImplementationOnce(() =>
+        mockJsonResponse([{ id: "srv-1", tipo: "BANHO" }]),
+      )
+      .mockImplementationOnce(() =>
+        mockJsonResponse([
+          {
+            id: "f-1",
+            nomeCompleto: "Sofia Ramalho",
+            cargo: "BANHISTA",
+            telefone: "912345678",
+            email: "sofia.r@bet.com",
+            porteAnimais: ["MEDIO"],
+            ativo: true,
+            horariosTrabalho: [
+              {
+                diasSemana: ["TERCA"],
+                horaInicio: "09:00",
+                horaFim: "18:00",
+                pausaInicio: "13:00",
+                pausaFim: "14:00",
+              },
+            ],
+            servicos: [{ tipoServicoId: "srv-1", tipo: "BANHO" }],
+          },
+        ]),
+      );
+
+    renderFuncionarios();
+
+    await screen.findByText("Sofia Ramalho");
+    await userEvent.click(screen.getByRole("button", { name: "Editar" }));
+
+    expect(mockNavigate).not.toHaveBeenCalled();
+    expect(screen.getByDisplayValue("Sofia Ramalho")).toBeInTheDocument();
   });
 });

@@ -7,16 +7,20 @@ Pensa nisto como o chassis do projeto: rotas, autenticação fake, layout base e
 
 ## Elementos da equipa
 
-- Gonçalo Rodrigues as "Gonçalo_Rodrigues | Goncalo-Dias-Rodrigues"
+- Ariadna MA (all rise for the SCRUM_MASTER)
+- Gonçalo Rodrigues as Goncalo-Dias-Rodrigues as devOps_Engineer 
+- Mik3si7va as mik3si7va as tech_Lead
+- Catarina (kitty) Casanova as product_Owner
+
 
 ## 🚀 Como correr o projeto
 
 1. Clonar o repositório
     - git clone "repo-url"
-2. Instalar dependências
-    - npm install
-3. Iniciar o projeto
-    - npm start
+2. Instalar dependências (on root)
+    - npm run install:all
+3. Iniciar o projeto (on root)
+    - npm run project
 
 
 O projeto corre por defeito em:

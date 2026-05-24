@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Alert,
   Box,
@@ -19,6 +20,7 @@ import BlockIcon from '@mui/icons-material/Block';
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
 import RestoreIcon from '@mui/icons-material/Restore';
+import WorkIcon from '@mui/icons-material/Work';
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
 
@@ -76,6 +78,7 @@ const initialForm = {
 
 export default function Funcionarios() {
   const { colors } = useThemeContext();
+  const navigate = useNavigate();
 
   const [form, setForm] = useState(initialForm);
   const [cargoOptions, setCargoOptions] = useState(DEFAULT_CARGO_OPTIONS);
@@ -561,9 +564,29 @@ export default function Funcionarios() {
 
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
           {funcionarios.map((f) => (
-            <Paper key={f.id} variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
+            <Paper
+              key={f.id}
+              variant="outlined"
+              onClick={() => {
+                const nomeUrl = encodeURIComponent((f.nomeCompleto || 'funcionario').replace(/\s+/g, '_'));
+                navigate(`/funcionarios/${f.id}/${nomeUrl}`);
+              }}
+              sx={{
+                p: 2,
+                borderRadius: 2,
+                cursor: 'pointer',
+                opacity: f.ativo ? 1 : 0.55,
+                borderStyle: f.ativo ? 'solid' : 'dashed',
+                transition: 'all 0.2s',
+                '&:hover': {
+                  boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                  borderColor: colors.primary,
+                },
+              }}
+            >
               <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2, flexWrap: 'wrap' }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+                  <WorkIcon sx={{ fontSize: 20, color: colors.primary }} />
                   <Typography variant="subtitle1" sx={{ fontWeight: 700, color: colors.text }}>
                     {f.nomeCompleto}
                   </Typography>
@@ -577,7 +600,7 @@ export default function Funcionarios() {
                 <Box sx={{ display: 'flex', gap: 1 }}>
                   <IconButton
                     size="small"
-                    onClick={() => handleEdit(f)}
+                    onClick={(e) => { e.stopPropagation(); handleEdit(f); }}
                     sx={{ color: colors.primary }}
                     title="Editar funcionario"
                     aria-label="Editar"
@@ -587,7 +610,7 @@ export default function Funcionarios() {
                   <IconButton
                     size="small"
                     disabled={loadingStatusId === f.id}
-                    onClick={() => handleToggleAtivo(f)}
+                    onClick={(e) => { e.stopPropagation(); handleToggleAtivo(f); }}
                     sx={{ color: colors.textSecondary }}
                     title={f.ativo ? 'Desativar funcionario' : 'Ativar funcionario'}
                     aria-label={f.ativo ? 'Desativar' : 'Ativar'}
@@ -597,7 +620,7 @@ export default function Funcionarios() {
                   <IconButton
                     size="small"
                     disabled={loadingDeleteId === f.id}
-                    onClick={() => handleDelete(f)}
+                    onClick={(e) => { e.stopPropagation(); handleDelete(f); }}
                     sx={{ color: colors.textSecondary }}
                     title="Eliminar funcionario"
                     aria-label="Eliminar"
